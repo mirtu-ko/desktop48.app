@@ -22,7 +22,7 @@ interface Item {
   member: Member
 }
 
-const props = defineProps<{ item: Item }>()
+defineProps<{ item: Item }>()
 </script>
 
 <template>

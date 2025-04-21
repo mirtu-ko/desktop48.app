@@ -14,6 +14,7 @@ export interface mainAPI {
   netRequest: (options: NetRequestOptions) => Promise<any>
 
   // 团队与分组
+  saveMemberData: (content: any) => Promise<any>
   getTeamOptions: () => Promise<Array<{ label: string, value: number }>>
   getGroupOptions: () => Promise<Array<{ label: string, value: number }>>
   getTeam: (teamId: number) => Promise<any>
@@ -25,13 +26,15 @@ export interface mainAPI {
   getMemberOptions: () => Promise<Array<{ label: string, value: number }>>
   getHiddenMembers: () => Promise<any>
   setHiddenMembers: (ids: number[]) => Promise<any>
-  getConfig: (key: string, defaultValue: any) => Promise<any>
+  removeHiddenMember: (userId: number) => Promise<any>
+  getConfig: (key: string, defaultValue?: any) => Promise<any>
   setConfig: (key: string, value: any) => Promise<any>
   getDownloadDir: () => Promise<any>
   setFfmpegDir: (dir: string) => Promise<any>
 
   // 文件夹目录
   showItemInFolder: (filePath: string) => Promise<any>
+  checkFfmpegBinaries: (dir: string) => Promise<any>
   getDesktopPath: () => Promise<any>
   selectDirectory: () => Promise<any>
 

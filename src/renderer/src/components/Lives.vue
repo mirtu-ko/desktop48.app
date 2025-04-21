@@ -6,7 +6,6 @@ import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
 import RecordTask from '../assets/js/record-task'
-import { store } from '../assets/js/store'
 import Tools from '../assets/js/tools'
 import LiveItem from '../components/LiveItem.vue'
 
@@ -19,20 +18,21 @@ const router = useRouter()
 const disabled = computed(() => loading.value || noMore.value)
 
 const filteredLiveList = computed(() => {
-  return liveList.value.filter((item: any) => {
-    return !store.hiddenMemberIds.some((memberId: number) => item.userInfo.userId == memberId)
+  return liveList.value.filter(async (item: any) => {
+    const hiddenMembers = await window.mainAPI.getHiddenMembers()
+    return hiddenMembers.some((member: any) => item.userInfo.userId == member.userId)
   })
 })
 // 保留原二维分组逻辑供其它地方使用
-const listAfterHandle = computed(() => {
-  const list = filteredLiveList.value
-  const rowCount = Math.ceil(list.length / Constants.LIST_COL)
-  const data: any[] = []
-  for (let i = 0; i < rowCount; i++) {
-    data[i] = list.slice(i * Constants.LIST_COL, (i + 1) * Constants.LIST_COL)
-  }
-  return data
-})
+// const listAfterHandle = computed(() => {
+//   const list = filteredLiveList.value
+//   const rowCount = Math.ceil(list.length / Constants.LIST_COL)
+//   const data: any[] = []
+//   for (let i = 0; i < rowCount; i++) {
+//     data[i] = list.slice(i * Constants.LIST_COL, (i + 1) * Constants.LIST_COL)
+//   }
+//   return data
+// })
 
 async function getLiveList() {
   console.log('[Lives.vue] getLiveList 方法开始执行')

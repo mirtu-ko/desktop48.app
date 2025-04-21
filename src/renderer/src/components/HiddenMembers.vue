@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { computed, ref } from 'vue'
-import { mutations, store } from '../assets/js/store'
+import { onMounted, ref } from 'vue'
 
 // 所有成员
 const members = ref<any[]>([])
@@ -10,25 +9,20 @@ window.mainAPI.getMemberOptions().then((options: any[]) => {
 })
 const selectedMember = ref<any[]>([])
 
-const hiddenMembers = computed(() => {
-  const membersList: any[] = store.hiddenMemberIds.map((memberId: number) => {
-    return window.mainAPI.getMember(memberId).then((member: any) => {
-      member.team = window.mainAPI.getTeam(member.teamId).then((team: any) => {
-        team.teamColor = team.teamColor == '' ? '#409eff' : `#${team.teamColor}`
-        return team
-      })
-      return member
-    })
-  })
-  return Promise.all(membersList)
+// 屏蔽成员
+const hiddenMembers = ref<any[]>([])
+
+onMounted(async () => {
+  hiddenMembers.value = await window.mainAPI.getHiddenMembers()
+  console.log('hiddenMembers', hiddenMembers.value)
 })
 
 function clear() {
-  mutations.setHiddenMemberIds([])
   window.mainAPI.setHiddenMembers([])
 }
 
-function addHiddenMember() {
+async function addHiddenMember() {
+  console.log(selectedMember.value)
   if (typeof selectedMember.value[2] === 'undefined') {
     ElMessage({
       message: '请选中需要屏蔽的成员',
@@ -36,7 +30,7 @@ function addHiddenMember() {
     })
     return
   }
-  const exists = store.hiddenMemberIds.some((memberId: number) => memberId == selectedMember.value[2])
+  const exists = hiddenMembers.value.some((member: any) => member.userId == selectedMember.value[2])
   if (exists) {
     ElMessage({
       message: '请勿重复添加',
@@ -44,22 +38,17 @@ function addHiddenMember() {
     })
     return
   }
-  const member: any = window.mainAPI.getMember(selectedMember.value[2]).then((member: any) => {
-    member.team = window.mainAPI.getTeam(member.teamId).then((team: any) => {
-      team.teamColor = team.teamColor == '' ? '#409eff' : `#${team.teamColor}`
-      return team
-    })
-    return member
-  })
-  const tempIds = Array.from(store.hiddenMemberIds)
-  tempIds.push(member.userId)
-  mutations.setHiddenMemberIds(tempIds)
+  const tempIds = Array.from(hiddenMembers.value.map((m: any) => m.userId))
+  tempIds.push(selectedMember.value[2])
   window.mainAPI.setHiddenMembers(tempIds)
+  console.log(tempIds)
   selectedMember.value = []
+  hiddenMembers.value = await window.mainAPI.getHiddenMembers()
 }
 
-function removeHiddenMember(memberId: number) {
-  mutations.setHiddenMemberIds(store.hiddenMemberIds.filter((item: number) => item != memberId))
+async function removeHidMember(memberId: number) {
+  await window.mainAPI.removeHiddenMember(memberId)
+  hiddenMembers.value = await window.mainAPI.getHiddenMembers()
 }
 </script>
 
@@ -79,9 +68,11 @@ function removeHiddenMember(memberId: number) {
 
     <div style="margin-top: 8px;">
       <el-tag
-        v-for="member in hiddenMembers" :key="member.userId"
-        :style="{ color: 'white', borderColor: member.team.teamColor, marginRight: '8px' }" :name="member.userId"
-        closable :color="member.team.teamColor" @close="removeHiddenMember(member.userId)"
+        v-for="member in hiddenMembers" :key="member.userId" closable
+        :name="member.userId"
+        :color="`#${member.team.teamColor}`"
+        effect="dark"
+        @close="removeHidMember(member.userId)"
       >
         {{ member.realName }}
       </el-tag>
@@ -90,13 +81,15 @@ function removeHiddenMember(memberId: number) {
 </template>
 
 <style lang="scss">
-.el-icon-close:before {
+.el-tag {
+  margin: 4px;
+}
+
+:deep(.--el-tag-text-color) {
   color: #fff !important;
 }
 
-.el-tag {
-  --el-tag__close {
-    color: #fff !important;
-  }
+:deep(.--el-tag__close) {
+  color: #fff !important;
 }
 </style>

@@ -7,9 +7,9 @@ class Tools {
   public static readonly APP_DATA_PATH: string = '' // Electron环境下需通过主进程或window.electron暴露;
 
   /**
-   *
-   * @param picturesStr
-   * @returns
+   * 将逗号分隔的图片路径转换为完整的URL数组
+   * @param picturesStr 逗号分隔的图片路径字符串
+   * @returns {string[]} 完整的图片URL数组
    */
   public static pictureUrls(picturesStr: string) {
     const pictures = picturesStr.split(',')
@@ -77,7 +77,7 @@ class Tools {
     })
   }
 
-  public static download({ url = '', filePath = '', onProgress = (_progress: string) => { }, onFinish = () => { }, onError = (_error: any) => { } }) {
+  public static download({ url = '', filePath = '' }) {
     console.log(url, filePath)
     // 请通过 window.mainAPI.downloadTask 实现实际下载
   }
@@ -93,14 +93,22 @@ class Tools {
       'q+': Math.floor((date.getMonth() + 3) / 3), // 季度
       'S': date.getMilliseconds(), // 毫秒
     }
-    if (/(y+)/.test(fmt)) {
-      fmt = fmt.replace(RegExp.$1, (`${date.getFullYear()}`).substr(4 - RegExp.$1.length))
+    // Replace year token (e.g., 'yyyy', 'yy')
+    const yearMatch = /(y+)/.exec(fmt)
+    if (yearMatch) {
+      const yStr = yearMatch[1]
+      fmt = fmt.replace(yStr, `${date.getFullYear()}`.substr(4 - yStr.length))
     }
+    // Replace other tokens
     for (const k in o) {
-      if (new RegExp(`(${k})`).test(fmt)) {
-        fmt = fmt.replace(RegExp.$1, (RegExp.$1.length === 1)
-          ? (o[k])
-          : ((`00${o[k]}`).substr((`${o[k]}`).length)))
+      const regex = new RegExp(`(${k})`)
+      const match = regex.exec(fmt)
+      if (match) {
+        const matchStr = match[1]
+        const replacement = matchStr.length === 1
+          ? o[k]
+          : (`00${o[k]}`).substr(`${o[k]}`.length)
+        fmt = fmt.replace(matchStr, replacement)
       }
     }
     return fmt

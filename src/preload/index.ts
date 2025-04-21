@@ -14,6 +14,7 @@ const api = {
   getMemberTree: () => ipcRenderer.invoke('getMemberTree'),
   getHiddenMembers: () => ipcRenderer.invoke('getHiddenMembers'),
   setHiddenMembers: (ids: number[]) => ipcRenderer.invoke('setHiddenMembers', ids),
+  removeHiddenMember: (userId: number) => ipcRenderer.invoke('removeHiddenMember', userId),
   getTeam: (teamId: number) => ipcRenderer.invoke('getTeam', teamId),
   hasMembers: () => ipcRenderer.invoke('hasMembers'),
   // 配置相关
@@ -27,6 +28,7 @@ const api = {
   showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
   getDesktopPath: () => ipcRenderer.invoke('get-desktop-path'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('check-ffmpeg-binaries', dir),
   getPlatform: () => process.platform,
   // 其他
 }

@@ -125,7 +125,7 @@ class Database {
     // 为 starInfo 每一项新增 team 字段
     if (Array.isArray(this.db.starInfo) && Array.isArray(this.db.teamInfo)) {
       this.db.starInfo.forEach((member: any) => {
-        const team = this.db.teamInfo.find((t: any) => String(t.teamId) === String(member.teamId))
+        const team = this.db.teamInfo.find((t: any) => Number(t.teamId) === Number(member.teamId))
         member.team = team ? { teamColor: team.teamColor, teamName: team.teamName } : { teamColor: '', teamName: '' }
       })
     }
@@ -137,7 +137,7 @@ class Database {
 
   public getMember(userId: number) {
     // 通过 userId 查找成员
-    return this.db.starInfo.find((m: any) => String(m.userId) === String(userId))
+    return this.db.starInfo.find((m: any) => Number(m.userId) === Number(userId))
   }
 
   public getMemberOptions() {
@@ -154,11 +154,17 @@ class Database {
   }
 
   public getHiddenMembers() {
-    return this.db.hiddenMemberIds || []
+    const hiddenMembers = this.db.hiddenMemberIds.map(id => this.db.starInfo.find((m: any) => Number(m.userId) === Number(id)))
+    return hiddenMembers
   }
 
   public setHiddenMembers(ids: number[]) {
     this.db.hiddenMemberIds = ids
+    this.lowdb.write()
+  }
+
+  public removeHiddenMember(userId: number) {
+    this.db.hiddenMemberIds = this.db.hiddenMemberIds.filter((id: number) => id !== userId)
     this.lowdb.write()
   }
 
@@ -215,16 +221,17 @@ class Database {
 Database.instance().init()
 
 // 注册 IPC handler
-ipcMain.handle('getMember', async (event, userId) => Database.instance().getMember(userId))
+ipcMain.handle('getMember', async (_event, userId) => Database.instance().getMember(userId))
 ipcMain.handle('getMemberOptions', async () => Database.instance().getMemberOptions())
 ipcMain.handle('getHiddenMembers', async () => Database.instance().getHiddenMembers())
-ipcMain.handle('setHiddenMembers', async (event, ids) => Database.instance().setHiddenMembers(ids))
-ipcMain.handle('getTeam', async (event, teamId) => Database.instance().getTeam(teamId))
+ipcMain.handle('setHiddenMembers', async (_event, ids) => Database.instance().setHiddenMembers(ids))
+ipcMain.handle('getTeam', async (_event, teamId) => Database.instance().getTeam(teamId))
 ipcMain.handle('hasMembers', async () => Database.instance().hasMembers())
-ipcMain.handle('getConfig', async (event, key, defaultValue) => Database.instance().getConfig(key, defaultValue))
-ipcMain.handle('setConfig', async (event, key, value) => Database.instance().setConfig(key, value))
+ipcMain.handle('getConfig', async (_event, key, defaultValue?: any) => Database.instance().getConfig(key, defaultValue))
+ipcMain.handle('setConfig', async (_event, key, value) => Database.instance().setConfig(key, value))
 ipcMain.handle('getTeamOptions', async () => Database.instance().getTeamOptions())
 ipcMain.handle('getGroupOptions', async () => Database.instance().getGroupOptions())
 ipcMain.handle('getMemberTree', async () => Database.instance().db.memberTree)
+ipcMain.handle('removeHiddenMember', async (_event, userId) => Database.instance().removeHiddenMember(userId))
 
 export { Database }

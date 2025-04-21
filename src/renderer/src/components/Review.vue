@@ -196,7 +196,7 @@ function onTimeUpdate(newTime: number) {
 function volumeChange(val: number) {
   volume.value = val
   console.log('volumeChange')
-  Database.instance().setConfig('volume', val)
+  window.mainAPI.setConfig('volume', val)
 }
 function fullScreen() {
   if (nativeVideo.value) {

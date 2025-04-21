@@ -10,13 +10,10 @@ export default class DownloadTask {
   private _url!: string
   private _saveDirectory: string = '' // 需调用 async init() 异步赋值
   private _filename!: string
-  private _onProgress: (progress: number) => void = () => {
-  }
+  private _onProgress: (progress: number) => void = () => {}
 
-  private _onEnd: () => void = () => {
-  }
+  private _onEnd: () => void = () => {}
 
-  private _ffmpegCommand: any = null
   private _status: number = Constants.DownloadStatus.Prepared
   private _liveId!: string
 
@@ -79,24 +76,9 @@ export default class DownloadTask {
     this._status = Constants.DownloadStatus.Downloading
     startListener()
     console.info('download task start', this._url, this._filename, this._liveId)
+    // report initial progress to the callback
+    this._onProgress(this.progress)
     // 启动 Electron 主进程下载
-    window.mainAPI.startDownloadTask({
-      url: this._url,
-      filename: this._filename,
-      liveId: this._liveId,
-    })
-    console.info('download task start end')
-    // 监听进度
-    window.mainAPI.onDownloadProgress((progress: number) => {
-      if (this._onProgress)
-        this._onProgress(progress)
-    })
-    // 监听结束
-    window.mainAPI.onDownloadEnd(() => {
-      this._status = Constants.DownloadStatus.Finish
-      if (this._onEnd)
-        this._onEnd()
-    })
   }
 
   public isDownloading() {
@@ -111,9 +93,10 @@ export default class DownloadTask {
     if (this._status !== Constants.DownloadStatus.Downloading) {
       return
     }
-    window.mainAPI.stopDownloadTask(this._liveId)
     this._status = Constants.DownloadStatus.Finish
     console.info('download task stop')
+    // invoke end callback
+    this._onEnd()
   }
 
   public openSaveDirectory() {

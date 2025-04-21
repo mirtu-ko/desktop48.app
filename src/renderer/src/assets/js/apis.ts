@@ -97,7 +97,7 @@ export default class Apis {
     return Request.get(barrageUrl)
   }
 
-  private request(url: string, data: any, headers: any) {
+  private request(url: string, data: any, headers: any): Promise<any> {
     return new Promise((resolve, reject) => {
       Request.post(url, data, headers)
         .then((responseBody) => {

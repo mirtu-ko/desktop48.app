@@ -116,6 +116,20 @@ ipcMain.handle('set-download-dir', async (_event: IpcMainInvokeEvent, dir: strin
   return true
 })
 
+// ffmpeg 相关
+ipcMain.handle('check-ffmpeg-binaries', async (_event: IpcMainInvokeEvent, dir: string) => {
+  function ffmpegFullFilename(name: string): string {
+    return process.platform === 'win32' ? `${name}.exe` : name
+  }
+  const ffmpegPath = path.join(dir, ffmpegFullFilename('ffmpeg'))
+  const ffplayPath = path.join(dir, ffmpegFullFilename('ffplay'))
+  if (!fs.existsSync(ffmpegPath))
+    throw new Error('ffmpeg 不存在')
+  if (!fs.existsSync(ffplayPath))
+    throw new Error('ffplay 不存在')
+  return true
+})
+
 function createWindow(): void {
   // 创建浏览器窗口。
   const mainWindow = new BrowserWindow({

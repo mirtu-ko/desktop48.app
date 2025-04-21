@@ -8,16 +8,10 @@ export default class RecordTask {
   private _url!: string
   private _saveDirectory: string = '' // 需调用 async init() 异步赋值
   private _filename!: string
-  private _onProgress: (progress: number) => void = () => {
-  }
-
-  private _onEnd: () => void = () => {
-  }
 
   private _ffmpegCommand: any = null
   private _status: number = Constants.RecordStatus.Prepared
   private _liveId!: string
-  private _duration: number = 0
 
   public constructor(url: string, filename: string, liveId: string) {
     this._url = url
@@ -51,14 +45,6 @@ export default class RecordTask {
 
   public getLiveId() {
     return this._liveId
-  }
-
-  public setOnProgress(value: (progress: number) => void) {
-    this._onProgress = value
-  }
-
-  public setOnEnd(value: () => void) {
-    this._onEnd = value
   }
 
   public getFilePath() {
@@ -97,16 +83,5 @@ export default class RecordTask {
 
   public openSaveDirectory() {
     window.mainAPI?.showItemInFolder?.(this.getFilePath())
-  }
-
-  private setDuration(timeMark: string) {
-    const timeArray = timeMark.split(':')
-    if (timeArray.length === 0)
-      this._duration = 0
-    const hours: number = Number.parseFloat(timeArray[0])
-    const minutes: number = Number.parseFloat(timeArray[1])
-    const seconds: number = Number.parseFloat(timeArray[2])
-    this._duration = hours * 60 * 60 + minutes * 60 + seconds
-    console.log('duration', this._duration)
   }
 }
