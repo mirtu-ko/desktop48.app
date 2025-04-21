@@ -74,12 +74,18 @@ ipcMain.handle('save-member-data', async (_event: IpcMainInvokeEvent, content: a
 
 ipcMain.handle('get-desktop-path', () => app.getPath('desktop'))
 
+// 播放器相关
+interface PlayerOptions {
+  title: string
+  streamPath: string
+}
+
 ipcMain.handle('open-player', async (_event: IpcMainInvokeEvent, { title, streamPath }: PlayerOptions) => {
   const ffmpegDir = Database.instance().getConfig('ffmpegDirectory')
   if (!ffmpegDir)
     throw new Error('尚未设置 ffmpeg 目录，请先在设置中选择 ffmpeg 路径')
 
-  const ffplayPath = path.join(
+  const ffplayPath = join(
     ffmpegDir,
     process.platform === 'win32' ? 'ffplay.exe' : 'ffplay',
   )

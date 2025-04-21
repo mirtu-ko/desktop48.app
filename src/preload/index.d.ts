@@ -1,4 +1,4 @@
-import type { mainAPI } from '@electron-toolkit/preload'
+import type { electronAPI } from '@electron-toolkit/preload'
 
 // 网络请求参数类型
 export interface NetRequestOptions {
@@ -44,7 +44,7 @@ export interface mainAPI {
 
 declare global {
   interface Window {
-    electron: mainAPI
+    electron: electronAPI
     mainAPI: mainAPI
   }
 }

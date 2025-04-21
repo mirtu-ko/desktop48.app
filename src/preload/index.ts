@@ -1,4 +1,4 @@
-import { mainAPI } from '@electron-toolkit/preload'
+import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
 console.log('[preload/index.ts]preload')
@@ -34,6 +34,6 @@ const api = {
 // 使用 `contextBridge` API 将 Electron API 暴露给
 // 渲染进程（启用上下文隔离时），否则
 // 直接添加到全局 window。
-contextBridge.exposeInMainWorld('electron', mainAPI)
+contextBridge.exposeInMainWorld('electron', electronAPI)
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('mainAPI', api)

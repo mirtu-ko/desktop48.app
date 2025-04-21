@@ -136,12 +136,16 @@ function play(item: any) {
 
     <!-- 加载中时显示 -->
     <div v-if="loading" style="height: 800px;">
-      <div>加载中...</div>
+      <div style="text-align: center;">
+        加载中...
+      </div>
     </div>
 
     <!-- 无直播时显示 -->
     <div v-if="!loading && liveList.length === 0" style="height: 800px;">
-      <div>当前没有直播</div>
+      <div style="text-align: center;">
+        当前没有直播
+      </div>
     </div>
 
     <el-main
