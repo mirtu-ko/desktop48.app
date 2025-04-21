@@ -86,4 +86,10 @@ onUnmounted(() => {
 .side-menu:not(.el-menu--collapse) {
   min-height: 100%;
 }
+
+:deep(.el-menu--vertical) {
+  .el-menu-item {
+    justify-content: center;
+  }
+}
 </style>
