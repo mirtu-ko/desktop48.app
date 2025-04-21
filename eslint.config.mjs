@@ -1,39 +1,15 @@
-import tseslint from '@electron-toolkit/eslint-config-ts'
-import eslintConfigPrettier from '@electron-toolkit/eslint-config-prettier'
-import eslintPluginVue from 'eslint-plugin-vue'
-import vueParser from 'vue-eslint-parser'
+import antfu from '@antfu/eslint-config'
 
-export default tseslint.config(
-  { ignores: ['**/node_modules', '**/dist', '**/out'] },
-  tseslint.configs.recommended,
-  eslintPluginVue.configs['flat/recommended'],
-  {
-    files: ['**/*.vue'],
-    languageOptions: {
-      parser: vueParser,
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true
-        },
-        extraFileExtensions: ['.vue'],
-        parser: tseslint.parser
-      }
-    }
+export default antfu({
+  formatters: true,
+  vue: true,
+  ignores: ['node_modules', 'build', 'out', 'dist'],
+}, {
+  rules: {
+    'vue/eqeqeq': 'off',
+    'no-console': 'off',
+    'eqeqeq': 'off',
+    'node/prefer-global/process': 'off',
+    'n/prefer-global/process': 'off',
   },
-  {
-    files: ['**/*.{ts,mts,tsx,vue}'],
-    rules: {
-      'vue/require-default-prop': 'off',
-      'vue/multi-word-component-names': 'off',
-      'vue/block-lang': [
-        'error',
-        {
-          script: {
-            lang: 'ts'
-          }
-        }
-      ]
-    }
-  },
-  eslintConfigPrettier
-)
+})
