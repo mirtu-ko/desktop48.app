@@ -20,17 +20,20 @@ const selectedTeam = ref<any[]>([])
 const selectedGroup = ref<any[]>([])
 
 const members = ref<any[]>([])
+const hiddenMemberIds = ref<number[]>([])
 onMounted(async () => {
   members.value = await window.mainAPI.getMemberTree()
+  const hiddenMembers = await window.mainAPI.getHiddenMembers()
+  hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
   // console.log('members', members.value)
 })
 
-const teams = ref<any[]>([])
-const groups = ref<any[]>([])
+const teamOptions = ref<any[]>([])
+const groupOptions = ref<any[]>([])
 
 onMounted(async () => {
-  teams.value = await window.mainAPI.getTeamOptions()
-  groups.value = await window.mainAPI.getGroupOptions()
+  teamOptions.value = await window.mainAPI.getTeamOptions()
+  groupOptions.value = await window.mainAPI.getGroupOptions()
 })
 
 const disabled = computed(() => loading.value || noMore.value)
@@ -84,6 +87,8 @@ async function getReviewList() {
     }
     reviewNext.value = content.next
     content.liveList.forEach(async (item: any) => {
+      if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
+        return
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.isReview = true
@@ -119,7 +124,7 @@ function onReviewClick(item: any) {
     label: `${item.userInfo.nickname}的直播间`,
     title: item.title,
     liveId: item.liveId,
-    name: `${item.liveId}_${Math.random().toString(36).substr(2)}`,
+    name: `${item.liveId}_${Math.random().toString(36).substring(2)}`,
     startTime: Number.parseInt(item.ctime),
   }
   liveTabs.value.push(liveTab)
@@ -134,8 +139,6 @@ onMounted(() => {
   getReviewList()
 })
 const isLoadingMore = ref(false)
-// 添加 ref 用于存储滚动容器
-const reviewMainRef = ref<HTMLElement | null>(null)
 
 async function onInfiniteScroll() {
   console.log('触发加载更多', {
@@ -153,13 +156,6 @@ async function onInfiniteScroll() {
     isLoadingMore.value = false
   }
 }
-
-// 添加组件卸载时的清理
-onUnmounted(() => {
-  if (reviewMainRef.value) {
-    reviewMainRef.value.removeEventListener('scroll', onInfiniteScroll)
-  }
-})
 </script>
 
 <template>
@@ -191,12 +187,12 @@ onUnmounted(() => {
 
               <el-cascader
                 v-if="reviewScreen === Constants.REVIEW_SCREEN.TEAM" v-model="selectedTeam" transfer
-                placeholder="请选择队伍" clearable filterable :options="teams"
+                placeholder="请选择队伍" clearable filterable :options="teamOptions"
               />
 
               <el-cascader
                 v-if="reviewScreen === Constants.REVIEW_SCREEN.GROUP" v-model="selectedGroup" transfer
-                placeholder="请选择分团" clearable filterable :options="groups"
+                placeholder="请选择分团" clearable filterable :options="groupOptions"
               />
             </div>
             <el-button style="margin-left: 8px;" type="primary" @click="refresh">
@@ -207,22 +203,28 @@ onUnmounted(() => {
           <div v-if="reviewList.length === 0 && !loading" style="text-align:center; color:#999; padding:120px 0;">
             暂无回放
           </div>
-          <div
-            ref="reviewMainRef" v-loading="loading" v-infinite-scroll="onInfiniteScroll" class="review-main"
-            :infinite-scroll-disabled="disabled"
+          <el-scrollbar
+            wrap-class="scrollbar-wrapper"
           >
-            <div class="review-list-grid">
-              <div
-                v-for="item in reviewList" :key="item.liveId" class="review-list-grid-item"
-                @click="onReviewClick(item)"
-              >
-                <LiveItem :item="item" class="live-card" />
+            <div
+              v-loading="loading" v-infinite-scroll="onInfiniteScroll" class="review-main"
+              :infinite-scroll-disabled="disabled"
+              infinite-scroll-delay="100"
+              infinite-scroll-distance="20"
+            >
+              <div class="review-list-grid">
+                <div
+                  v-for="item in reviewList" :key="item.liveId" class="review-list-grid-item"
+                  @click="onReviewClick(item)"
+                >
+                  <LiveItem :item="item" class="live-card" />
+                </div>
+              </div>
+              <div v-if="isLoadingMore" class="loading-more-tip">
+                正在加载更多...
               </div>
             </div>
-            <div v-if="isLoadingMore" class="loading-more-tip">
-              正在加载更多...
-            </div>
-          </div>
+          </el-scrollbar>
         </div>
       </el-tab-pane>
 
@@ -237,18 +239,31 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
+.reviews-root,
+.el-tabs,
+.el-tab-pane,
+.review-container {
+  height: 100%;
+  overflow: hidden;
+}
+
+.header-box {
+  display: flex;
+  align-items: right;
+  justify-content: right;
+  padding: 12px;
+  width: 100%;
+}
+
+.scrollbar-wrapper {
+  height: calc(100% - 60px);
+  overflow-x: hidden !important;
+}
+
 .review-list-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
-}
-
-:deep(.el-card__body) {
-  padding: 6px !important;
-}
-
-:deep(.el-card__header) {
-  padding: 12px !important;
 }
 
 .review-list-grid-item {
@@ -261,6 +276,14 @@ onUnmounted(() => {
   color: #888;
   padding: 12px 0 16px 0;
   font-size: 14px;
+}
+
+:deep(.el-card__body) {
+  padding: 6px !important;
+}
+
+:deep(.el-card__header) {
+  padding: 12px !important;
 }
 
 html,

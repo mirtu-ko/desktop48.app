@@ -17,10 +17,15 @@ const router = useRouter()
 
 const disabled = computed(() => loading.value || noMore.value)
 
+const hiddenMemberIds = ref<number[]>([])
+onMounted(async () => {
+  const hiddenMembers = await window.mainAPI.getHiddenMembers()
+  hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
+})
+
 const filteredLiveList = computed(() => {
-  return liveList.value.filter(async (item: any) => {
-    const hiddenMembers = await window.mainAPI.getHiddenMembers()
-    return hiddenMembers.some((member: any) => item.userInfo.userId == member.userId)
+  return liveList.value.filter((item: any) => {
+    return !hiddenMemberIds.value.includes(Number(item.userInfo.userId))
   })
 })
 // 保留原二维分组逻辑供其它地方使用
@@ -39,6 +44,7 @@ async function getLiveList() {
   loading.value = true
   try {
     const content = await Apis.instance().lives(liveNext.value)
+    console.log('获取到的直播列表:', content)
     if (noMore.value) {
       ElMessage({
         message: '加载完毕',

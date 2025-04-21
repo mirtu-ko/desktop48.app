@@ -69,7 +69,6 @@ async function removeHidMember(memberId: number) {
     <div style="margin-top: 8px;">
       <el-tag
         v-for="member in hiddenMembers" :key="member.userId" closable
-        :name="member.userId"
         :color="`#${member.team.teamColor}`"
         effect="dark"
         @close="removeHidMember(member.userId)"

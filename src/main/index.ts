@@ -1,4 +1,3 @@
-/* eslint-disable import/no-duplicates */
 import type { IpcMainInvokeEvent } from 'electron'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -8,10 +7,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
-import { Database } from '../main/database.js'
-import '../main/database.js'
-
-const db = Database.instance()
+import { Database } from './database.js'
 
 // 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -60,18 +56,6 @@ if (!ipcMain.eventNames().includes('net-request')) {
   })
 }
 
-// 数据库相关
-ipcMain.handle('save-member-data', async (_event: IpcMainInvokeEvent, content: any) => {
-  try {
-    Database.instance().saveMemberData(content)
-    return { ok: true }
-  }
-  catch (e) {
-    console.error('[index.ts] save-member-data 写入失败:', e)
-    throw e
-  }
-})
-
 ipcMain.handle('get-desktop-path', () => app.getPath('desktop'))
 
 // 播放器相关
@@ -106,16 +90,6 @@ ipcMain.handle('open-player', async (_event: IpcMainInvokeEvent, { title, stream
   }
 })
 
-// 下载目录相关
-ipcMain.handle('get-download-dir', async () => {
-  return db.getConfig('downloadDirectory', app.getPath('downloads'))
-})
-
-ipcMain.handle('set-download-dir', async (_event: IpcMainInvokeEvent, dir: string) => {
-  db.setConfig('downloadDirectory', dir)
-  return true
-})
-
 // ffmpeg 相关
 ipcMain.handle('check-ffmpeg-binaries', async (_event: IpcMainInvokeEvent, dir: string) => {
   function ffmpegFullFilename(name: string): string {
@@ -133,8 +107,8 @@ ipcMain.handle('check-ffmpeg-binaries', async (_event: IpcMainInvokeEvent, dir: 
 function createWindow(): void {
   // 创建浏览器窗口。
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1400,
+    height: 900,
     show: false,
     autoHideMenuBar: false,
     ...(process.platform === 'linux' ? { icon } : {}),

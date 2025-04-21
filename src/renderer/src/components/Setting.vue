@@ -99,75 +99,85 @@ async function setUserAgent() {
 </script>
 
 <template>
-  <div>
-    <el-divider content-position="left">
-      更新成员信息
-    </el-divider>
-
-    <el-card style="text-align: left;" shadow="hover">
-      <el-button type="primary" :loading="isUpdating" @click="updateInfo">
+  <el-scrollbar
+    style="height: 100%"
+    wrap-class="scrollbar-wrapper"
+  >
+    <div class="setting-root">
+      <el-divider content-position="left">
         更新成员信息
-      </el-button>
-    </el-card>
+      </el-divider>
 
-    <el-divider content-position="left">
-      User-Agent设置
-    </el-divider>
-
-    <el-card style="margin-top: 16px;" shadow="hover">
-      <div style="display: flex;flex-direction: row;width: 720px;">
-        <el-input v-model="userAgent" style="" type="text" placeholder="设置User-Agent" />
-
-        <el-button style="margin-left: 8px;" type="primary" @click="setUserAgent">
-          设置
+      <el-card style="text-align: left;" shadow="hover">
+        <el-button type="primary" :loading="isUpdating" @click="updateInfo">
+          更新成员信息
         </el-button>
-      </div>
-    </el-card>
+      </el-card>
 
-    <el-divider content-position="left">
-      默认下载目录
-    </el-divider>
+      <el-divider content-position="left">
+        User-Agent设置
+      </el-divider>
 
-    <el-card style="margin-top: 16px;" shadow="hover">
-      <div style="display: flex;flex-direction: row; width: 640px;">
-        <el-input v-model="downloadDirectory" type="text" placeholder="下载目录" readonly @click="setDownloadDirectory" />
+      <el-card style="margin-top: 16px;" shadow="hover">
+        <div style="display: flex;flex-direction: row;width: 720px;">
+          <el-input v-model="userAgent" style="" type="text" placeholder="设置User-Agent" />
 
-        <el-button style="margin-left: 8px;" type="primary" @click="setDownloadDirectory">
-          选择
-        </el-button>
+          <el-button style="margin-left: 8px;" type="primary" @click="setUserAgent">
+            设置
+          </el-button>
+        </div>
+      </el-card>
 
-        <el-button style="margin-left: 8px;" type="success" @click="openDownloadDirectory">
-          打开目录
-        </el-button>
-      </div>
-    </el-card>
+      <el-divider content-position="left">
+        默认下载目录
+      </el-divider>
 
-    <el-divider content-position="left">
-      ffmpeg目录
-    </el-divider>
+      <el-card style="margin-top: 16px;" shadow="hover">
+        <div style="display: flex;flex-direction: row; width: 640px;">
+          <el-input v-model="downloadDirectory" type="text" placeholder="下载目录" readonly @click="setDownloadDirectory" />
 
-    <el-card style="margin-top: 16px;" shadow="hover">
-      <div style="display: flex;flex-direction: row; width: 640px;">
-        <el-input v-model="ffmpegDirectory" type="text" placeholder="ffmpeg目录" readonly @click="setFfmpegDirectory" />
+          <el-button style="margin-left: 8px;" type="primary" @click="setDownloadDirectory">
+            选择
+          </el-button>
 
-        <el-button style="margin-left: 8px;" type="primary" @click="setFfmpegDirectory">
-          选择
-        </el-button>
+          <el-button style="margin-left: 8px;" type="success" @click="openDownloadDirectory">
+            打开目录
+          </el-button>
+        </div>
+      </el-card>
 
-        <el-button style="margin-left: 8px;" type="success" @click="openFfmpegDirectory">
-          打开目录
-        </el-button>
-      </div>
-    </el-card>
+      <el-divider content-position="left">
+        ffmpeg目录
+      </el-divider>
 
-    <el-divider content-position="left">
-      屏蔽成员直播|回放
-    </el-divider>
+      <el-card style="margin-top: 16px;" shadow="hover">
+        <div style="display: flex;flex-direction: row; width: 640px;">
+          <el-input v-model="ffmpegDirectory" type="text" placeholder="ffmpeg目录" readonly @click="setFfmpegDirectory" />
 
-    <el-card style="margin-top: 16px;" shadow="hover">
-      <HiddenMembers />
-    </el-card>
-  </div>
+          <el-button style="margin-left: 8px;" type="primary" @click="setFfmpegDirectory">
+            选择
+          </el-button>
+
+          <el-button style="margin-left: 8px;" type="success" @click="openFfmpegDirectory">
+            打开目录
+          </el-button>
+        </div>
+      </el-card>
+
+      <el-divider content-position="left">
+        屏蔽成员直播|回放
+      </el-divider>
+
+      <el-card style="margin-top: 16px;" shadow="hover">
+        <HiddenMembers />
+      </el-card>
+    </div>
+  </el-scrollbar>
 </template>
 
-<style scoped></style>
+<style scoped>
+.scrollbar-wrapper,
+.setting-root {
+  height: 100%;
+}
+</style>

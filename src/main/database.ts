@@ -135,6 +135,25 @@ class Database {
     console.log('[数据库路径]', this.dbPath)
   }
 
+  public saveMemberData(content: any) {
+    if (content.starInfo)
+      this.db.starInfo = content.starInfo
+    if (content.teamInfo)
+      this.db.teamInfo = content.teamInfo
+    if (content.groupInfo)
+      this.db.groupInfo = content.groupInfo
+    this.buildMemberTree()
+    this.lowdb.write()
+    console.log('[database.ts] save-member-data 写入成功:', {
+      starInfo: this.db.starInfo?.length,
+      teamInfo: this.db.teamInfo?.length,
+      groupInfo: this.db.groupInfo?.length,
+      memberTree: this.db.memberTree?.length,
+    })
+    this.lowdb.write()
+    return { ok: true }
+  }
+
   public getMember(userId: number) {
     // 通过 userId 查找成员
     return this.db.starInfo.find((m: any) => Number(m.userId) === Number(userId))
@@ -176,24 +195,6 @@ class Database {
     return Array.isArray(this.membersDB) && this.membersDB.length > 0
   }
 
-  public saveMemberData(content: any) {
-    if (content.starInfo)
-      this.db.starInfo = content.starInfo
-    if (content.teamInfo)
-      this.db.teamInfo = content.teamInfo
-    if (content.groupInfo)
-      this.db.groupInfo = content.groupInfo
-    this.buildMemberTree()
-    this.lowdb.write()
-    console.log('[main.ts] save-member-data 写入成功:', {
-      starInfo: this.db.starInfo?.length,
-      teamInfo: this.db.teamInfo?.length,
-      groupInfo: this.db.groupInfo?.length,
-      memberTree: this.db.memberTree?.length,
-    })
-    this.lowdb.write()
-  }
-
   public getConfig(key: string, defaultValue: any = null) {
     if (!this.db.config)
       this.db.config = {}
@@ -221,17 +222,17 @@ class Database {
 Database.instance().init()
 
 // 注册 IPC handler
+ipcMain.handle('saveMemberData', async (_event, content) => Database.instance().saveMemberData(content))
 ipcMain.handle('getMember', async (_event, userId) => Database.instance().getMember(userId))
 ipcMain.handle('getMemberOptions', async () => Database.instance().getMemberOptions())
 ipcMain.handle('getHiddenMembers', async () => Database.instance().getHiddenMembers())
 ipcMain.handle('setHiddenMembers', async (_event, ids) => Database.instance().setHiddenMembers(ids))
-ipcMain.handle('getTeam', async (_event, teamId) => Database.instance().getTeam(teamId))
+ipcMain.handle('removeHiddenMember', async (_event, userId) => Database.instance().removeHiddenMember(userId))
 ipcMain.handle('hasMembers', async () => Database.instance().hasMembers())
 ipcMain.handle('getConfig', async (_event, key, defaultValue?: any) => Database.instance().getConfig(key, defaultValue))
 ipcMain.handle('setConfig', async (_event, key, value) => Database.instance().setConfig(key, value))
 ipcMain.handle('getTeamOptions', async () => Database.instance().getTeamOptions())
 ipcMain.handle('getGroupOptions', async () => Database.instance().getGroupOptions())
 ipcMain.handle('getMemberTree', async () => Database.instance().db.memberTree)
-ipcMain.handle('removeHiddenMember', async (_event, userId) => Database.instance().removeHiddenMember(userId))
 
 export { Database }

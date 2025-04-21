@@ -30,7 +30,6 @@ async function init() {
     // 打印当前的系统平台
     const platform = window.mainAPI.getPlatform()
     console.log('[Initialize.vue]当前系统平台：', platform)
-    console.log('已保存ffmpeg目录')
     emit('onInitialized')
     return
   }
