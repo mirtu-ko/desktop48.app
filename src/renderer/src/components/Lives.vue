@@ -28,16 +28,6 @@ const filteredLiveList = computed(() => {
     return !hiddenMemberIds.value.includes(Number(item.userInfo.userId))
   })
 })
-// 保留原二维分组逻辑供其它地方使用
-// const listAfterHandle = computed(() => {
-//   const list = filteredLiveList.value
-//   const rowCount = Math.ceil(list.length / Constants.LIST_COL)
-//   const data: any[] = []
-//   for (let i = 0; i < rowCount; i++) {
-//     data[i] = list.slice(i * Constants.LIST_COL, (i + 1) * Constants.LIST_COL)
-//   }
-//   return data
-// })
 
 async function getLiveList() {
   console.log('[Lives.vue] getLiveList 方法开始执行')
@@ -139,51 +129,72 @@ function play(item: any) {
         刷新
       </el-button>
     </el-header>
-
-    <!-- 加载中时显示 -->
-    <div v-if="loading" style="height: 800px;">
-      <div style="text-align: center;">
+    <el-main v-loading="loading">
+      <!-- 加载中时显示 -->
+      <div v-if="loading" class="live-info">
         加载中...
       </div>
-    </div>
 
-    <!-- 无直播时显示 -->
-    <div v-if="!loading && liveList.length === 0" style="height: 800px;">
-      <div style="text-align: center;">
+      <!-- 无直播时显示 -->
+      <div v-if="!loading && liveList.length === 0" class="live-info">
         当前没有直播
       </div>
-    </div>
 
-    <el-main
-      v-else v-loading="loading" v-infinite-scroll="getLiveList" style="overflow: auto;height: 800px;"
-      :infinite-scroll-disabled="disabled"
-    >
-      <div class="live-list-grid">
-        <div v-for="item in filteredLiveList" :key="item.liveId" class="live-list-grid-item">
-          <el-popover
-            :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
-            :fallback-placements="[]"
-          >
-            <p>{{ item.title }}</p>
-            <div>
-              <el-button type="danger" size="small" @click="record(item)">
-                录制
-              </el-button>
-              <el-button type="success" size="small" @click="play(item)">
-                观看
-              </el-button>
+      <!-- 有直播时显示 -->
+      <el-scrollbar v-else class="scrollbar-wrapper">
+        <div
+          v-infinite-scroll="getLiveList"
+          :infinite-scroll-disabled="disabled"
+          infinite-scroll-delay="100"
+          infinite-scroll-distance="20"
+          class="live-main"
+        >
+          <div class="live-list-grid">
+            <div v-for="item in filteredLiveList" :key="item.liveId" class="live-list-grid-item">
+              <el-popover
+                :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
+                :fallback-placements="[]"
+              >
+                <p>{{ item.title }}</p>
+                <div>
+                  <el-button type="danger" size="small" @click="record(item)">
+                    录制
+                  </el-button>
+                  <el-button type="success" size="small" @click="play(item)">
+                    观看
+                  </el-button>
+                </div>
+                <template #reference>
+                  <LiveItem :item="item" class="live-card" />
+                </template>
+              </el-popover>
             </div>
-            <template #reference>
-              <LiveItem :item="item" class="live-card" />
-            </template>
-          </el-popover>
+          </div>
         </div>
-      </div>
+      </el-scrollbar>
     </el-main>
   </el-container>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+el-container {
+  height: 100%;
+  overflow: hidden;
+}
+
+el-main {
+  height: calc(100% - 60px);
+  overflow: hidden;
+}
+
+.live-info {
+  height: calc(100% - 60px);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .live-list-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

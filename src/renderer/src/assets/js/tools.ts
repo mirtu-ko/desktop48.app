@@ -97,7 +97,7 @@ class Tools {
     const yearMatch = /(y+)/.exec(fmt)
     if (yearMatch) {
       const yStr = yearMatch[1]
-      fmt = fmt.replace(yStr, `${date.getFullYear()}`.substr(4 - yStr.length))
+      fmt = fmt.replace(yStr, `${date.getFullYear()}`.substring(4 - yStr.length))
     }
     // Replace other tokens
     for (const k in o) {
@@ -107,7 +107,7 @@ class Tools {
         const matchStr = match[1]
         const replacement = matchStr.length === 1
           ? o[k]
-          : (`00${o[k]}`).substr(`${o[k]}`.length)
+          : (`00${o[k]}`).substring(`${o[k]}`.length)
         fmt = fmt.replace(matchStr, replacement)
       }
     }
