@@ -17,8 +17,9 @@ onMounted(async () => {
   console.log('hiddenMembers', hiddenMembers.value)
 })
 
-function clear() {
-  window.mainAPI.setHiddenMembers([])
+async function clear() {
+  await window.mainAPI.setHiddenMembers([])
+  hiddenMembers.value = await window.mainAPI.getHiddenMembers()
 }
 
 async function addHiddenMember() {

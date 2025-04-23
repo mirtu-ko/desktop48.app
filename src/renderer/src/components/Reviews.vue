@@ -21,10 +21,15 @@ const selectedGroup = ref<any[]>([])
 
 const members = ref<any[]>([])
 const hiddenMemberIds = ref<number[]>([])
-onMounted(async () => {
-  members.value = await window.mainAPI.getMemberTree()
+
+async function updateHiddenMemberIds() {
   const hiddenMembers = await window.mainAPI.getHiddenMembers()
   hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
+}
+
+onMounted(async () => {
+  members.value = await window.mainAPI.getMemberTree()
+  updateHiddenMemberIds()
 })
 
 const teamOptions = ref<any[]>([])
@@ -64,7 +69,7 @@ async function getReviewList() {
   }
   params.next = reviewNext.value
   loading.value = true
-  Apis.instance().reviews(params).then((content: any) => {
+  Apis.instance().reviews(params).then(async (content: any) => {
     if (!content || !Array.isArray(content.liveList)) {
       console.warn('liveList 不是数组或无内容', content?.liveList)
       noMore.value = true
@@ -84,6 +89,7 @@ async function getReviewList() {
       noMore.value = true
     }
     reviewNext.value = content.next
+    updateHiddenMemberIds()
     content.liveList.forEach(async (item: any) => {
       if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
         return
@@ -96,10 +102,6 @@ async function getReviewList() {
       reviewList.value.push(item)
     })
     loading.value = false
-    // filter reviewList
-    reviewList.value = reviewList.value.filter(async (item: any) => {
-      return !(await window.mainAPI.getHiddenMembers()).some((memberId: number) => item.userInfo.userId == memberId) // 请确保主进程暴露此API
-    })
   }).catch((error: any) => {
     console.info(error)
     noMore.value = true

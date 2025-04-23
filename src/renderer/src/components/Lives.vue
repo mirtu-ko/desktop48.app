@@ -18,9 +18,14 @@ const router = useRouter()
 const disabled = computed(() => loading.value || noMore.value)
 
 const hiddenMemberIds = ref<number[]>([])
-onMounted(async () => {
+
+async function updateHiddenMemberIds() {
   const hiddenMembers = await window.mainAPI.getHiddenMembers()
   hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
+}
+
+onMounted(async () => {
+  updateHiddenMemberIds()
 })
 
 const filteredLiveList = computed(() => {
@@ -33,6 +38,7 @@ async function getLiveList() {
   console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
   try {
+    updateHiddenMemberIds()
     const content = await Apis.instance().lives(liveNext.value)
     console.log('获取到的直播列表:', content)
     if (noMore.value) {
@@ -49,6 +55,8 @@ async function getLiveList() {
     }
     liveNext.value = content.next
     for (const item of content.liveList) {
+      if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
+        continue
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.isReview = true
@@ -128,7 +136,7 @@ function play(item: any) {
         刷新
       </el-button>
     </el-header>
-    <el-main v-loading="loading">
+    <div v-loading="loading" class="live-main">
       <!-- 无直播时显示 -->
       <div v-if="!loading && liveList.length === 0" class="live-info">
         当前没有直播
@@ -166,7 +174,7 @@ function play(item: any) {
           </div>
         </div>
       </el-scrollbar>
-    </el-main>
+    </div>
   </el-container>
 </template>
 
@@ -176,8 +184,8 @@ el-container {
   overflow: hidden;
 }
 
-el-main {
-  height: calc(100% - 60px);
+.live-main {
+  height: calc(100% - 70px);
   overflow: hidden;
 }
 
