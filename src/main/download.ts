@@ -38,8 +38,8 @@ ipcMain.handle('downloadTaskStart', async (event: IpcMainInvokeEvent, url: strin
         resolve(filePath)
       }
       else {
-        const errMsg = `ffmpeg exited with code ${code}`
-        event.sender.send('[download.ts]downloadTaskError', liveId, errMsg)
+        const errMsg = `[download.ts]ffmpeg exited with code ${code}`
+        event.sender.send('downloadTaskError', liveId, errMsg)
         reject(new Error(errMsg))
       }
     })

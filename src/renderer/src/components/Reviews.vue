@@ -25,7 +25,6 @@ onMounted(async () => {
   members.value = await window.mainAPI.getMemberTree()
   const hiddenMembers = await window.mainAPI.getHiddenMembers()
   hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
-  // console.log('members', members.value)
 })
 
 const teamOptions = ref<any[]>([])
@@ -230,8 +229,9 @@ async function onInfiniteScroll() {
       <el-tab-pane
         v-for="(liveTab, index) in liveTabs" :key="index" closable :label="liveTab.label"
         :name="liveTab.name"
+        @close="onTabRemove(liveTab.name)"
       >
-        <Review :index="index" :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" />
+        <Review :index="index" :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" :name="liveTab.name" />
       </el-tab-pane>
     </el-tabs>
   </div>

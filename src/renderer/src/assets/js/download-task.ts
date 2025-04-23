@@ -68,6 +68,7 @@ export default class DownloadTask {
           const [h, m, s] = time.split(':')
           const seconds = Number.parseInt(h) * 3600 + Number.parseInt(m) * 60 + Number.parseFloat(s)
           this._onProgress(seconds)
+          console.log('[download-task.ts] download task progress:', liveId, seconds)
         }
       })
       // 监听下载完成

@@ -29,13 +29,17 @@ defineExpose({ clear, shoot })
 <template>
   <el-card style="flex: 1 0 auto;" shadow="never">
     <template #header>
-      <el-tag :type="statusType">
-        {{ statusText }}
-      </el-tag>
-    </template>
-    <template #extra>
-      <span>观看人数：{{ number }} </span>
-      <span style="margin-left: 8px;color: #19be6b">开始时间：{{ startDate }}</span>
+      <el-row :gutter="8" justify="space-between" style="width: 100%;">
+        <el-col :span="6">
+          <el-tag :type="statusType">
+            {{ statusText }}
+          </el-tag>
+        </el-col>
+        <el-col :span="18" style="text-align: right;">
+          <span style="font-size: 12px;">观看人数：{{ number }} </span>
+          <span style="margin-left: 8px;color: #19be6b; font-size: 12px;">开始时间：{{ startDate }}</span>
+        </el-col>
+      </el-row>
     </template>
 
     <div class="barrage-container">
