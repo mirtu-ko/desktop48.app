@@ -86,8 +86,7 @@ function record(item: any) {
   Apis.instance().live(item.liveId).then(async (content) => {
     const member = await window.mainAPI.getMember(content.user.userId)
     const date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyyMMddhhmm')
-    const randomNumber = Number.parseInt((Math.random() * 100000000).toFixed())
-    const filename = `${member.realName} ${date}-${randomNumber}.flv`
+    const filename = `${member.realName} ${date}_${Math.random().toString(36).substring(2)}.flv`
     const recordTask: RecordTask = new RecordTask(content.playStreamPath, filename, content.liveId)
     EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
     router.push('/downloads')
@@ -130,11 +129,6 @@ function play(item: any) {
       </el-button>
     </el-header>
     <el-main v-loading="loading">
-      <!-- 加载中时显示 -->
-      <div v-if="loading" class="live-info">
-        加载中...
-      </div>
-
       <!-- 无直播时显示 -->
       <div v-if="!loading && liveList.length === 0" class="live-info">
         当前没有直播

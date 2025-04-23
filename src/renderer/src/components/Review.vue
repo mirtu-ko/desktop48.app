@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
-import { cloneDeep, random } from 'lodash'
+import { cloneDeep } from 'lodash'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
@@ -230,7 +230,7 @@ function getBarrages() {
 const router = useRouter()
 function download() {
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  const filename = `${memberInfo.value.realName}${date}-${random(10000)}.mp4`
+  const filename = `${memberInfo.value.realName}${date}_${Math.random().toString(36).substring(2)}.mp4`
   console.log('[Review.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
   const downloadTask: any = new DownloadTask(playStreamPath.value, filename, props.liveId)
   EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
