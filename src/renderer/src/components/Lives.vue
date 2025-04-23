@@ -141,7 +141,7 @@ function play(item: any) {
       </div>
 
       <!-- 有直播时显示 -->
-      <el-scrollbar v-else class="scrollbar-wrapper">
+      <el-scrollbar v-if="!loading && liveList.length > 0" class="scrollbar-wrapper">
         <div
           v-infinite-scroll="getLiveList"
           :infinite-scroll-disabled="disabled"
@@ -188,7 +188,7 @@ el-main {
 }
 
 .live-info {
-  height: calc(100% - 60px);
+  height: calc(100% - 150px);
   overflow: hidden;
   display: flex;
   justify-content: center;
