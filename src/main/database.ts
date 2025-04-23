@@ -198,11 +198,11 @@ class Database {
   public getConfig(key: string, defaultValue: any = null) {
     if (!this.db.config)
       this.db.config = {}
+    if (key !== 'downloadDirectory' && key !== 'ffmpegDirectory' && key !== 'userAgent' && key !== 'all')
+      throw new Error('Invalid config key')
     if (key in this.db.config)
       return this.db.config[key]
     if (key === 'all')
-      return this.db.config
-    if (key === '')
       return this.db.config
     else
       this.db.config[key] = defaultValue
@@ -213,6 +213,8 @@ class Database {
   public setConfig(key: string, value: any) {
     if (!this.db.config)
       this.db.config = {}
+    if (key !== 'downloadDirectory' && key !== 'ffmpegDirectory' && key !== 'userAgent' && key !== 'all')
+      throw new Error('Invalid config key')
     this.db.config[key] = value
     this.lowdb.write()
   }

@@ -30,6 +30,17 @@ const api = {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('check-ffmpeg-binaries', dir),
   getPlatform: () => process.platform,
+  // 下载
+  downloadTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('downloadTaskStart', url, filename, liveId),
+  downloadTaskProgress: (callback: (liveId: string, time: string) => void) => {
+    ipcRenderer.on('downloadTaskProgress', (_e, liveId, time) => callback(liveId, time))
+  },
+  downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => {
+    ipcRenderer.on('downloadTaskEnd', (_e, liveId, filePath) => callback(liveId, filePath))
+  },
+  downloadTaskError: (callback: (liveId: string, error: any) => void) => {
+    ipcRenderer.on('downloadTaskError', (_e, liveId, error) => callback(liveId, error))
+  },
   // 其他
 }
 

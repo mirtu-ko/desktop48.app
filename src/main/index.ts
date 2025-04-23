@@ -8,6 +8,7 @@ import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
 import { Database } from './database.js'
+import './download.js'
 
 // 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)

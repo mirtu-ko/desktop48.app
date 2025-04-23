@@ -50,7 +50,6 @@ async function getReviewList() {
     groupId: '0',
     next: reviewNext.value,
   }
-  console.log('reviewScreen', reviewScreen.value, selectedUser.value, selectedTeam.value, selectedGroup.value)
   switch (reviewScreen.value) {
     case Constants.REVIEW_SCREEN.USER:
       params.userId = selectedUser.value[2]

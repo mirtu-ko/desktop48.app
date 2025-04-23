@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import type { IDownloadTask, IRecordTask } from '../types/tasks'
+import type RecordTask from '../assets/js/record-task'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 import DownloadTask from '../assets/js/download-task'
 import EventBus from '../assets/js/event-bus'
-import RecordTask from '../assets/js/record-task'
 
-const downloadTasks = ref<IDownloadTask[]>([])
-const recordTasks = ref<IRecordTask[]>([])
+const downloadTasks = ref<DownloadTask[]>([])
+const recordTasks = ref<RecordTask[]>([])
 
 onMounted(() => {
   // 绑定下载事件
   EventBus.on('download-task', (taskData: any) => {
-    const downloadTask = new DownloadTask(taskData._url, taskData._filename, taskData._liveId) as unknown as IDownloadTask
+    console.log('[Downloads.vue]taskData', taskData)
+    const downloadTask = new DownloadTask(taskData._url, taskData._filename, taskData._liveId)
     downloadTask.progress = taskData.progress || 0
-
-    const exists = downloadTasks.value.some((item: IDownloadTask) => {
+    const exists = downloadTasks.value.some((item) => {
+      console.log('[Downloads.vue]task exists', item.getLiveId(), downloadTask.getLiveId())
       return item.getLiveId() === downloadTask.getLiveId()
     })
     if (exists) {
@@ -31,34 +31,12 @@ onMounted(() => {
     })
     downloadTask.setOnEnd(() => {
       downloadTask.progress = 100
+      // 触发响应式刷新
+      downloadTasks.value = [...downloadTasks.value]
     })
     downloadTask.start(() => {
       ElMessage({
         message: '下载开始',
-        type: 'info',
-      })
-    })
-  })
-
-  // 绑定录制事件
-  EventBus.on('record-task', (taskData: any) => {
-    const recordTask = new RecordTask(taskData._url, taskData._filename, taskData._liveId) as unknown as IRecordTask
-    recordTask.progress = taskData.progress || 0
-
-    const exists = recordTasks.value.some((item: IRecordTask) => {
-      return item.getLiveId() === recordTask.getLiveId() && item.isRecording()
-    })
-    if (exists) {
-      ElMessage({
-        message: '该直播已在录制',
-        type: 'warning',
-      })
-      return
-    }
-    recordTasks.value.push(recordTask)
-    recordTask.start(() => {
-      ElMessage({
-        message: '录制开始',
         type: 'info',
       })
     })

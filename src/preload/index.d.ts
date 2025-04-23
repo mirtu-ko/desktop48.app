@@ -41,6 +41,11 @@ export interface mainAPI {
   // 播放
   openPlayer: (params: { title: string, streamPath: string, ffplayPath?: string }) => Promise<any>
 
+  // 下载
+  downloadTaskStart: (url: string, filename: string, liveId: string) => Promise<any>
+  downloadTaskProgress: (callback: (liveId: string, time: string) => void) => void
+  downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
+  downloadTaskError: (callback: (liveId: string, error: any) => void) => void
   getPlatform: () => string
   // 可继续扩展更多API
 }

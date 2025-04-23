@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
-import { cloneDeep } from 'lodash'
+import { cloneDeep, random } from 'lodash'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
@@ -23,7 +23,7 @@ const playStreamPath = ref('')
 const isReview = ref(false)
 const isRadio = ref(false)
 const number = ref(0)
-const member = ref<any>({})
+const memberInfo = ref<any>({})
 const player = ref<any>(null) // 保留用于控制播放/暂停等
 const nativeVideo = ref<HTMLVideoElement | null>(null) // 原生 video 播放器
 const isMuted = ref(false)
@@ -85,7 +85,7 @@ onUnmounted(() => {
 })
 
 function getOne() {
-  Apis.instance().live(props.liveId).then((data) => {
+  Apis.instance().live(props.liveId).then(async (data) => {
     playStreamPath.value = Tools.streamPathHandle(data.playStreamPath, props.startTime)
     isReview.value = data.review
     barrageUrl.value = data.msgFilePath
@@ -95,7 +95,7 @@ function getOne() {
       carousels.value = data.carousels.carousels.map((carousel: any) => Tools.sourceUrl(carousel))
       carouselTime.value = Number.parseInt(data.carousels.carouselTime)
     }
-    // member.value = await window.mainAPI.getMember(data.user.userId) // 请确保主进程暴露此API
+    memberInfo.value = await window.mainAPI.getMember(data.user.userId)
     initPlayer()
   }).catch((error: any) => {
     console.error(error)
@@ -230,7 +230,8 @@ function getBarrages() {
 const router = useRouter()
 function download() {
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  const filename = `${member.value.realName} ${date}.mp4`
+  const filename = `${memberInfo.value.realName}${date}-${random(10000)}.mp4`
+  console.log('[Review.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
   const downloadTask: any = new DownloadTask(playStreamPath.value, filename, props.liveId)
   EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
   router.push('/downloads')
@@ -268,10 +269,6 @@ function download() {
       <el-row :gutter="12" class="review-row">
         <el-col :span="12" class="review-left">
           <el-card shadow="never">
-            <template #extra>
-              <span>{{ member.userName }}</span>
-            </template>
-
             <div class="video-box">
               <video
                 ref="nativeVideo" class="video" controls :poster="isRadio ? coverImage : ''"

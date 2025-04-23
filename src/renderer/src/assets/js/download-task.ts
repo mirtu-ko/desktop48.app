@@ -1,6 +1,4 @@
 import Constants from './constants'
-// import Database removed, use window.mainAPI instead
-// [提示] 所有 ffmpeg 相关逻辑需通过主进程/IPC 桥接
 
 /**
  * 回放下载任务
@@ -28,7 +26,7 @@ export default class DownloadTask {
    * 异步初始化，获取保存目录等
    */
   public async init() {
-    this._saveDirectory = await window.mainAPI.getConfig('donwloadDirectory', '')
+    this._saveDirectory = await window.mainAPI.getConfig('downloadDirectory', '')
   }
 
   public getUrl(): string {
@@ -39,20 +37,8 @@ export default class DownloadTask {
     this._url = value
   }
 
-  public getSaveDirectory(): string {
-    return this._saveDirectory
-  }
-
-  public setSaveDirectory(value: string) {
-    this._saveDirectory = value
-  }
-
-  public getFilename(): string {
-    return this._filename
-  }
-
-  public setFilename(value: string) {
-    this._filename = value
+  public getFilePath(): string {
+    return `${this._saveDirectory}/${this._filename}`
   }
 
   public getLiveId() {
@@ -67,18 +53,38 @@ export default class DownloadTask {
     this._onEnd = value
   }
 
-  public getFilePath() {
-    console.log('getFilePath', this._saveDirectory, this._filename)
-    return `${this._saveDirectory}/${this._filename}`
-  }
-
   public start(startListener: () => void) {
-    this._status = Constants.DownloadStatus.Downloading
-    startListener()
-    console.info('download task start', this._url, this._filename, this._liveId)
-    // report initial progress to the callback
-    this._onProgress(this.progress)
-    // 启动 Electron 主进程下载
+    this.init().then(() => {
+      this._status = Constants.DownloadStatus.Downloading
+      startListener()
+      console.info('[download-task.ts] download task:', this._url, this._filename, this._liveId)
+      // report initial progress to the callback
+      this._onProgress(this.progress)
+      // start download via main process
+      window.mainAPI.downloadTaskStart(this._url, this._filename, this._liveId)
+      // 监听下载进度
+      window.mainAPI.downloadTaskProgress((liveId: string, time: string) => {
+        if (liveId === this._liveId) {
+          const [h, m, s] = time.split(':')
+          const seconds = Number.parseInt(h) * 3600 + Number.parseInt(m) * 60 + Number.parseFloat(s)
+          this._onProgress(seconds)
+        }
+      })
+      // 监听下载完成
+      window.mainAPI.downloadTaskEnd((liveId: string, _filePath: string) => {
+        console.info('[download-task.ts] download task end:', liveId, this._liveId)
+        if (liveId === this._liveId) {
+          this._status = Constants.DownloadStatus.Finish
+          this._onEnd()
+        }
+      })
+      // 监听下载错误
+      window.mainAPI.downloadTaskError((liveId: string, error: any) => {
+        if (liveId === this._liveId) {
+          console.error('[download-task] download error', error)
+        }
+      })
+    })
   }
 
   public isDownloading() {
@@ -100,6 +106,10 @@ export default class DownloadTask {
   }
 
   public openSaveDirectory() {
-    window.mainAPI?.showItemInFolder?.(this.getFilePath())
+    if (!this._saveDirectory) {
+      console.error('saveDirectory is not initialized')
+      return
+    }
+    window.mainAPI.showItemInFolder(this._saveDirectory)
   }
 }
