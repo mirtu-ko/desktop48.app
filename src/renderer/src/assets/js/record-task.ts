@@ -13,10 +13,25 @@ export default class RecordTask {
   private _status: number = Constants.RecordStatus.Prepared
   private _liveId!: string
 
+  private _onProgress: (progress: number) => void = () => {}
+  private _onEnd: () => void = () => {}
+
+  public setOnProgress(cb: (progress: number) => void) {
+    this._onProgress = cb
+  }
+
+  public setOnEnd(cb: () => void) {
+    this._onEnd = cb
+  }
+
   public constructor(url: string, filename: string, liveId: string) {
     this._url = url
     this._filename = filename
     this._liveId = liveId
+  }
+
+  public async init() {
+    this._saveDirectory = await window.mainAPI.getConfig('downloadDirectory', '')
   }
 
   public getUrl(): string {
@@ -48,17 +63,50 @@ export default class RecordTask {
   }
 
   public getFilePath() {
+    this.init()
     return `${this._saveDirectory}/${this._filename}`
   }
 
   public start(startListener: () => void) {
-    // 此处需通过 window.electron 或主进程 IPC 实现录制任务
-    // 原 ffmpeg 相关链式调用已移除
-    // 示例：window.electron.startRecordTask({ url: this._url, filename: this._filename, ... })
-    this._status = Constants.RecordStatus.Recording
-    startListener()
-    console.info('record task start')
-    // 录制进度、完成、失败等回调逻辑请通过 IPC 消息与主进程通信实现
+    this.init().then(() => {
+    // 启动录制任务并监听主进程回调
+      this._status = Constants.RecordStatus.Recording
+      startListener()
+      console.info('[record-task.ts] record task start:', this._url, this._filename, this._liveId)
+      // 调用主进程IPC开始录制
+      window.mainAPI.recordTaskStart?.(this._url, this._filename, this._liveId)
+      // 监听录制进度
+      window.mainAPI.recordTaskProgress?.((liveId: string, time: string) => {
+        if (liveId === this._liveId) {
+        // 解析时间字符串为秒数
+          const [h, m, s] = time.split(':')
+          const seconds = Number.parseInt(h) * 3600 + Number.parseInt(m) * 60 + Number.parseFloat(s)
+          this.progress = seconds
+          // 可扩展进度回调
+          if (typeof this._onProgress === 'function') {
+            this._onProgress(seconds)
+          }
+          console.log('[record-task.ts] record task progress:', liveId, seconds)
+        }
+      })
+      // 监听录制完成
+      window.mainAPI.recordTaskEnd?.((liveId: string, _filePath: string) => {
+        if (liveId === this._liveId) {
+          this._status = Constants.RecordStatus.Finish
+          if (typeof this._onEnd === 'function') {
+            this._onEnd()
+          }
+          console.info('[record-task.ts] record task end:', liveId)
+        }
+      })
+      // 监听录制错误
+      window.mainAPI.recordTaskError?.((liveId: string, error: any) => {
+        if (liveId === this._liveId) {
+          this._status = Constants.RecordStatus.Finish
+          console.error('[record-task.ts] record error', error)
+        }
+      })
+    })
   }
 
   public isRecording() {
@@ -82,6 +130,7 @@ export default class RecordTask {
   }
 
   public openSaveDirectory() {
+    this.init()
     window.mainAPI?.showItemInFolder?.(this.getFilePath())
   }
 }

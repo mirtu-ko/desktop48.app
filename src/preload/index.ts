@@ -41,6 +41,17 @@ const api = {
   downloadTaskError: (callback: (liveId: string, error: any) => void) => {
     ipcRenderer.on('downloadTaskError', (_e, liveId, error) => callback(liveId, error))
   },
+  // 录制
+  recordTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('recordTaskStart', url, filename, liveId),
+  recordTaskProgress: (callback: (liveId: string, time: string) => void) => {
+    ipcRenderer.on('recordTaskProgress', (_e, liveId, time) => callback(liveId, time))
+  },
+  recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => {
+    ipcRenderer.on('recordTaskEnd', (_e, liveId, filePath) => callback(liveId, filePath))
+  },
+  recordTaskError: (callback: (liveId: string, error: any) => void) => {
+    ipcRenderer.on('recordTaskError', (_e, liveId, error) => callback(liveId, error))
+  },
   // 其他
 }
 

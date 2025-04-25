@@ -99,6 +99,7 @@ function record(item: any) {
     EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
     router.push('/downloads')
     setTimeout(() => {
+      recordTask.init()
       EventBus.emit('record-task', recordTask)
     })
   }).catch((error) => {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type RecordTask from '../assets/js/record-task'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 import DownloadTask from '../assets/js/download-task'
 import EventBus from '../assets/js/event-bus'
+import RecordTask from '../assets/js/record-task'
 
 const downloadTasks = ref<DownloadTask[]>([])
 const recordTasks = ref<RecordTask[]>([])
@@ -37,6 +37,35 @@ onMounted(() => {
     downloadTask.start(() => {
       ElMessage({
         message: '下载开始',
+        type: 'info',
+      })
+    })
+  })
+  // 新增：监听 record-task 事件
+  EventBus.on('record-task', (taskData: any) => {
+    console.log('[Downloads.vue]record-task', taskData)
+    // 始终用 new RecordTask，只取参数，避免原型链问题
+    const recordTask = new RecordTask(taskData._url, taskData._filename, taskData._liveId)
+    recordTask.progress = taskData.progress || 0
+    const exists = recordTasks.value.some(item => item.getLiveId() === recordTask.getLiveId())
+    if (exists) {
+      ElMessage({
+        message: '该直播已在录制列表',
+        type: 'warning',
+      })
+      return
+    }
+    recordTasks.value.push(recordTask)
+    recordTask.setOnProgress((progress: number) => {
+      recordTask.progress = progress
+    })
+    recordTask.setOnEnd(() => {
+      // 触发响应式刷新
+      recordTasks.value = [...recordTasks.value]
+    })
+    recordTask.start(() => {
+      ElMessage({
+        message: '录制开始',
         type: 'info',
       })
     })
@@ -96,9 +125,12 @@ onMounted(() => {
     >
       <div class="task-info">
         <div>
-          <i v-if="recordTask.isRecording()" class="el-icon-loading" style="color: #409EFF;" />
-          <i v-if="recordTask.isFinish()" class="el-icon-check" style="color: #67C23A;" />
-          <span style="margin-left: 8px;">{{ recordTask.getFilePath() }}</span>
+          <i v-if="recordTask.isRecording()" class="el-icon-loading" style="color: #409EFF;">
+            <span style="margin-left: 8px;">{{ `${recordTask.getFilename()}|${recordTask.progress}` }}</span>
+          </i>
+          <i v-if="recordTask.isFinish()" class="el-icon-check" style="color: #67C23A;">
+            <span style="margin-left: 8px;">{{ recordTask.getFilePath() }}</span>
+          </i>
         </div>
         <div>
           <el-button v-if="recordTask.isRecording()" type="danger" size="small" @click="recordTask.stop()">

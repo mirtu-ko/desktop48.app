@@ -47,6 +47,11 @@ export interface mainAPI {
   downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
   downloadTaskError: (callback: (liveId: string, error: any) => void) => void
   getPlatform: () => string
+  // 录制
+  recordTaskStart: (url: string, filename: string, liveId: string) => Promise<any>
+  recordTaskProgress: (callback: (liveId: string, time: string) => void) => void
+  recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
+  recordTaskError: (callback: (liveId: string, error: any) => void) => void
   // 可继续扩展更多API
 }
 
