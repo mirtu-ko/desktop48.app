@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { Check, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import DownloadTask from '../assets/js/download-task'
 import EventBus from '../assets/js/event-bus'
 import RecordTask from '../assets/js/record-task'
@@ -12,8 +13,9 @@ onMounted(() => {
   // 绑定下载事件
   EventBus.on('download-task', (taskData: any) => {
     console.log('[Downloads.vue]taskData', taskData)
-    const downloadTask = new DownloadTask(taskData._url, taskData._filename, taskData._liveId)
-    downloadTask.progress = taskData.progress || 0
+    // 始终用 new DownloadTask，只取参数，避免原型链问题，并用 reactive 代理
+    const rawTask = new DownloadTask(taskData._url, taskData._filename, taskData._liveId)
+    const downloadTask = reactive(rawTask)
     const exists = downloadTasks.value.some((item) => {
       console.log('[Downloads.vue]task exists', item.getLiveId(), downloadTask.getLiveId())
       return item.getLiveId() === downloadTask.getLiveId()
@@ -26,11 +28,7 @@ onMounted(() => {
       return
     }
     downloadTasks.value.push(downloadTask)
-    downloadTask.setOnProgress((percent: number) => {
-      downloadTask.progress = percent
-    })
     downloadTask.setOnEnd(() => {
-      downloadTask.progress = 100
       // 触发响应式刷新
       downloadTasks.value = [...downloadTasks.value]
     })
@@ -44,9 +42,9 @@ onMounted(() => {
   // 新增：监听 record-task 事件
   EventBus.on('record-task', (taskData: any) => {
     console.log('[Downloads.vue]record-task', taskData)
-    // 始终用 new RecordTask，只取参数，避免原型链问题
-    const recordTask = new RecordTask(taskData._url, taskData._filename, taskData._liveId)
-    recordTask.progress = taskData.progress || 0
+    // 始终用 new RecordTask，只取参数，避免原型链问题，并用 reactive 代理
+    const rawTask = new RecordTask(taskData._url, taskData._filename, taskData._liveId)
+    const recordTask = reactive(rawTask)
     const exists = recordTasks.value.some(item => item.getLiveId() === recordTask.getLiveId())
     if (exists) {
       ElMessage({
@@ -56,9 +54,8 @@ onMounted(() => {
       return
     }
     recordTasks.value.push(recordTask)
-    recordTask.setOnProgress((progress: number) => {
-      recordTask.progress = progress
-    })
+    // trigger reactivity update to render filename immediately
+    recordTasks.value = [...recordTasks.value]
     recordTask.setOnEnd(() => {
       // 触发响应式刷新
       recordTasks.value = [...recordTasks.value]
@@ -88,9 +85,13 @@ onMounted(() => {
       shadow="hover"
     >
       <div class="task-info">
-        <div>
-          <i v-if="downloadTask.isDownloading()" class="el-icon-loading" style="color: #409EFF;" />
-          <i v-if="downloadTask.isFinish()" class="el-icon-check" style="color: #67C23A;" />
+        <div style="display: flex; align-items: center;">
+          <el-icon v-if="downloadTask.isDownloading()" color="#409EFF" class="is-loading">
+            <Loading />
+          </el-icon>
+          <el-icon v-if="downloadTask.isFinish()" color="#67C23A">
+            <Check />
+          </el-icon>
           <span style="margin-left: 8px;">{{ downloadTask.getFilePath() }}</span>
         </div>
         <div>
@@ -105,10 +106,6 @@ onMounted(() => {
           </el-button>
         </div>
       </div>
-
-      <div class="task-progress">
-        <el-progress text-inside :stroke-width="18" :percentage="downloadTask.progress" />
-      </div>
     </el-card>
 
     <el-divider content-position="left">
@@ -120,17 +117,18 @@ onMounted(() => {
     </el-card>
 
     <el-card
-      v-for="recordTask in recordTasks" v-else :key="recordTask.getLiveId()" style="margin-bottom: 8px;"
+      v-for="recordTask in recordTasks" :key="recordTask.getLiveId()" style="margin-bottom: 8px;"
       shadow="hover"
     >
       <div class="task-info">
-        <div>
-          <i v-if="recordTask.isRecording()" class="el-icon-loading" style="color: #409EFF;">
-            <span style="margin-left: 8px;">{{ `${recordTask.getFilename()}|${recordTask.progress}` }}</span>
-          </i>
-          <i v-if="recordTask.isFinish()" class="el-icon-check" style="color: #67C23A;">
-            <span style="margin-left: 8px;">{{ recordTask.getFilePath() }}</span>
-          </i>
+        <div style="display: flex; align-items: center;">
+          <el-icon v-if="recordTask.isRecording()" color="#409EFF" class="is-loading">
+            <Loading />
+          </el-icon>
+          <el-icon v-if="recordTask.isFinish()" color="#67C23A">
+            <Check />
+          </el-icon>
+          <span style="margin-left: 8px;">{{ recordTask.getFilePath() }}</span>
         </div>
         <div>
           <el-button v-if="recordTask.isRecording()" type="danger" size="small" @click="recordTask.stop()">

@@ -34,6 +34,10 @@ ipcMain.handle('select-directory', async () => {
   return result.filePaths[0]
 })
 
+// path处理
+ipcMain.handle('path-join', (_event: IpcMainInvokeEvent, ...paths: string[]) => path.join(...paths))
+
+// 网络请求
 if (!ipcMain.eventNames().includes('net-request')) {
   ipcMain.handle('net-request', async (_event: IpcMainInvokeEvent, options: any) => {
     return new Promise((resolve, reject) => {

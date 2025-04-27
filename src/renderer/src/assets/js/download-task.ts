@@ -4,11 +4,10 @@ import Constants from './constants'
  * 回放下载任务
  */
 export default class DownloadTask {
-  public progress: number = 0
   private _url!: string
-  private _saveDirectory: string = '' // 需调用 async init() 异步赋值
+  private _saveDirectory: string = ''
   private _filename!: string
-  private _onProgress: (progress: number) => void = () => {}
+  private _filePath: string = ''
 
   private _onEnd: () => void = () => {}
 
@@ -19,7 +18,6 @@ export default class DownloadTask {
     this._url = url
     this._filename = filename
     this._liveId = liveId
-    // 构造函数不能 async，异步初始化请调用 this.init()
   }
 
   /**
@@ -38,15 +36,11 @@ export default class DownloadTask {
   }
 
   public getFilePath(): string {
-    return `${this._saveDirectory}/${this._filename}`
+    return this._filePath
   }
 
   public getLiveId() {
     return this._liveId
-  }
-
-  public setOnProgress(value: (progress: number) => void) {
-    this._onProgress = value
   }
 
   public setOnEnd(value: () => void) {
@@ -54,27 +48,23 @@ export default class DownloadTask {
   }
 
   public start(startListener: () => void) {
-    this.init().then(() => {
+    this.init().then(async () => {
+      // compute full file path early for display during download
+      this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
       this._status = Constants.DownloadStatus.Downloading
       startListener()
-      console.info('[download-task.ts] download task:', this._url, this._filename, this._liveId)
-      // report initial progress to the callback
-      this._onProgress(this.progress)
-      // start download via main process
+      console.info('[download-task.ts] download task start:', this._url, this._filename, this._liveId)
       window.mainAPI.downloadTaskStart(this._url, this._filename, this._liveId)
       // 监听下载进度
       window.mainAPI.downloadTaskProgress((liveId: string, time: string) => {
         if (liveId === this._liveId) {
-          const [h, m, s] = time.split(':')
-          const seconds = Number.parseInt(h) * 3600 + Number.parseInt(m) * 60 + Number.parseFloat(s)
-          this._onProgress(seconds)
-          console.log('[download-task.ts] download task progress:', liveId, seconds)
+          console.log('[download-task.ts] download task progress:', liveId, time)
         }
       })
       // 监听下载完成
       window.mainAPI.downloadTaskEnd((liveId: string, _filePath: string) => {
-        console.info('[download-task.ts] download task end:', liveId, this._liveId)
         if (liveId === this._liveId) {
+          this._filePath = _filePath
           this._status = Constants.DownloadStatus.Finish
           this._onEnd()
         }
@@ -100,6 +90,7 @@ export default class DownloadTask {
     if (this._status !== Constants.DownloadStatus.Downloading) {
       return
     }
+    window.mainAPI.downloadTaskStop(this._liveId)
     this._status = Constants.DownloadStatus.Finish
     console.info('download task stop')
     // invoke end callback

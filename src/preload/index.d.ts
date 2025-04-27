@@ -37,6 +37,7 @@ export interface mainAPI {
   checkFfmpegBinaries: (dir: string) => Promise<any>
   getDesktopPath: () => Promise<any>
   selectDirectory: () => Promise<any>
+  pathJoin: (...paths: string[]) => Promise<string>
 
   // 播放
   openPlayer: (params: { title: string, streamPath: string, ffplayPath?: string }) => Promise<any>
@@ -46,12 +47,14 @@ export interface mainAPI {
   downloadTaskProgress: (callback: (liveId: string, time: string) => void) => void
   downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
   downloadTaskError: (callback: (liveId: string, error: any) => void) => void
+  downloadTaskStop: (liveId: string) => void
   getPlatform: () => string
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => Promise<any>
   recordTaskProgress: (callback: (liveId: string, time: string) => void) => void
   recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
   recordTaskError: (callback: (liveId: string, error: any) => void) => void
+  recordTaskStop: (liveId: string) => void
   // 可继续扩展更多API
 }
 

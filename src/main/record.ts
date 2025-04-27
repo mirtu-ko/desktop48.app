@@ -16,11 +16,17 @@ ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string,
     // spawn ffmpeg to record RTMP stream
     // -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 可选参数用于断线重连
     const ffmpeg = spawn('ffmpeg', [
-      '-hide_banner', '-loglevel', 'info',
-      '-i', url,
-      '-c', 'copy',
-      '-f', 'flv',
-      filePath
+      '-hide_banner',
+      '-loglevel',
+      'info',
+      '-y',
+      '-i',
+      url,
+      '-c',
+      'copy',
+      '-f',
+      'flv',
+      filePath,
     ])
     console.log('[record.ts]spawn ffmpeg start', filePath)
     ffmpeg.stderr.on('data', (chunk) => {
@@ -29,16 +35,19 @@ ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string,
       if (match && match[1]) {
         console.log('[record.ts]spawn ffmpeg progress', match[1])
         event.sender.send('recordTaskProgress', liveId, match[1])
-      } else {
+      }
+      else {
         console.log('[record.ts]ffmpeg stderr(no match):', msg.trim())
       }
     })
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
+    // Handle process close; treat SIGINT (code null, signal 'SIGINT') as normal stop
+    ffmpeg.on('close', (code, signal) => {
+      if (code === 0 || signal === 'SIGINT') {
         console.log('[record.ts]spawn ffmpeg end', liveId, filePath)
         event.sender.send('recordTaskEnd', liveId, filePath)
         resolve(filePath)
-      } else {
+      }
+      else {
         const errMsg = `[record.ts]ffmpeg exited with code ${code}`
         event.sender.send('recordTaskError', liveId, errMsg)
         reject(new Error(errMsg))

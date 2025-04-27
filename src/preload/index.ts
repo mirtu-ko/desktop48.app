@@ -30,6 +30,7 @@ const api = {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('check-ffmpeg-binaries', dir),
   getPlatform: () => process.platform,
+  pathJoin: (...paths: string[]) => ipcRenderer.invoke('path-join', ...paths),
   // 下载
   downloadTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('downloadTaskStart', url, filename, liveId),
   downloadTaskProgress: (callback: (liveId: string, time: string) => void) => {
@@ -41,6 +42,7 @@ const api = {
   downloadTaskError: (callback: (liveId: string, error: any) => void) => {
     ipcRenderer.on('downloadTaskError', (_e, liveId, error) => callback(liveId, error))
   },
+  downloadTaskStop: (liveId: string) => ipcRenderer.send(`downloadTaskStop:${liveId}`),
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('recordTaskStart', url, filename, liveId),
   recordTaskProgress: (callback: (liveId: string, time: string) => void) => {
@@ -52,6 +54,7 @@ const api = {
   recordTaskError: (callback: (liveId: string, error: any) => void) => {
     ipcRenderer.on('recordTaskError', (_e, liveId, error) => callback(liveId, error))
   },
+  recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
   // 其他
 }
 

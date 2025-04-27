@@ -230,7 +230,7 @@ function getBarrages() {
 const router = useRouter()
 function download() {
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  const filename = `${memberInfo.value.realName}${date}_${Math.random().toString(36).substring(2)}.mp4`
+  const filename = `${memberInfo.value.realName}${date}.mp4`
   console.log('[Review.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
   const downloadTask: any = new DownloadTask(playStreamPath.value, filename, props.liveId)
   EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)

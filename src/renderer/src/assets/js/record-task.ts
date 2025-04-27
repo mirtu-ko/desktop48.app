@@ -4,21 +4,15 @@ import Constants from './constants'
  * 直播录制任务
  */
 export default class RecordTask {
-  public progress: number = 0
   private _url!: string
   private _saveDirectory: string = '' // 需调用 async init() 异步赋值
   private _filename!: string
+  private _filePath: string = ''
 
-  private _ffmpegCommand: any = null
   private _status: number = Constants.RecordStatus.Prepared
   private _liveId!: string
 
-  private _onProgress: (progress: number) => void = () => {}
   private _onEnd: () => void = () => {}
-
-  public setOnProgress(cb: (progress: number) => void) {
-    this._onProgress = cb
-  }
 
   public setOnEnd(cb: () => void) {
     this._onEnd = cb
@@ -62,14 +56,14 @@ export default class RecordTask {
     return this._liveId
   }
 
-  public getFilePath() {
-    this.init()
-    return `${this._saveDirectory}/${this._filename}`
+  public getFilePath(): string {
+    return this._filePath
   }
 
   public start(startListener: () => void) {
-    this.init().then(() => {
-    // 启动录制任务并监听主进程回调
+    this.init().then(async () => {
+      // compute full file path early for display during recording
+      this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
       this._status = Constants.RecordStatus.Recording
       startListener()
       console.info('[record-task.ts] record task start:', this._url, this._filename, this._liveId)
@@ -78,20 +72,13 @@ export default class RecordTask {
       // 监听录制进度
       window.mainAPI.recordTaskProgress?.((liveId: string, time: string) => {
         if (liveId === this._liveId) {
-        // 解析时间字符串为秒数
-          const [h, m, s] = time.split(':')
-          const seconds = Number.parseInt(h) * 3600 + Number.parseInt(m) * 60 + Number.parseFloat(s)
-          this.progress = seconds
-          // 可扩展进度回调
-          if (typeof this._onProgress === 'function') {
-            this._onProgress(seconds)
-          }
-          console.log('[record-task.ts] record task progress:', liveId, seconds)
+          console.log('[record-task.ts] record task progress:', liveId, time)
         }
       })
       // 监听录制完成
       window.mainAPI.recordTaskEnd?.((liveId: string, _filePath: string) => {
         if (liveId === this._liveId) {
+          this._filePath = _filePath
           this._status = Constants.RecordStatus.Finish
           if (typeof this._onEnd === 'function') {
             this._onEnd()
@@ -118,10 +105,15 @@ export default class RecordTask {
   }
 
   public stop() {
-    if (this._ffmpegCommand === null || this._status !== Constants.RecordStatus.Recording)
+    console.info('record task stop')
+    if (this._status !== Constants.RecordStatus.Recording) {
+      // 已结束或未开始
+      console.info('record task 已结束或未开始')
       return
+    }
     try {
-      this._ffmpegCommand.ffmpegProc.stdin.write('q')
+      console.info('record task stopping')
+      window.mainAPI.recordTaskStop(this._liveId)
     }
     finally {
       this._status = Constants.RecordStatus.Finish
@@ -130,7 +122,9 @@ export default class RecordTask {
   }
 
   public openSaveDirectory() {
-    this.init()
-    window.mainAPI?.showItemInFolder?.(this.getFilePath())
+    this.init().then(() => {
+      console.info('record task open save directory', this._saveDirectory)
+      window.mainAPI?.showItemInFolder?.(this._saveDirectory)
+    })
   }
 }
