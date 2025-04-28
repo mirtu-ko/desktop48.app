@@ -94,7 +94,7 @@ function record(item: any) {
   Apis.instance().live(item.liveId).then(async (content) => {
     const member = await window.mainAPI.getMember(content.user.userId)
     const date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyyMMddhhmm')
-    const filename = `${member.realName} ${date}_${Math.random().toString(36).substring(2)}.flv`
+    const filename = `${member.realName} ${date}.flv`
     const recordTask: RecordTask = new RecordTask(content.playStreamPath, filename, content.liveId)
     EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
     router.push('/downloads')

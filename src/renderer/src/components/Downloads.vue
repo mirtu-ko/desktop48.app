@@ -28,10 +28,6 @@ onMounted(() => {
       return
     }
     downloadTasks.value.push(downloadTask)
-    downloadTask.setOnEnd(() => {
-      // 触发响应式刷新
-      downloadTasks.value = [...downloadTasks.value]
-    })
     downloadTask.start(() => {
       ElMessage({
         message: '下载开始',
@@ -39,7 +35,7 @@ onMounted(() => {
       })
     })
   })
-  // 新增：监听 record-task 事件
+  // 监听 record-task 事件
   EventBus.on('record-task', (taskData: any) => {
     console.log('[Downloads.vue]record-task', taskData)
     // 始终用 new RecordTask，只取参数，避免原型链问题，并用 reactive 代理
@@ -51,15 +47,19 @@ onMounted(() => {
         message: '该直播已在录制列表',
         type: 'warning',
       })
+      // 更新任务，如果任务状态为结束，重新开始
+      const task = recordTasks.value.find(item => item.getLiveId() === recordTask.getLiveId())
+      if (task && task.isFinish()) {
+        task.start(() => {
+          ElMessage({
+            message: '录制已重新开始，原任务将被覆盖',
+            type: 'info',
+          })
+        })
+      }
       return
     }
     recordTasks.value.push(recordTask)
-    // trigger reactivity update to render filename immediately
-    recordTasks.value = [...recordTasks.value]
-    recordTask.setOnEnd(() => {
-      // 触发响应式刷新
-      recordTasks.value = [...recordTasks.value]
-    })
     recordTask.start(() => {
       ElMessage({
         message: '录制开始',
@@ -95,7 +95,7 @@ onMounted(() => {
           <span style="margin-left: 8px;">{{ downloadTask.getFilePath() }}</span>
         </div>
         <div>
-          <el-button v-if="downloadTask.isDownloading()" type="danger" size="small" @click="downloadTask.stop()">
+          <el-button v-if="downloadTask.isDownloading()" type="danger" size="small" @click="downloadTask.stop(); downloadTasks.splice(downloadTasks.indexOf(downloadTask), 1)">
             结束
           </el-button>
           <el-button
