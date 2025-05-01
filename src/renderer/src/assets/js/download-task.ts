@@ -50,6 +50,10 @@ export default class DownloadTask {
   public start(startListener: () => void) {
     this.init().then(async () => {
       // compute full file path early for display during download
+      if (!this._saveDirectory) {
+        console.error('saveDirectory is not initialized')
+        return
+      }
       this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
       this._status = Constants.DownloadStatus.Downloading
       startListener()

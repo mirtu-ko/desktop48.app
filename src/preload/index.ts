@@ -5,7 +5,7 @@ console.log('[preload/index.ts]preload')
 
 // 渲染进程的自定义 API
 const api = {
-  saveMemberData: (data: any) => ipcRenderer.invoke('save-member-data', data),
+  saveMemberData: (data: any) => ipcRenderer.invoke('saveMemberData', data),
   // 成员
   getMember: (userId: number) => ipcRenderer.invoke('getMember', userId),
   getMemberOptions: () => ipcRenderer.invoke('getMemberOptions'),

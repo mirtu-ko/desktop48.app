@@ -111,6 +111,16 @@ class Database {
     this.lowdb = new LowSync(this.adapter, data) // 传递默认数据，避免 data 未初始化
   }
 
+  private memberTeamUpdate() {
+    // 为 starInfo 每一项新增 team 字段
+    if (Array.isArray(this.db.starInfo) && Array.isArray(this.db.teamInfo)) {
+      this.db.starInfo.forEach((member: any) => {
+        const team = this.db.teamInfo.find((t: any) => Number(t.teamId) === Number(member.teamId))
+        member.team = team ? { teamColor: team.teamColor, teamName: team.teamName } : { teamColor: '', teamName: '' }
+      })
+    }
+  }
+
   public init() {
     this.lowdb.read()
     if (!this.lowdb.data) {
@@ -122,20 +132,16 @@ class Database {
     this.teamsDB = this.db.teamInfo
     this.groupsDB = this.db.groupInfo
 
-    // 为 starInfo 每一项新增 team 字段
-    if (Array.isArray(this.db.starInfo) && Array.isArray(this.db.teamInfo)) {
-      this.db.starInfo.forEach((member: any) => {
-        const team = this.db.teamInfo.find((t: any) => Number(t.teamId) === Number(member.teamId))
-        member.team = team ? { teamColor: team.teamColor, teamName: team.teamName } : { teamColor: '', teamName: '' }
-      })
-    }
-
     this.buildMemberTree()
+    this.memberTeamUpdate()
+    this.lowdb.write()
     // 调试打印数据库路径
     console.log('[数据库路径]', this.dbPath)
   }
 
   public saveMemberData(content: any) {
+    // 写入 starInfo 数据
+    console.log('[database.ts] save-member-data 开始写入:', content.starInfo?.length, content.teamInfo?.length, content.groupInfo?.length)
     if (content.starInfo)
       this.db.starInfo = content.starInfo
     if (content.teamInfo)
@@ -143,6 +149,7 @@ class Database {
     if (content.groupInfo)
       this.db.groupInfo = content.groupInfo
     this.buildMemberTree()
+    this.memberTeamUpdate()
     this.lowdb.write()
     console.log('[database.ts] save-member-data 写入成功:', {
       starInfo: this.db.starInfo?.length,
@@ -150,7 +157,6 @@ class Database {
       groupInfo: this.db.groupInfo?.length,
       memberTree: this.db.memberTree?.length,
     })
-    this.lowdb.write()
     return { ok: true }
   }
 
@@ -173,8 +179,23 @@ class Database {
   }
 
   public getHiddenMembers() {
-    const hiddenMembers = this.db.hiddenMemberIds.map(id => this.db.starInfo.find((m: any) => Number(m.userId) === Number(id)))
-    return hiddenMembers
+    // 确保 hiddenMemberIds 存在且为数组
+    if (!this.db.hiddenMemberIds) {
+      this.db.hiddenMemberIds = []
+      this.lowdb.write()
+    }
+
+    // 确保 starInfo 存在
+    if (!this.db.starInfo) {
+      return []
+    }
+
+    const hiddenMembers = this.db.hiddenMemberIds.map(id =>
+      this.db.starInfo.find((m: any) => Number(m.userId) === Number(id)),
+    )
+
+    // 过滤掉可能的 undefined 结果
+    return hiddenMembers.filter(member => member !== undefined)
   }
 
   public setHiddenMembers(ids: number[]) {
