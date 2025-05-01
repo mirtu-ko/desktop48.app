@@ -6,6 +6,7 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      minify: 'terser',
       terserOptions: {
         compress: {
           drop_console: true,
@@ -17,6 +18,7 @@ export default defineConfig({
   preload: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      minify: 'terser',
       terserOptions: {
         compress: {
           drop_console: true,
@@ -33,6 +35,7 @@ export default defineConfig({
     },
     plugins: [vue()],
     build: {
+      minify: 'terser',
       terserOptions: {
         compress: {
           drop_console: true,
