@@ -5,9 +5,25 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
+    },
   },
   renderer: {
     resolve: {
@@ -16,5 +32,13 @@ export default defineConfig({
       },
     },
     plugins: [vue()],
+    build: {
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
+    },
   },
 })

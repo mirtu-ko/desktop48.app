@@ -56,13 +56,13 @@ async function getReviewList() {
   }
   switch (reviewScreen.value) {
     case Constants.REVIEW_SCREEN.USER:
-      params.userId = selectedUser.value[2]
+      params.userId = selectedUser.value?.[2]
       break
     case Constants.REVIEW_SCREEN.TEAM:
-      params.teamId = selectedTeam.value[0]
+      params.teamId = selectedTeam.value?.[0]
       break
     case Constants.REVIEW_SCREEN.GROUP:
-      params.groupId = selectedGroup.value[0]
+      params.groupId = selectedGroup.value?.[0]
       break
     default:
       break

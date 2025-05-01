@@ -102,7 +102,7 @@ export default class Apis {
     return new Promise((resolve, reject) => {
       Request.post(url, data, headers)
         .then((responseBody) => {
-          console.log('[apis.ts]response:', responseBody)
+          // console.log('[apis.ts]response:', responseBody)
           if (typeof responseBody === 'string') {
             try {
               responseBody = JSON.parse(responseBody)

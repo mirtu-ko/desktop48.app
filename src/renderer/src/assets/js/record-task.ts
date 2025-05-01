@@ -63,6 +63,10 @@ export default class RecordTask {
   public start(startListener: () => void) {
     this.init().then(async () => {
       // compute full file path early for display during recording
+      if (!this._saveDirectory) {
+        console.error('save directory is empty')
+        return
+      }
       this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
       this._status = Constants.RecordStatus.Recording
       startListener()
