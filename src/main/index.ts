@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path, { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
+import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
 import { Database } from './database.js'
@@ -182,3 +182,18 @@ app.on('window-all-closed', () => {
 
 // 在此文件中，您可以包含应用主进程的其他特定代码，
 // 也可以将它们放在单独文件中并在此处引入。
+
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+}
+else {
+  app.on('second-instance', () => {
+    // 当运行第二个实例时，将会聚焦到我的窗口中
+    const allWindows = BaseWindow.getAllWindows()
+    if (allWindows) {
+      allWindows[0].show()
+    }
+  })
+}

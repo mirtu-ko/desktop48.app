@@ -1,7 +1,7 @@
 {
-  "name": "desktop48.app",
+  "name": "desktop48",
   "version": "0.0.1",
-  "description": "desktop48.app",
+  "description": "desktop48",
   "author": "Zack",
   "homepage": "https://electron-vite.org",
   "main": "./out/main/index.js",

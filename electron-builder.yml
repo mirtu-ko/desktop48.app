@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: desktop48.app
+appId: com.electron.desktop48
+productName: Desktop48
 directories:
   buildResources: build
 files:
