@@ -1,18 +1,3 @@
-<template>
-  <div class="shows-container">
-    <h2>最近公演</h2>
-    <div class="shows-list">
-      <div v-for="show in shows" :key="show.id" class="show-item">
-        <div class="show-image">
-          <img :src="show.image" :alt="show.title">
-          <span class="show-time">{{ show.date }}日 {{ show.time }}</span>
-        </div>
-        <h3>{{ show.title }}</h3>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script>
 import Apis from '../assets/js/apis'
 
@@ -40,6 +25,21 @@ export default {
 }
 </script>
 
+<template>
+  <div class="shows-container">
+    <h2>最近公演</h2>
+    <div class="shows-list">
+      <div v-for="show in shows" :key="show.id" class="show-item">
+        <div class="show-image">
+          <img :src="show.image" :alt="show.title">
+          <span class="show-time">{{ show.date }}日 {{ show.time }}</span>
+        </div>
+        <h3>{{ show.title }}</h3>
+      </div>
+    </div>
+  </div>
+</template>
+
 <style scoped>
 .shows-container {
   padding: 20px;
@@ -48,7 +48,7 @@ export default {
 .shows-list {
   display: grid;
   gap: 20px;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .show-item {
@@ -61,7 +61,7 @@ export default {
 .show-image {
   position: relative;
   width: 100%;
-  padding-top: 75%; /* 4:3 aspect ratio */
+  padding-top: 48%; /* 4:3 aspect ratio */
 }
 
 .show-image img {

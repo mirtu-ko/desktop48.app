@@ -1,6 +1,4 @@
 import Constants from './constants.js'
-// import Database removed, use window.mainAPI instead
-// import {remote} from 'electron';
 
 export default class Request {
   /**
