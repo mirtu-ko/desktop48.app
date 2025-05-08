@@ -30,6 +30,7 @@ export default class Constants {
     REVIEWS: 'reviews',
     SETTING: 'setting',
     DOWNLOADS: 'downloads',
+    Shows: 'shows',
   }
 
   /**

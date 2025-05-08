@@ -12,6 +12,7 @@ const route = useRoute()
 const pathToMenu = {
   '/lives': Constants.Menu.LIVES,
   '/reviews': Constants.Menu.REVIEWS,
+  '/shows': Constants.Menu.Shows,
   '/downloads': Constants.Menu.DOWNLOADS,
   '/setting': Constants.Menu.SETTING,
 }
@@ -64,6 +65,9 @@ onUnmounted(() => {
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.REVIEWS">
           回放
+        </el-menu-item>
+        <el-menu-item :index="Constants.Menu.Shows">
+          演出
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.DOWNLOADS">
           下载

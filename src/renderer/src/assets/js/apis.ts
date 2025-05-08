@@ -127,4 +127,54 @@ export default class Apis {
         })
     })
   }
+
+  /**
+   * 获取公演信息
+   */
+  public shows(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      Request.get(ApiUrls.SHOW_LIST_URL)
+        .then((html) => {
+          // 使用正则表达式解析HTML内容
+          const shows = this.parseShowsHtml(html)
+          console.log('[apis.ts]parseShowsHtml', shows)
+          resolve(shows)
+        })
+        .catch((error) => {
+          reject(error)
+        })
+    })
+  }
+
+  private parseShowsHtml(html: string): Array<{
+    id: number
+    title: string
+    date: string
+    time: string
+    image: string
+  }> {
+    const shows: Array<{
+      id: number
+      title: string
+      date: string
+      time: string
+      image: string
+    }> = []
+
+    // 使用正则表达式匹配演出信息
+    const regex = /<li class="starts">\s*<div class="startimg">\s*<img src="([^"]+)"[^>]*>\s*<span class="starttime">(\d+)日&nbsp;(\d+:\d+)<\/span>\s*<\/div>\s*<p>([^<]+)<\/p>/g
+    let match: RegExpExecArray | null
+
+    // eslint-disable-next-line no-cond-assign
+    while ((match = regex.exec(html)) !== null) {
+      shows.push({
+        id: shows.length + 1,
+        image: match[1],
+        date: match[2],
+        time: match[3],
+        title: match[4].trim(),
+      })
+    }
+    return shows
+  }
 }

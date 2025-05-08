@@ -26,4 +26,5 @@ export default class ApiUrls {
   public static readonly CHECK_IN_URL = 'https://pocketapi.48.cn/user/api/v1/checkin'
 
   public static readonly TRIP_LIST_URL = 'https://pocketapi.48.cn/trip/api/trip/v1/list'
+  public static readonly SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/1'
 }
