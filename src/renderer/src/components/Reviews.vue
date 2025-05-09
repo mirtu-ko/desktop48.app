@@ -160,7 +160,7 @@ async function onInfiniteScroll() {
 
 <template>
   <div class="reviews-root">
-    <el-tabs v-model="activeName" type="card" @tab-remove="onTabRemove">
+    <el-tabs v-model="activeName" @tab-remove="onTabRemove">
       <el-tab-pane label="回放列表" name="Home">
         <div class="review-container">
           <el-header class="header-box">

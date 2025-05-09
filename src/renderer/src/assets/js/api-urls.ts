@@ -27,4 +27,8 @@ export default class ApiUrls {
 
   public static readonly TRIP_LIST_URL = 'https://pocketapi.48.cn/trip/api/trip/v1/list'
   public static readonly SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/1'
+  public static readonly BEJ_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/2'
+  public static readonly GNZ_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/3'
+  public static readonly CKG_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/5'
+  public static readonly CGT_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/6'
 }

@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import ApiUrls from './api-urls.js'
 // import Database removed, use window.mainAPI instead
 import Request from './request.js'
@@ -18,6 +19,7 @@ export default class Apis {
       this.request(ApiUrls.UPDATE_INFO_URL, {}, {})
         .then(async (content: any) => {
           // 更新数据到数据库
+          console.log('[apis.ts]更新成员信息', content)
           await window.mainAPI.saveMemberData(content)
           resolve(content)
         })
@@ -131,14 +133,41 @@ export default class Apis {
   /**
    * 获取公演信息
    */
-  public shows(): Promise<any> {
+  public shows(key): Promise<any> {
+    console.log('[apis.ts]开始获取公演信息')
+    const url = ref('')
+    if (key === '1') {
+      url.value = ApiUrls.SHOW_LIST_URL
+    }
+    else if (key === '2') {
+      url.value = ApiUrls.BEJ_SHOW_LIST_URL
+    }
+    else if (key === '3') {
+      url.value = ApiUrls.GNZ_SHOW_LIST_URL
+    }
+    else if (key === '5') {
+      url.value = ApiUrls.CKG_SHOW_LIST_URL
+    }
+    else if (key === '6') {
+      url.value = ApiUrls.CGT_SHOW_LIST_URL
+    }
+    else {
+      console.error('[apis.ts]未知的 key', key)
+      return Promise.reject(new Error(`[apis.ts]未知的 key ${key}`))
+    }
+
     return new Promise((resolve, reject) => {
-      Request.get(ApiUrls.SHOW_LIST_URL)
+      Request.get(url.value)
         .then((html) => {
           // 使用正则表达式解析HTML内容
           const shows = this.parseShowsHtml(html)
+          const watchContent = this.parseWatchContent(html)
           console.log('[apis.ts]parseShowsHtml', shows)
-          resolve(shows)
+          console.log('[apis.ts]parseWatchContent', watchContent)
+          resolve({
+            shows,
+            watchContent,
+          })
         })
         .catch((error) => {
           reject(error)
@@ -176,5 +205,44 @@ export default class Apis {
       })
     }
     return shows
+  }
+
+  private parseWatchContent(html: string): Array<{
+    id: number
+    title: string
+    image: string
+    description: string
+    startTime: number
+    endTime: number
+    status: string
+  }> {
+    const watchContents: Array<{
+      id: number
+      title: string
+      image: string
+      description: string
+      startTime: number
+      endTime: number
+      status: string
+    }> = []
+
+    // 使用正则表达式匹配watchcontent信息
+    const regex = /<div class="watchcontent">[\s\S]*?<div class="v-img"><a[^>]*?href="[^"]*?\/id\/(\d+)"[^>]*><img src="([^"]+)"[^>]*><\/a><\/div>[\s\S]*?<h2>([^<]+)<\/h2>[\s\S]*?<p>&nbsp;&nbsp;([^<]+)<\/p>[\s\S]*?<input[^>]*?id="start_time_\d+"[^>]*?value="(\d+)"[^>]*>[\s\S]*?<input[^>]*?id="end_time_\d+"[^>]*?value="(\d+)"[^>]*>/g
+
+    let match: RegExpExecArray | null
+    // eslint-disable-next-line no-cond-assign
+    while ((match = regex.exec(html)) !== null) {
+      watchContents.push({
+        id: Number.parseInt(match[1]),
+        image: match[2],
+        title: match[3].trim(),
+        description: match[4].trim(),
+        startTime: Number.parseInt(match[5]),
+        endTime: Number.parseInt(match[6]),
+        status: 'upcoming', // 可以根据时间判断状态
+      })
+    }
+
+    return watchContents
   }
 }

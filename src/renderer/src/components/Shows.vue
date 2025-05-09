@@ -1,32 +1,105 @@
-<script>
+<script setup lang="ts">
+import type { TabsPaneContext } from 'element-plus'
+import { onMounted, ref, watch } from 'vue'
 import Apis from '../assets/js/apis'
 
-export default {
-  name: 'Shows',
-  data() {
-    return {
-      shows: [],
+interface Show {
+  id: number
+  title: string
+  image: string
+  date: string
+  time: string
+}
+
+interface watchcontent {
+  id: number
+  title: string
+  image: string
+  description: string
+  startTime: number
+  endTime: number
+  status: string
+}
+
+const shows = ref<Show[]>([])
+
+const showToday = ref<watchcontent[]>()
+
+const key = ref('1')
+
+async function fetchShows() {
+  try {
+    const showsData = await Apis.instance().shows(key.value)
+    shows.value = showsData.shows
+    if (showsData.watchContent) {
+      showToday.value = showsData.watchContent
     }
-  },
-  async mounted() {
-    await this.fetchShows()
-  },
-  methods: {
-    async fetchShows() {
-      try {
-        const shows = await Apis.instance().shows()
-        this.shows = shows
-      }
-      catch (error) {
-        console.error('获取演出信息失败:', error)
-      }
-    },
-  },
+  }
+  catch (error) {
+    console.error('获取演出信息失败:', error)
+  }
+}
+
+onMounted(async () => {
+  await fetchShows()
+})
+
+watch(key, async () => {
+  await fetchShows()
+})
+
+// 格式化时间戳的函数
+function formatTimestamp(timestamp: number): string {
+  const date = new Date(timestamp * 1000) // 转换为毫秒
+  return date.toLocaleString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function handleClick(tab: TabsPaneContext) {
+  console.log(tab.props.label)
+  if (tab.props.label === 'SNH48') {
+    key.value = '1'
+  }
+  if (tab.props.label === 'BEJ48') {
+    key.value = '2'
+  }
+  if (tab.props.label === 'GNZ48') {
+    key.value = '3'
+  }
+  if (tab.props.label === 'CKG48') {
+    key.value = '5'
+  }
+  if (tab.props.label === 'CGT48') {
+    key.value = '6'
+  }
 }
 </script>
 
 <template>
+  <el-tabs @tab-click="handleClick">
+    <el-tab-pane label="SNH48" />
+    <el-tab-pane label="BEJ48" />
+    <el-tab-pane label="GNZ48" />
+    <el-tab-pane label="CKG48" />
+    <el-tab-pane label="CGT48" />
+  </el-tabs>
   <div class="shows-container">
+    <h2 v-if="showToday">
+      即将开始
+    </h2>
+    <div v-if="showToday" class="showToday-list">
+      <div v-for="show in showToday" :key="show.id" class="show-item">
+        <div class="show-image">
+          <img :src="show.image" :alt="show.title">
+          <span class="show-time">{{ `${formatTimestamp(show.startTime)} - ${formatTimestamp(show.endTime)}` }}</span>
+        </div>
+        <h3>{{ show.title }}</h3>
+        <p>{{ show.description }}</p>
+      </div>
+    </div>
     <h2>最近公演</h2>
     <div class="shows-list">
       <div v-for="show in shows" :key="show.id" class="show-item">
@@ -49,6 +122,12 @@ export default {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.showToday-list {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
 }
 
 .show-item {
