@@ -115,7 +115,7 @@ function handleClick(tab: TabsPaneContext) {
 
 <style scoped>
 .shows-container {
-  padding: 20px;
+  padding: 0 10px;
 }
 
 .shows-list {

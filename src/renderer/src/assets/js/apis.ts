@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 import ApiUrls from './api-urls.js'
-// import Database removed, use window.mainAPI instead
 import Request from './request.js'
 
 export default class Apis {
