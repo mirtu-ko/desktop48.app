@@ -96,8 +96,12 @@ function handleClick(tab: TabsPaneContext) {
           <img :src="show.image" :alt="show.title">
           <span class="show-time">{{ `${formatTimestamp(show.startTime)} - ${formatTimestamp(show.endTime)}` }}</span>
         </div>
-        <h3>{{ show.title }}</h3>
-        <p>{{ show.description }}</p>
+        <div class="show-info">
+          <h3>{{ show.title }}</h3>
+          <el-text size="middle">
+            {{ show.description }}
+          </el-text>
+        </div>
       </div>
     </div>
     <h2>最近公演</h2>
@@ -135,6 +139,8 @@ function handleClick(tab: TabsPaneContext) {
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-in-out;
 }
 
 .show-image {
@@ -150,6 +156,10 @@ function handleClick(tab: TabsPaneContext) {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.show-info {
+  padding: 5px 10px;
 }
 
 .show-time {

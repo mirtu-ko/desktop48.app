@@ -201,7 +201,7 @@ el-container {
 .live-list {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 0.3fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 0.3fr));
 }
 
 :deep(.el-card__body) {
@@ -209,7 +209,7 @@ el-container {
 }
 
 :deep(.el-card__header) {
-  padding: 12px !important;
+  padding: 8px !important;
 }
 
 .live-item {
