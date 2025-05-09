@@ -27,17 +27,14 @@ async function updateHiddenMemberIds() {
   hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
 }
 
-onMounted(async () => {
-  members.value = await window.mainAPI.getMemberTree()
-  updateHiddenMemberIds()
-})
-
 const teamOptions = ref<any[]>([])
 const groupOptions = ref<any[]>([])
 
 onMounted(async () => {
   teamOptions.value = await window.mainAPI.getTeamOptions()
   groupOptions.value = await window.mainAPI.getGroupOptions()
+  members.value = await window.mainAPI.getMemberTree()
+  updateHiddenMemberIds()
 })
 
 const disabled = computed(() => loading.value || noMore.value)
@@ -69,6 +66,7 @@ async function getReviewList() {
   }
   params.next = reviewNext.value
   loading.value = true
+  updateHiddenMemberIds()
   Apis.instance().reviews(params).then(async (content: any) => {
     if (!content || !Array.isArray(content.liveList)) {
       console.warn('liveList 不是数组或无内容', content?.liveList)
@@ -89,10 +87,9 @@ async function getReviewList() {
       noMore.value = true
     }
     reviewNext.value = content.next
-    updateHiddenMemberIds()
-    content.liveList.forEach(async (item: any) => {
+    for (const item of content.liveList) {
       if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
-        return
+        continue
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.isReview = true
@@ -100,7 +97,8 @@ async function getReviewList() {
       item.team = item.member?.teamName || ''
       item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
       reviewList.value.push(item)
-    })
+      // console.log('当前列表长度:', reviewList.value.length)
+    }
     loading.value = false
   }).catch((error: any) => {
     console.info(error)
@@ -109,6 +107,7 @@ async function getReviewList() {
   })
 }
 
+// 刷新
 function refresh() {
   reviewList.value = []
   reviewNext.value = '0'
@@ -116,6 +115,7 @@ function refresh() {
   getReviewList()
 }
 
+// 点击回放
 function onReviewClick(item: any) {
   const exists = liveTabs.value.some((tab: any) => tab.liveId === item.liveId)
   if (exists)
@@ -135,9 +135,13 @@ function onTabRemove(targetName: string) {
   activeName.value = 'Home'
   liveTabs.value = liveTabs.value.filter((tab: any) => tab.name != targetName)
 }
+
+// 初始化
 onMounted(() => {
   getReviewList()
 })
+
+// 加载更多
 const isLoadingMore = ref(false)
 
 async function onInfiniteScroll() {
@@ -212,9 +216,9 @@ async function onInfiniteScroll() {
               infinite-scroll-delay="100"
               infinite-scroll-distance="20"
             >
-              <div class="review-list-grid">
+              <div class="review-list">
                 <div
-                  v-for="item in reviewList" :key="item.liveId" class="review-list-grid-item"
+                  v-for="item in reviewList" :key="item.liveId" class="review-item"
                   @click="onReviewClick(item)"
                 >
                   <LiveItem :item="item" class="live-card" />
@@ -261,15 +265,14 @@ async function onInfiniteScroll() {
   overflow-x: hidden !important;
 }
 
-.review-list-grid {
+.review-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 0.3fr));
 }
 
-.review-list-grid-item {
-  max-width: 280px;
-  min-height: 100px;
+.review-item {
+  cursor: pointer;
 }
 
 .loading-more-tip {

@@ -35,12 +35,12 @@ const filteredLiveList = computed(() => {
 })
 
 async function getLiveList() {
-  console.log('[Lives.vue] getLiveList 方法开始执行')
+  // console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
   try {
     updateHiddenMemberIds()
     const content = await Apis.instance().lives(liveNext.value)
-    console.log('获取到的直播列表:', content)
+    // console.log('获取到的直播列表:', content)
     if (noMore.value) {
       ElMessage({
         message: '加载完毕',
@@ -152,8 +152,8 @@ function play(item: any) {
           infinite-scroll-distance="20"
           class="live-main"
         >
-          <div class="live-list-grid">
-            <div v-for="item in filteredLiveList" :key="item.liveId" class="live-list-grid-item">
+          <div class="live-list">
+            <div v-for="item in filteredLiveList" :key="item.liveId" class="live-item">
               <el-popover
                 :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
                 :fallback-placements="[]"
@@ -198,10 +198,10 @@ el-container {
   align-items: center;
 }
 
-.live-list-grid {
+.live-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 0.3fr));
 }
 
 :deep(.el-card__body) {
@@ -212,8 +212,8 @@ el-container {
   padding: 12px !important;
 }
 
-.live-list-grid-item {
-  max-width: 280px;
-  min-height: 100px;
+.live-item {
+  overflow: hidden;
+  background: #fff;
 }
 </style>

@@ -1,6 +1,3 @@
-// ⚠️ 前端不能直接 import 'node:fs' 或 'node:https'。如需文件/网络操作请通过 window.mainAPI 或主进程 IPC 实现。
-// import Database removed, use window.mainAPI instead
-
 const YI_ZHI_BO_HOST = 'alcdn.hls.xiaoka.tv'
 
 class Tools {
@@ -77,11 +74,6 @@ class Tools {
     })
   }
 
-  public static download({ url = '', filePath = '' }) {
-    console.log(url, filePath)
-    // 请通过 window.mainAPI.downloadTask 实现实际下载
-  }
-
   public static dateFormat(timestamp: number, fmt: string): string {
     const date = new Date(timestamp)
     const o: any = {
@@ -112,74 +104,6 @@ class Tools {
       }
     }
     return fmt
-  }
-
-  /**
-   * ffplay路径
-   */
-  /**
-   * ffplay路径（仅渲染进程可用）
-   */
-  public static async ffplayPath(): Promise<string> {
-    if (typeof window === 'undefined' || !window.mainAPI) {
-      throw new Error('Tools.ffplayPath()只能在渲染进程中调用')
-    }
-    return await this.ffmpegToolsPath('ffplay')
-  }
-
-  /**
-   * ffmpeg路径（仅渲染进程可用）
-   */
-  public static async ffmpegPath(): Promise<string> {
-    if (typeof window === 'undefined' || !window.mainAPI) {
-      throw new Error('Tools.ffmpegPath()只能在渲染进程中调用')
-    }
-    return await this.ffmpegToolsPath('ffmpeg')
-  }
-
-  /**
-   * 获取执行文件全称（仅渲染进程可用）
-   * @param filename
-   */
-  public static ffmpegFullFilename(filename: string): string {
-    if (typeof window === 'undefined' || !window.mainAPI) {
-      throw new Error('Tools.ffmpegFullFilename()只能在渲染进程中调用')
-    }
-    // 若 getPlatform 返回 Promise，需要同步处理或报错。此处假定 getPlatform 已同步返回 string。
-    const platform = window.mainAPI.getPlatform()
-    if (typeof platform !== 'string') {
-      // 容错处理，防止 platform 为 Promise
-      return `${filename}.exe`
-    }
-    switch (platform) {
-      case 'darwin':
-        return filename
-      case 'win32':
-      default:
-        return `${filename}.exe`
-    }
-  }
-
-  public static setFfmpegExecutable() {
-    try {
-      // fs.chmodSync(Tools.ffmpegPath(), '777');
-      // fs.chmodSync(Tools.ffplayPath(), '777');
-    }
-    catch (e) {
-      console.error(e)
-    }
-  }
-
-  /**
-   * ffmpeg|ffplay路径（仅渲染进程可用）
-   * @param executeFilename
-   */
-  private static async ffmpegToolsPath(executeFilename: string): Promise<string> {
-    if (typeof window === 'undefined' || !window.mainAPI) {
-      throw new Error('Tools.ffmpegToolsPath()只能在渲染进程中调用')
-    }
-    const dir = await window.mainAPI.getConfig('ffmpegDirctory')
-    return `${dir}/${this.ffmpegFullFilename(executeFilename)}`
   }
 }
 
