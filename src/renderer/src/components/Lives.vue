@@ -170,7 +170,6 @@ function play(item: any) {
             <div v-for="item in liveList" :key="item.liveId" class="live-item">
               <el-popover
                 :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
-                :fallback-placements="[]"
               >
                 <p>{{ item.title }}</p>
                 <div>

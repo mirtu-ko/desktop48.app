@@ -83,16 +83,45 @@ ipcMain.handle('open-player', async (_event: IpcMainInvokeEvent, { title, stream
     throw new Error('ffplay 不存在于指定目录，请检查 ffmpeg 路径设置')
 
   try {
-    const spawnOptions = process.platform === 'win32' ? { windowsHide: false } : {}
-    const child = spawn(ffplayPath, ['-window_title', title, streamPath], spawnOptions)
+    const spawnOptions = process.platform === 'win32'
+      ? { windowsHide: false }
+      : {
+          detached: true,
+        }
+    // 建议添加的 ffplay 参数：
+    // -loglevel debug: 输出更详细的日志
+    // -autoexit: 播放完毕后自动退出 ffplay
+    // -probesize 5M -analyzeduration 5M: 增加探测大小和分析时长，可能有助于处理某些流
+    // 您可以根据需要调整或添加其他参数
+    const ffplayArgs = [
+      '-window_title',
+      title,
+      '-loglevel',
+      'info', // 添加日志级别参数
+      '-autoexit', // 播放结束后自动退出
+      // '-probesize', '5M', // 示例：增加探测大小
+      // '-analyzeduration', '5M', // 示例：增加分析时长
+      streamPath,
+    ]
+    const child = spawn(ffplayPath, ffplayArgs, spawnOptions)
+
     child.on('error', (err) => {
-      console.error('[主进程] ffplay 启动失败:', err)
+      console.error('[主进程] ffplay 启动失败或进程错误:', err)
+      // 可以在这里处理错误，例如通知用户
+    })
+
+    child.on('close', (code, signal) => {
+      console.log(`[主进程] ffplay 进程退出，退出码: ${code}, 信号: ${signal}`)
+      if (code !== 0 && code !== null) {
+        console.error(`[主进程] ffplay 异常退出 (退出码: ${code})`)
+        // 可以在这里处理 ffplay 异常退出的情况，例如通知用户
+      }
     })
     return true
   }
   catch (err) {
     console.error('[主进程] open-player 捕获异常:', err)
-    throw err
+    throw err // 将错误重新抛出，以便渲染进程可以捕获
   }
 })
 
