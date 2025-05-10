@@ -89,21 +89,40 @@ ipcMain.handle('open-player', async (_event: IpcMainInvokeEvent, { title, stream
           detached: true,
         }
     // 建议添加的 ffplay 参数：
-    // -loglevel debug: 输出更详细的日志
+    // -loglevel debug/verbose: 输出更详细的日志，有助于排查问题
     // -autoexit: 播放完毕后自动退出 ffplay
-    // -probesize 5M -analyzeduration 5M: 增加探测大小和分析时长，可能有助于处理某些流
+    // -exitonfailure: 遇到流错误或播放错误时自动退出 ffplay，防止假死
+    // -rw_timeout <microseconds>: 设置网络I/O超时 (例如 15000000 for 15s)，避免因网络问题导致进程长时间等待
+    // -probesize <bytes>: 设置探测数据大小 (例如 5242880 for 5MB)，影响流格式分析的准确性
+    // -analyzeduration <microseconds>: 设置分析时长 (例如 5000000 for 5s)，影响流格式分析的深度
     // 您可以根据需要调整或添加其他参数
     const ffplayArgs = [
-      '-window_title',
-      title,
       '-loglevel',
-      'info', // 添加日志级别参数
-      '-autoexit', // 播放结束后自动退出
-      // '-probesize', '5M', // 示例：增加探测大小
-      // '-analyzeduration', '5M', // 示例：增加分析时长
-      streamPath,
+      'debug', // 日志级别
+      '-window_title',
+      title, // 窗口标题
+      '-infbuf', // 无限缓冲区
+      '-framedrop', // 允许丢帧
+      '-sync',
+      'ext', // 外部时钟同步
+      '-probesize',
+      '5242880', // 5MB 的探测大小
+      '-analyzeduration',
+      '5000000', // 5秒的分析时长
+      '-rw_timeout',
+      '5000000', // 5秒的网络I/O超时
+      '-autoexit', // 自动退出
+      streamPath, // 流地址
     ]
     const child = spawn(ffplayPath, ffplayArgs, spawnOptions)
+
+    child.stdout.on('data', (data) => {
+      console.log(`[主进程] ffplay 输出: ${data}`)
+    })
+
+    // child.stderr.on('data', (data) => {
+    //   console.error(`[主进程] ffplay 错误: ${data}`)
+    // })
 
     child.on('error', (err) => {
       console.error('[主进程] ffplay 启动失败或进程错误:', err)
