@@ -98,7 +98,7 @@ function handleClick(tab: TabsPaneContext) {
         </div>
         <div class="show-info">
           <h3>{{ show.title }}</h3>
-          <el-text size="middle">
+          <el-text>
             {{ show.description }}
           </el-text>
         </div>

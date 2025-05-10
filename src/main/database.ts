@@ -6,8 +6,6 @@ import { JSONFileSync } from 'lowdb/node'
 import data from './data.js'
 
 interface Team {
-  teamColor: string
-  teamName: string
   label: string
   value: string
 }
@@ -35,7 +33,6 @@ interface MemberTree {
       value: string
       [key: string]: any
     }[]
-    teamColor: string
   }[]
 }
 
@@ -67,7 +64,6 @@ class Database {
     this.memberTree = Array.from(groupMap.values()).map((group: GroupWithTeams) => ({
       groupName: group.groupName,
       teams: Array.from(group.teams.values()).map((team: TeamWithMembers) => ({
-        teamColor: '',
         teamName: team.teamName,
         label: team.teamName,
         value: team.teamName,
@@ -82,7 +78,6 @@ class Database {
           value: member.userId,
           ...member,
         })),
-        teamColor: '',
       })),
     }))
     this.db.memberTree = this.memberTree
@@ -112,11 +107,11 @@ class Database {
   }
 
   private memberTeamUpdate() {
-    // 为 starInfo 每一项新增 team 字段
+    // 为 starInfo 每一项新增 teamColor 字段
     if (Array.isArray(this.db.starInfo) && Array.isArray(this.db.teamInfo)) {
       this.db.starInfo.forEach((member: any) => {
         const team = this.db.teamInfo.find((t: any) => Number(t.teamId) === Number(member.teamId))
-        member.team = team ? { teamColor: team.teamColor, teamName: team.teamName } : { teamColor: '', teamName: '' }
+        member.teamColor = team?.teamColor || ''
       })
     }
   }
@@ -129,7 +124,13 @@ class Database {
     }
     this.db = this.lowdb.data
     this.membersDB = this.db.starInfo
+    // 统计starInfo里所有成员的teamId，并排重。如果teamInfo里的teamId不在starInfo里，就删除
+    const teamIds = Array.from(new Set(this.db.starInfo.map((m: any) => m.teamId)))
+    this.db.teamInfo = this.db.teamInfo.filter((t: any) => teamIds.includes(t.teamId))
     this.teamsDB = this.db.teamInfo
+    // 统计starInfo里所有成员的groupId，并排重。如果groupInfo里的groupId不在starInfo里，就删除
+    const groupIds = Array.from(new Set(this.db.starInfo.map((m: any) => m.groupId)))
+    this.db.groupInfo = this.db.groupInfo.filter((g: any) => groupIds.includes(g.groupId))
     this.groupsDB = this.db.groupInfo
 
     this.buildMemberTree()
@@ -148,15 +149,17 @@ class Database {
       this.db.teamInfo = content.teamInfo
     if (content.groupInfo)
       this.db.groupInfo = content.groupInfo
-    this.buildMemberTree()
-    this.memberTeamUpdate()
-    this.lowdb.write()
     console.log('[database.ts] save-member-data 写入成功:', {
       starInfo: this.db.starInfo?.length,
       teamInfo: this.db.teamInfo?.length,
       groupInfo: this.db.groupInfo?.length,
       memberTree: this.db.memberTree?.length,
     })
+    // 更新 memberTree
+    this.buildMemberTree()
+    this.memberTeamUpdate()
+    // 写入数据库
+    this.lowdb.write()
     return { ok: true }
   }
 
@@ -166,11 +169,15 @@ class Database {
   }
 
   public getMemberOptions() {
-    // return (this.membersDB || []).map((m: any) => ({ label: m.realName, value: m.userId }))
     return this.db.memberTree
   }
 
   public getTeamOptions() {
+    // teamInfo 根据groupid 获取groupname，拼接到teamName
+    this.teamsDB.forEach((team: any) => {
+      const group = this.db.groupInfo.find((g: any) => Number(g.groupId) === Number(team.groupId))
+      team.teamName = `${group?.groupName || ''}-${team.teamName || ''}`
+    })
     return (this.teamsDB || []).map((t: any) => ({ label: t.teamName, value: t.teamId }))
   }
 
@@ -206,6 +213,10 @@ class Database {
   public removeHiddenMember(userId: number) {
     this.db.hiddenMemberIds = this.db.hiddenMemberIds.filter((id: number) => id !== userId)
     this.lowdb.write()
+  }
+
+  public getTeamInfo() {
+    return this.teamsDB
   }
 
   public getTeam(teamId: number) {
@@ -254,6 +265,7 @@ ipcMain.handle('removeHiddenMember', async (_event, userId) => Database.instance
 ipcMain.handle('hasMembers', async () => Database.instance().hasMembers())
 ipcMain.handle('getConfig', async (_event, key, defaultValue?: any) => Database.instance().getConfig(key, defaultValue))
 ipcMain.handle('setConfig', async (_event, key, value) => Database.instance().setConfig(key, value))
+ipcMain.handle('getTeamInfo', async () => Database.instance().getTeamInfo())
 ipcMain.handle('getTeamOptions', async () => Database.instance().getTeamOptions())
 ipcMain.handle('getGroupOptions', async () => Database.instance().getGroupOptions())
 ipcMain.handle('getMemberTree', async () => Database.instance().db.memberTree)

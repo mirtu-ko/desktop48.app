@@ -19,7 +19,7 @@ const selectedUser = ref<any[]>([])
 const selectedTeam = ref<any[]>([])
 const selectedGroup = ref<any[]>([])
 
-const members = ref<any[]>([])
+const memberOption = ref<any[]>([])
 const hiddenMemberIds = ref<number[]>([])
 
 async function updateHiddenMemberIds() {
@@ -30,15 +30,16 @@ async function updateHiddenMemberIds() {
 const teamOptions = ref<any[]>([])
 const groupOptions = ref<any[]>([])
 
+// 初始化
 onMounted(async () => {
   teamOptions.value = await window.mainAPI.getTeamOptions()
   groupOptions.value = await window.mainAPI.getGroupOptions()
-  members.value = await window.mainAPI.getMemberTree()
+  memberOption.value = await window.mainAPI.getMemberTree()
   updateHiddenMemberIds()
 })
 
+// 获取录播列表
 const disabled = computed(() => loading.value || noMore.value)
-
 async function getReviewList() {
   const params: {
     userId: string
@@ -94,7 +95,6 @@ async function getReviewList() {
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.isReview = true
       item.member = await window.mainAPI.getMember(item.userInfo.userId)
-      item.team = item.member?.teamName || ''
       item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
       reviewList.value.push(item)
       // console.log('当前列表长度:', reviewList.value.length)
@@ -177,7 +177,7 @@ async function onInfiniteScroll() {
             <div style="margin-left: 8px;">
               <el-cascader
                 v-if="reviewScreen === Constants.REVIEW_SCREEN.USER" v-model="selectedUser" transfer
-                style="width: 320px;" clearable placeholder="请选择成员" filterable :options="members" :props="{
+                style="width: 320px;" clearable placeholder="请选择成员" filterable :options="memberOption" :props="{
                   label: 'label',
                   value: 'value',
                   children: 'children',

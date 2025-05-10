@@ -47,16 +47,24 @@ onMounted(() => {
   watch(
     () => playStreamPath.value,
     (newPath) => {
-      if (nativeVideo.value && newPath && newPath.endsWith('.m3u8')) {
-        if (Hls.isSupported()) {
-          const hls = new Hls()
-          hls.loadSource(newPath)
-          hls.attachMedia(nativeVideo.value)
+      if (nativeVideo.value && newPath) {
+        if (newPath.endsWith('.m3u8')) {
+          if (Hls.isSupported()) {
+            const hls = new Hls()
+            hls.loadSource(newPath)
+            hls.attachMedia(nativeVideo.value)
+          }
+          else if (nativeVideo.value.canPlayType('application/vnd.apple.mpegurl')) {
+            nativeVideo.value.src = newPath
+          }
         }
-        else if (nativeVideo.value.canPlayType('application/vnd.apple.mpegurl')) {
+        else if (newPath.endsWith('.mp4')) {
           nativeVideo.value.src = newPath
+          nativeVideo.value.load()
         }
-        // 绑定原生 video 事件
+
+        // 绑定原生 video 事件 (适用于 MP4 和部分 M3U8 场景)
+        // 对于 Hls.js 控制的 M3U8，这些事件也应该在 video 元素上触发
         nativeVideo.value.ontimeupdate = (e) => {
           const video = (e?.target as HTMLVideoElement) || nativeVideo.value
           if (!video)

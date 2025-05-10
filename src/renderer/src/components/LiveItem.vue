@@ -1,11 +1,7 @@
 <script setup lang="ts">
-interface Team {
-  teamColor: string
-  teamName: string
-}
-
 interface Member {
-  team: Team
+  teamName: string
+  teamColor: string
 }
 
 interface UserInfo {
@@ -54,11 +50,11 @@ defineProps<{ item: Item }>()
       <div class="member-info">
         <span style="color: #000;">{{ item.userInfo.nickname }}</span>
         <span
-          v-if="item.member && item.member.team"
+          v-if="item.member && item.member.teamName"
           class="team-badge"
-          :style="{ 'background-color': `#${item.member.team.teamColor}` }"
+          :style="{ 'background-color': `#${item.member.teamColor}` }"
         >
-          {{ item.member.team.teamName.replace('TEAM ', '') }}
+          {{ item.member.teamName.replace('TEAM ', '') }}
         </span>
       </div>
     </div>

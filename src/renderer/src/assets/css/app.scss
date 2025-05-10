@@ -113,7 +113,7 @@ $width: 400px;
 
 .versions {
   position: absolute;
-  left: 30%;
+  left: calc(50% - 240px);
   bottom: 15px;
   margin: 0 auto;
   padding: 10px 0;

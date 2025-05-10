@@ -81,7 +81,14 @@ onUnmounted(() => {
     <el-main>
       <router-view v-slot="{ Component }">
         <keep-alive>
-          <component :is="Component" />
+          <Suspense>
+            <template #default>
+              <component :is="Component" />
+            </template>
+            <template #fallback>
+              <div>Loading...</div>
+            </template>
+          </Suspense>
         </keep-alive>
       </router-view>
     </el-main>
