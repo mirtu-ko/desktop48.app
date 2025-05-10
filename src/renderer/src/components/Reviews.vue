@@ -233,11 +233,11 @@ async function onInfiniteScroll() {
       </el-tab-pane>
 
       <el-tab-pane
-        v-for="(liveTab, index) in liveTabs" :key="index" closable :label="liveTab.label"
+        v-for="liveTab in liveTabs" :key="liveTab.name" closable :label="liveTab.label"
         :name="liveTab.name"
         @close="onTabRemove(liveTab.name)"
       >
-        <Review :index="index" :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" :name="liveTab.name" />
+        <Review :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" />
       </el-tab-pane>
     </el-tabs>
   </div>

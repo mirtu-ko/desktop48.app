@@ -2,7 +2,7 @@
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { cloneDeep } from 'lodash'
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
@@ -23,28 +23,26 @@ const playStreamPath = ref('')
 const isReview = ref(false)
 const isRadio = ref(false)
 const number = ref(0)
-const memberInfo = ref<any>({})
-const player = ref<any>(null) // 保留用于控制播放/暂停等
 const nativeVideo = ref<HTMLVideoElement | null>(null) // 原生 video 播放器
-const isMuted = ref(false)
 const status = ref(0)
 const currentTime = ref(0)
 const duration = ref(0)
-const volume = ref(80)
 const carousels = ref<string[]>([])
 const carouselTime = ref(5000)
 // 音频流时的封面图片
 const coverImage = ref('') // 你可以根据实际需求赋值，如 member.value.avatar 或其它图片
+// 弹幕
 const barrageUrl = ref('')
 const barrageLoaded = ref(false)
 const barrageList = ref<any[]>([])
-const finalBarrageList = ref<any[]>([])
-
-// refs for child components
-// const controlsRef = ref()
 const barrageBoxRef = ref()
+const finalBarrageList = ref<any[]>([])
+// 路由
+const router = useRouter()
+
 // 生命周期：onMounted/onUnmounted
 onMounted(() => {
+  console.log('[Review.vue] onMounted', props)
   getOne()
   watch(
     () => playStreamPath.value,
@@ -77,45 +75,28 @@ onMounted(() => {
     { immediate: true },
   )
 })
-onUnmounted(() => {
-  if (player.value != null) {
-    player.value.destroy()
-    console.info('player destroyed')
-  }
-})
 
+// 获取录播信息
+const realName = ref('')
 function getOne() {
-  Apis.instance().live(props.liveId).then(async (data) => {
+  Apis.instance().live(props.liveId).then((data) => {
+    console.log('获取到的录播信息:', data)
     playStreamPath.value = Tools.streamPathHandle(data.playStreamPath, props.startTime)
     isReview.value = data.review
     barrageUrl.value = data.msgFilePath
     isRadio.value = data.liveType == 2
     number.value = data.onlineNum
+    realName.value = data.user.userName
     if (isRadio.value) {
       carousels.value = data.carousels.carousels.map((carousel: any) => Tools.sourceUrl(carousel))
       carouselTime.value = Number.parseInt(data.carousels.carouselTime)
     }
-    memberInfo.value = await window.mainAPI.getMember(data.user.userId)
-    initPlayer()
   }).catch((error: any) => {
     console.error(error)
   })
 }
 
-function initPlayer() {
-  // 只保留必要的初始化逻辑
-  if (player.value != null && player.value.destroy) {
-    player.value.destroy()
-  }
-  // 设置音量
-  if (player.value && player.value.volume) {
-    // player.value.volume(await window.mainAPI.getConfig('volume', 80)) // 如需支持音量持久化，请主进程暴露此API
-  }
-  if (!isReview.value) {
-    play()
-  }
-}
-
+// 播放/暂停
 function play() {
   if (nativeVideo.value) {
     nativeVideo.value.play()
@@ -128,48 +109,9 @@ function play() {
 }
 
 // 暴露方法给模板
-defineExpose({ play, pause, mute, unmute, progressChange, volumeChange, fullScreen, download })
-function pause() {
-  if (nativeVideo.value) {
-    nativeVideo.value.pause()
-    status.value = Constants.STATUS_PREPARED
-    console.log('pause')
-  }
-  else {
-    console.warn('nativeVideo is null')
-  }
-}
-function mute() {
-  if (nativeVideo.value) {
-    nativeVideo.value.muted = true
-    isMuted.value = true
-    console.log('mute')
-  }
-  else {
-    console.warn('nativeVideo is null')
-  }
-}
-function unmute() {
-  if (nativeVideo.value) {
-    nativeVideo.value.muted = false
-    nativeVideo.value.volume = volume.value / 100
-    isMuted.value = false
-    console.log('unmute')
-  }
-  else {
-    console.warn('nativeVideo is null')
-  }
-}
-function progressChange(newTime: number) {
-  if (nativeVideo.value) {
-    nativeVideo.value.currentTime = newTime
-    onTimeUpdate(newTime)
-    console.log('progressChange')
-  }
-  else {
-    console.warn('nativeVideo is null')
-  }
-}
+defineExpose({ play, download })
+
+// 时间更新
 function onTimeUpdate(newTime: number) {
   if (newTime < currentTime.value) {
     barrageList.value = cloneDeep(finalBarrageList.value)
@@ -193,28 +135,8 @@ function onTimeUpdate(newTime: number) {
     }
   }
 }
-function volumeChange(val: number) {
-  volume.value = val
-  console.log('volumeChange')
-  window.mainAPI.setConfig('volume', val)
-}
-function fullScreen() {
-  if (nativeVideo.value) {
-    if (nativeVideo.value.requestFullscreen) {
-      nativeVideo.value.requestFullscreen()
-    }
-    else if ((nativeVideo.value as any).webkitRequestFullscreen) {
-      (nativeVideo.value as any).webkitRequestFullscreen()
-    }
-    else if ((nativeVideo.value as any).msRequestFullscreen) {
-      (nativeVideo.value as any).msRequestFullscreen()
-    }
-    console.log('fullScreen')
-  }
-  else {
-    console.warn('nativeVideo is null')
-  }
-}
+
+// 加载弹幕
 function getBarrages() {
   if (!barrageUrl.value || barrageUrl.value.length === 0)
     return
@@ -227,10 +149,28 @@ function getBarrages() {
     ElMessage({ message: '弹幕加载失败', type: 'error' })
   })
 }
-const router = useRouter()
+
+// 检查下载目录是否存在
+function checkDownloadDirectory() {
+  window.mainAPI.getConfig('downloadDirectory').then((result: any) => {
+    if (!result) {
+      ElMessage({
+        message: '下载目录不存在，请先配置下载目录',
+        type: 'warning',
+      })
+      router.push('/setting')
+    }
+  }).catch((error: any) => {
+    console.error(error)
+    ElMessage({ message: '检查下载目录失败', type: 'error' })
+  })
+}
+
+// 下载录播
 function download() {
+  checkDownloadDirectory()
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  const filename = `${memberInfo.value.realName}${date}.mp4`
+  const filename = `${realName.value}${date}.mp4`
   console.log('[Review.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
   const downloadTask: any = new DownloadTask(playStreamPath.value, filename, props.liveId)
   EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)

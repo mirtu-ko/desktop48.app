@@ -17,6 +17,7 @@ const router = useRouter()
 
 const disabled = computed(() => loading.value || noMore.value)
 
+// 更新隐藏的成员ID
 const hiddenMemberIds = ref<number[]>([])
 
 async function updateHiddenMemberIds() {
@@ -28,12 +29,7 @@ onMounted(async () => {
   updateHiddenMemberIds()
 })
 
-const filteredLiveList = computed(() => {
-  return liveList.value.filter((item: any) => {
-    return !hiddenMemberIds.value.includes(Number(item.userInfo.userId))
-  })
-})
-
+// 加载更多
 async function getLiveList() {
   // console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
@@ -83,14 +79,32 @@ onMounted(() => {
   getLiveList()
 })
 
+// 刷新
 function refresh() {
   liveList.value = []
   liveNext.value = '0'
   noMore.value = false
   getLiveList()
 }
+// 检查下载目录是否存在
+function checkDownloadDirectory() {
+  window.mainAPI.getConfig('downloadDirectory').then((result: any) => {
+    if (!result) {
+      ElMessage({
+        message: '下载目录不存在，请先配置下载目录',
+        type: 'warning',
+      })
+      router.push('/setting')
+    }
+  }).catch((error: any) => {
+    console.error(error)
+    ElMessage({ message: '检查下载目录失败', type: 'error' })
+  })
+}
 
+// 调用Electron主进程暴露的record方法
 function record(item: any) {
+  checkDownloadDirectory()
   Apis.instance().live(item.liveId).then(async (content) => {
     const member = await window.mainAPI.getMember(content.user.userId)
     const date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyyMMddhhmm')
@@ -153,7 +167,7 @@ function play(item: any) {
           class="live-main"
         >
           <div class="live-list">
-            <div v-for="item in filteredLiveList" :key="item.liveId" class="live-item">
+            <div v-for="item in liveList" :key="item.liveId" class="live-item">
               <el-popover
                 :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
                 :fallback-placements="[]"
