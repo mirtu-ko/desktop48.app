@@ -96,6 +96,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
+.el-main {
+  height: calc(100%);
+}
+
+.side-menu {
+  height: 100%;
+}
 .side-menu:not(.el-menu--collapse) {
   min-height: 100%;
 }

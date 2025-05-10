@@ -193,16 +193,20 @@ function play(item: any) {
 </template>
 
 <style scoped lang="scss">
-el-container {
+.el-container {
   height: 100%;
   overflow: hidden;
 }
 
 .live-main {
-  height: calc(100% - 70px);
+  height: calc(100% - 60px);
   overflow: hidden;
 }
 
+.scrollbar-wrapper {
+  height: 100%;
+  overflow-x: hidden !important;
+}
 .live-info {
   height: calc(100% - 150px);
   overflow: hidden;

@@ -79,47 +79,61 @@ function handleClick(tab: TabsPaneContext) {
 </script>
 
 <template>
-  <el-tabs @tab-click="handleClick">
-    <el-tab-pane label="SNH48" />
-    <el-tab-pane label="BEJ48" />
-    <el-tab-pane label="GNZ48" />
-    <el-tab-pane label="CKG48" />
-    <el-tab-pane label="CGT48" />
-  </el-tabs>
-  <div class="shows-container">
-    <h2 v-if="showToday">
-      即将开始
-    </h2>
-    <div v-if="showToday" class="showToday-list">
-      <div v-for="show in showToday" :key="show.id" class="show-item">
-        <div class="show-image">
-          <img :src="show.image" :alt="show.title">
-          <span class="show-time">{{ `${formatTimestamp(show.startTime)} - ${formatTimestamp(show.endTime)}` }}</span>
+  <div class="container">
+    <el-tabs @tab-click="handleClick">
+      <el-tab-pane label="SNH48" />
+      <el-tab-pane label="BEJ48" />
+      <el-tab-pane label="GNZ48" />
+      <el-tab-pane label="CKG48" />
+      <el-tab-pane label="CGT48" />
+    </el-tabs>
+    <el-scrollbar wrap-class="scrollbar-wrapper">
+      <div class="shows-container">
+        <h2 v-if="showToday">
+          即将开始
+        </h2>
+        <div v-if="showToday" class="showToday-list">
+          <div v-for="show in showToday" :key="show.id" class="show-item">
+            <div class="show-image">
+              <img :src="show.image" :alt="show.title">
+              <span class="show-time">{{ `${formatTimestamp(show.startTime)} - ${formatTimestamp(show.endTime)}` }}</span>
+            </div>
+            <div class="show-info">
+              <h3>{{ show.title }}</h3>
+              <el-text>
+                {{ show.description }}
+              </el-text>
+            </div>
+          </div>
         </div>
-        <div class="show-info">
-          <h3>{{ show.title }}</h3>
-          <el-text>
-            {{ show.description }}
-          </el-text>
+        <h2>最近公演</h2>
+        <div class="shows-list">
+          <div v-for="show in shows" :key="show.id" class="show-item">
+            <div class="show-image">
+              <img :src="show.image" :alt="show.title">
+              <span class="show-time">{{ show.date }}日 {{ show.time }}</span>
+            </div>
+            <h3>{{ show.title }}</h3>
+          </div>
         </div>
       </div>
-    </div>
-    <h2>最近公演</h2>
-    <div class="shows-list">
-      <div v-for="show in shows" :key="show.id" class="show-item">
-        <div class="show-image">
-          <img :src="show.image" :alt="show.title">
-          <span class="show-time">{{ show.date }}日 {{ show.time }}</span>
-        </div>
-        <h3>{{ show.title }}</h3>
-      </div>
-    </div>
+    </el-scrollbar>
   </div>
 </template>
 
 <style scoped>
+.container {
+  height: 100%;
+  overflow: hidden;
+}
+
 .shows-container {
   padding: 0 10px;
+}
+
+.scrollbar-wrapper {
+  height: calc(100% - 60px);
+  overflow-x: hidden !important;
 }
 
 .shows-list {
