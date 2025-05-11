@@ -173,7 +173,6 @@ async function onInfiniteScroll() {
               <el-option :value="Constants.REVIEW_SCREEN.TEAM" label="队伍" />
               <el-option :value="Constants.REVIEW_SCREEN.GROUP" label="分团" />
             </el-select>
-
             <div style="margin-left: 8px;">
               <el-cascader
                 v-if="reviewScreen === Constants.REVIEW_SCREEN.USER" v-model="selectedUser" transfer

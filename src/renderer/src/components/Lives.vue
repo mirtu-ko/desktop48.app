@@ -8,6 +8,7 @@ import EventBus from '../assets/js/event-bus'
 import RecordTask from '../assets/js/record-task'
 import Tools from '../assets/js/tools'
 import LiveItem from '../components/LiveItem.vue'
+import LivePlayer from '../components/LivePlayer.vue'
 
 const liveList = ref<any[]>([])
 const liveNext = ref('0')
@@ -121,78 +122,126 @@ function record(item: any) {
   })
 }
 
-// 调用Electron主进程暴露的openPlayer方法
+// // 调用Electron主进程暴露的openPlayer方法
+// function play(item: any) {
+//   Apis.instance().live(item.liveId).then(async (content) => {
+//     const params = {
+//       title: `${item.userInfo.nickname} ${item.title}`,
+//       streamPath: content.playStreamPath,
+//     }
+//     console.log('[lives.vue] 调用 openPlayer 参数:', params)
+//     try {
+//       const result = await window.mainAPI.openPlayer?.(params)
+//       console.log('[lives.vue] openPlayer 调用完成:', result)
+//     }
+//     catch (err) {
+//       ElMessage.error(`openPlayer 调用失败: ${(err as any)?.message || err}`)
+//       console.error('[lives.vue] openPlayer 错误:', err)
+//     }
+//   }).catch((error: any) => {
+//     ElMessage.error(error)
+//     console.error(error)
+//   })
+// }
+// 切换tab
+// 直播标签页
+const activeName = ref('Home')
+const liveTabs = ref<any[]>([])
+
+function onTabRemove(targetName: string) {
+  activeName.value = 'Home'
+  liveTabs.value = liveTabs.value.filter((tab: any) => tab.name != targetName)
+}
+
+// 修改播放方法
 function play(item: any) {
-  Apis.instance().live(item.liveId).then(async (content) => {
-    const params = {
-      title: `${item.userInfo.nickname} ${item.title}`,
-      streamPath: content.playStreamPath,
-    }
-    console.log('[lives.vue] 调用 openPlayer 参数:', params)
-    try {
-      const result = await window.mainAPI.openPlayer?.(params)
-      console.log('[lives.vue] openPlayer 调用完成:', result)
-    }
-    catch (err) {
-      ElMessage.error(`openPlayer 调用失败: ${(err as any)?.message || err}`)
-      console.error('[lives.vue] openPlayer 错误:', err)
-    }
-  }).catch((error: any) => {
-    ElMessage.error(error)
-    console.error(error)
-  })
+  const exists = liveTabs.value.some((tab: any) => tab.liveId === item.liveId)
+  if (exists)
+    return
+
+  const liveTab = {
+    label: `${item.userInfo.nickname}的直播间`,
+    title: item.title,
+    liveId: item.liveId,
+    name: `${item.liveId}_${Math.random().toString(36).substring(2)}`,
+  }
+  liveTabs.value.push(liveTab)
+  activeName.value = liveTab.name
 }
 </script>
 
 <template>
-  <el-container>
-    <el-header class="header-box">
-      <el-button type="primary" @click="refresh">
-        刷新
-      </el-button>
-    </el-header>
-    <div v-loading="loading" class="live-main">
-      <!-- 无直播时显示 -->
-      <div v-if="!loading && liveList.length === 0" class="live-info">
-        当前没有直播
-      </div>
-
-      <!-- 有直播时显示 -->
-      <el-scrollbar v-if="!loading && liveList.length > 0" class="scrollbar-wrapper">
-        <div
-          v-infinite-scroll="getLiveList"
-          :infinite-scroll-disabled="disabled"
-          infinite-scroll-delay="100"
-          infinite-scroll-distance="20"
-          class="live-main"
-        >
-          <div class="live-list">
-            <div v-for="item in liveList" :key="item.liveId" class="live-item">
-              <el-popover
-                :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
-              >
-                <p>{{ item.title }}</p>
-                <div>
-                  <el-button type="danger" size="small" @click="record(item)">
-                    录制
-                  </el-button>
-                  <el-button type="success" size="small" @click="play(item)">
-                    观看
-                  </el-button>
-                </div>
-                <template #reference>
-                  <LiveItem :item="item" class="live-card" />
-                </template>
-              </el-popover>
+  <div class="lives-root">
+    <el-tabs v-model="activeName" @tab-remove="onTabRemove">
+      <el-tab-pane label="直播列表" name="Home">
+        <el-container>
+          <el-header class="header-box">
+            <el-button type="primary" @click="refresh">
+              刷新
+            </el-button>
+          </el-header>
+          <div v-loading="loading" class="live-main">
+            <!-- 无直播时显示 -->
+            <div v-if="!loading && liveList.length === 0" class="live-info">
+              当前没有直播
             </div>
+
+            <!-- 有直播时显示 -->
+            <el-scrollbar v-if="!loading && liveList.length > 0" class="scrollbar-wrapper">
+              <div
+                v-infinite-scroll="getLiveList"
+                :infinite-scroll-disabled="disabled"
+                infinite-scroll-delay="100"
+                infinite-scroll-distance="20"
+                class="live-main"
+              >
+                <div class="live-list">
+                  <div v-for="item in liveList" :key="item.liveId" class="live-item">
+                    <el-popover
+                      :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
+                    >
+                      <p>{{ item.title }}</p>
+                      <div>
+                        <el-button type="danger" size="small" @click="record(item)">
+                          录制
+                        </el-button>
+                        <el-button type="success" size="small" @click="play(item)">
+                          观看
+                        </el-button>
+                      </div>
+                      <template #reference>
+                        <LiveItem :item="item" class="live-card" />
+                      </template>
+                    </el-popover>
+                  </div>
+                </div>
+              </div>
+            </el-scrollbar>
           </div>
-        </div>
-      </el-scrollbar>
-    </div>
-  </el-container>
+        </el-container>
+      </el-tab-pane>
+
+      <!-- 动态直播标签页 -->
+      <el-tab-pane
+        v-for="tab in liveTabs"
+        :key="tab.name"
+        :label="tab.label"
+        :name="tab.name"
+        closable
+      >
+        <LivePlayer
+          :live-title="tab.title"
+          :live-id="tab.liveId"
+        />
+      </el-tab-pane>
+    </el-tabs>
+  </div>
 </template>
 
 <style scoped lang="scss">
+.lives-root,
+.el-tabs,
+.el-tab-pane,
 .el-container {
   height: 100%;
   overflow: hidden;

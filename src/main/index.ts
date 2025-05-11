@@ -10,6 +10,8 @@ import icon from '../../resources/icon.png?asset'
 import { Database } from './database.js'
 import './download.js'
 import './record.js' // 录制功能主进程注册
+import './stream.js' // 流媒体相关主进程注册
+import './http-server.js'
 
 // 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)
