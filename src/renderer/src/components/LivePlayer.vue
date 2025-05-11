@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
@@ -92,7 +93,7 @@ onMounted(() => {
       class="video-player"
     />
     <div v-if="loading" class="loading-container">
-      <el-icon class="loading-icon">
+      <el-icon color="#FFFFFF" class="is-loading" size="24px">
         <Loading />
       </el-icon>
       <span class="loading-text">正在加载直播...</span>
@@ -126,12 +127,6 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   z-index: 1;
-}
-
-.loading-icon {
-  font-size: 24px;
-  color: #fff;
-  animation: rotating 2s linear infinite;
 }
 
 .loading-text {
