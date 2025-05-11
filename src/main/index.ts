@@ -120,9 +120,9 @@ ipcMain.handle('open-player', async (_event: IpcMainInvokeEvent, { title, stream
       console.log(`[主进程] ffplay 输出: ${data}`)
     })
 
-    // child.stderr.on('data', (data) => {
-    //   console.error(`[主进程] ffplay 错误: ${data}`)
-    // })
+    child.stderr.on('data', (data) => {
+      console.error(`[主进程] ffplay 错误: ${data}`)
+    })
 
     child.on('error', (err) => {
       console.error('[主进程] ffplay 启动失败或进程错误:', err)
