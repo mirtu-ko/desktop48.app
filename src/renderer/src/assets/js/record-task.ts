@@ -5,7 +5,7 @@ import Constants from './constants'
  */
 export default class RecordTask {
   private _url!: string
-  private _saveDirectory: string = '' // 需调用 async init() 异步赋值
+  private _saveDirectory: string = ''
   private _filename!: string
   private _filePath: string = ''
 
@@ -62,7 +62,6 @@ export default class RecordTask {
 
   public start(startListener: () => void) {
     this.init().then(async () => {
-      // compute full file path early for display during recording
       if (!this._saveDirectory) {
         console.error('save directory is empty')
         return

@@ -12,34 +12,71 @@ const props = defineProps({
 
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
-const streamId = ref('') // 添加 streamId 引用
-const loading = ref(true) // 添加 loading 状态
+const streamId = ref('')
+const loading = ref(true)
+const retryCount = ref(0)
+const maxRetries = 3
+const isManuallyUnmounted = ref(false) // 添加手动卸载标记
 
 // 获取直播信息
 function getOne() {
-  loading.value = true // 开始加载时显示
+  loading.value = true
+  retryCount.value = 0 // 重置重试计数
   Apis.instance().live(props.liveId).then((data) => {
     console.log('获取到的直播信息:', data)
-    // 这里需要主进程处理将 RTMP 转换为 HLS
-    window.mainAPI.convertToHls(data.playStreamPath).then((result) => {
-      // 假设返回格式为 { url: string, streamId: string }
-      console.log('转换后的 HLS 流地址:', result)
-      playStreamPath.value = result.url
-      streamId.value = result.streamId // 保存 streamId
-    }).catch((error) => {
-      console.error('转换直播流失败:', error)
-      ElMessage.error('转换直播流失败')
-      loading.value = false // 加载失败时隐藏
-    })
+    startHlsStream(data.playStreamPath)
   }).catch((error: any) => {
     console.error(error)
     ElMessage.error('获取直播信息失败')
-    loading.value = false // 加载失败时隐藏
+    loading.value = false
   })
 }
 
-// 组件卸载时清理资源
+// 启动 HLS 流
+function startHlsStream(rtmpUrl: string) {
+  window.mainAPI.convertToHls(rtmpUrl, props.liveId).then((result) => {
+    console.log('转换后的 HLS 流地址:', result)
+    playStreamPath.value = result.url
+    streamId.value = result.liveId
+  }).catch((error) => {
+    console.error('转换直播流失败:', error)
+    ElMessage.error('转换直播流失败')
+    loading.value = false
+  })
+}
+
+// 处理流错误和重试
+function handleStreamError() {
+  // 如果是手动卸载，不进行重试
+  if (isManuallyUnmounted.value) {
+    console.log('[LivePlayer.vue] 组件手动卸载，不进行重试')
+    return
+  }
+
+  if (retryCount.value < maxRetries) {
+    retryCount.value++
+    console.log(`[LivePlayer.vue] 直播流中断，正在进行第 ${retryCount.value} 次重试`)
+    loading.value = true
+    setTimeout(() => {
+      getOne()
+    }, 2000)
+  }
+  else {
+    console.log('[LivePlayer.vue] 重试次数已达上限，停止播放')
+    loading.value = false
+    ElMessage.warning('直播已结束')
+    // 清理资源
+    if (streamId.value) {
+      window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
+        console.error('停止转码失败:', err)
+      })
+    }
+  }
+}
+
 onUnmounted(() => {
+  console.log('[LivePlayer.vue] onUnmounted')
+  isManuallyUnmounted.value = true // 设置手动卸载标记
   if (streamId.value) {
     window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
       console.error('停止转码失败:', err)
@@ -59,22 +96,26 @@ onMounted(() => {
           hls.loadSource(newPath)
           hls.attachMedia(nativeVideo.value)
 
-          // 监听 HLS 事件
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            loading.value = false // 视频可以播放时隐藏加载效果
+            loading.value = false
           })
 
-          hls.on(Hls.Events.ERROR, () => {
-            loading.value = false // 出错时隐藏加载效果
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            console.error('[LivePlayer.vue] HLS 错误:', data)
+            if (data.fatal) {
+              loading.value = false
+              handleStreamError()
+            }
           })
         }
         else if (nativeVideo.value.canPlayType('application/vnd.apple.mpegurl')) {
           nativeVideo.value.src = newPath
           nativeVideo.value.oncanplay = () => {
-            loading.value = false // 视频可以播放时隐藏加载效果
+            loading.value = false
           }
           nativeVideo.value.onerror = () => {
-            loading.value = false // 出错时隐藏加载效果
+            loading.value = false
+            handleStreamError()
           }
         }
       }

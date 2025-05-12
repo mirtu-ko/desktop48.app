@@ -5,6 +5,10 @@ import { app } from 'electron'
 
 const tempDir = path.join(app.getPath('temp'), 'desktop48_hls')
 
+// 定义端口
+let _serverPort = 8080
+export const serverPort = () => _serverPort
+
 // 创建服务器实例
 const server = http.createServer((req, res) => {
   // Add CORS headers
@@ -67,8 +71,8 @@ function tryListen() {
     })
     .on('listening', () => {
       console.log(`[http-server.ts] HLS 服务器监听端口 ${port}`)
-      // 导出当前使用的端口号，供其他模块使用
-      exports.serverPort = port
+      // Update internal port value
+      _serverPort = port
     })
 }
 

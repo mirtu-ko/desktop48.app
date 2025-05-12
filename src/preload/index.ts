@@ -24,7 +24,7 @@ const api = {
   netRequest: (options: any) => ipcRenderer.invoke('net-request', options),
   // 播放
   openPlayer: (params: { title: string, streamPath: string, ffplayPath?: string }) => ipcRenderer.invoke('open-player', params),
-  convertToHls: (params: { inputPath: string, outputPath: string, crf: number }) => ipcRenderer.invoke('convertToHls', params),
+  convertToHls: (rtmpUrl: string, liveId: string) => ipcRenderer.invoke('convertToHls', rtmpUrl, liveId),
   stopHlsConvert: (liveId: string) => ipcRenderer.invoke('stopHlsConvert', liveId),
   // 文件夹目录
   showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
