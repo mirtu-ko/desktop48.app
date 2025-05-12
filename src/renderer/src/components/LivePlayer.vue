@@ -100,7 +100,7 @@ onMounted(() => {
             loading.value = false
           })
 
-          hls.on(Hls.Events.ERROR, (event, data) => {
+          hls.on(Hls.Events.ERROR, (_event, data) => {
             console.error('[LivePlayer.vue] HLS 错误:', data)
             if (data.fatal) {
               loading.value = false
