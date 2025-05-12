@@ -89,10 +89,8 @@ function handleClick(tab: TabsPaneContext) {
     </el-tabs>
     <el-scrollbar wrap-class="scrollbar-wrapper">
       <div class="shows-container">
-        <h2 v-if="showToday">
-          即将开始
-        </h2>
-        <div v-if="showToday" class="showToday-list">
+        <h2>即将开始</h2>
+        <div v-if="showToday?.length" class="showToday-list">
           <div v-for="show in showToday" :key="show.id" class="show-item">
             <div class="show-image">
               <img :src="show.image" :alt="show.title">
@@ -106,8 +104,11 @@ function handleClick(tab: TabsPaneContext) {
             </div>
           </div>
         </div>
+        <div v-else>
+          <p>暂无演出信息</p>
+        </div>
         <h2>最近公演</h2>
-        <div class="shows-list">
+        <div v-if="shows.length" class="shows-list">
           <div v-for="show in shows" :key="show.id" class="show-item">
             <div class="show-image">
               <img :src="show.image" :alt="show.title">
@@ -115,6 +116,9 @@ function handleClick(tab: TabsPaneContext) {
             </div>
             <h3>{{ show.title }}</h3>
           </div>
+        </div>
+        <div v-else>
+          <p>暂无演出信息</p>
         </div>
       </div>
     </el-scrollbar>

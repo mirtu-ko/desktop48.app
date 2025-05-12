@@ -27,7 +27,7 @@ defineExpose({ clear, shoot })
 </script>
 
 <template>
-  <el-card style="flex: 1 0 auto;" shadow="never">
+  <el-card style="height: fit-content !important;" shadow="never">
     <template #header>
       <el-row :gutter="8" justify="space-between" style="width: 100%;">
         <el-col :span="6">
@@ -48,4 +48,8 @@ defineExpose({ clear, shoot })
   </el-card>
 </template>
 
-<style scoped></style>
+<style scoped>
+:deep(.el-card) {
+  height: calc(100% - 5px) !important;
+}
+</style>

@@ -77,6 +77,7 @@ function handleStreamError() {
 onUnmounted(() => {
   console.log('[LivePlayer.vue] onUnmounted')
   isManuallyUnmounted.value = true // 设置手动卸载标记
+  // 停止 HLS 转码
   if (streamId.value) {
     window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
       console.error('停止转码失败:', err)
@@ -101,9 +102,19 @@ onMounted(() => {
           })
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (isManuallyUnmounted.value) {
+              hls.destroy()
+              console.log('[LivePlayer.vue] 组件手动卸载，不进行重试')
+              return
+            }
             console.error('[LivePlayer.vue] HLS 错误:', data)
             if (data.fatal) {
               loading.value = false
+              handleStreamError()
+            }
+            if (data.type === 'networkError') {
+              loading.value = true
+              console.log('[LivePlayer.vue] 网络错误，正在重试')
               handleStreamError()
             }
           })
@@ -126,7 +137,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="live-player">
+  <div class="video-box">
     <video
       ref="nativeVideo"
       controls
@@ -143,7 +154,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.live-player {
+.video-box {
   width: 100%;
   height: 100%;
   display: flex;

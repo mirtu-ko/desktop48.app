@@ -70,7 +70,7 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
       '-f',
       'hls',
       '-hls_time',
-      '2', // 减小分片时长为2秒
+      '3', // 减小分片时长为2秒
       '-hls_list_size',
       '6', // 增加列表大小为6，保持更多分片
       '-hls_flags',

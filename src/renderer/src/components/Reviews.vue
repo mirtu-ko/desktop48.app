@@ -5,7 +5,7 @@ import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import Tools from '../assets/js/tools'
 import LiveItem from '../components/LiveItem.vue'
-import Review from '../components/Review.vue'
+import ReviewPlayer from './ReviewPlayer.vue'
 
 // 响应式变量
 const activeName = ref('Home')
@@ -236,7 +236,7 @@ async function onInfiniteScroll() {
         :name="liveTab.name"
         @close="onTabRemove(liveTab.name)"
       >
-        <Review :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" />
+        <ReviewPlayer :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -282,7 +282,7 @@ async function onInfiniteScroll() {
 }
 
 :deep(.el-card__body) {
-  padding: 6px !important;
+  padding: 6px 0 !important;
 }
 
 :deep(.el-card__header) {

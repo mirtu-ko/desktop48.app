@@ -31,7 +31,7 @@ defineExpose({ shoot, clear, barrageList })
 </script>
 
 <template>
-  <el-scrollbar style="overflow-y: auto;height: 600px;">
+  <el-scrollbar style="overflow-y: auto; height: 100%;">
     <ul id="barrage-ul">
       <li v-for="(barrage, index) in barrageList" :key="index" class="barrage-item">
         <span class="barrage-time">{{ barrage.time }}</span>

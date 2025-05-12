@@ -42,7 +42,7 @@ const router = useRouter()
 
 // 生命周期：onMounted/onUnmounted
 onMounted(() => {
-  console.log('[Review.vue] onMounted', props)
+  console.log('[ReviewPlayer.vue] onMounted', props)
   getOne()
   watch(
     () => playStreamPath.value,
@@ -179,7 +179,7 @@ function download() {
   checkDownloadDirectory()
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
   const filename = `${realName.value}${date}.mp4`
-  console.log('[Review.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
+  console.log('[ReviewPlayer.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
   const downloadTask: any = new DownloadTask(playStreamPath.value, filename, props.liveId)
   EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
   router.push('/downloads')
@@ -190,9 +190,9 @@ function download() {
 </script>
 
 <template>
-  <el-container>
+  <div class="review-container">
     <el-header class="header-box">
-      <el-row :gutter="12" justify="space-between" style="width: 100%;">
+      <el-row :gutter="12" justify="space-between">
         <el-col :span="16">
           <div style="display: flex; align-items: center; float: left">
             <span>{{ liveTitle }}</span>
@@ -213,54 +213,67 @@ function download() {
       </el-row>
     </el-header>
 
-    <div>
-      <el-row :gutter="12" class="review-row">
-        <el-col :span="12" class="review-left">
-          <el-card shadow="never">
-            <div class="video-box">
-              <video
-                ref="nativeVideo" class="video" controls :poster="isRadio ? coverImage : ''"
-                :style="isRadio ? 'background: #000; object-fit: contain;' : ''"
-              />
-            </div>
-          </el-card>
+    <div class="review-content">
+      <el-row justify="space-between" class="review-row">
+        <el-col :span="10" class="video-box">
+          <video
+            ref="nativeVideo" class="video-player" controls :poster="isRadio ? coverImage : ''"
+            :style="isRadio ? 'background: #000; object-fit: contain;' : ''"
+          />
         </el-col>
-        <el-col :span="10" class="review-right">
+        <el-col :span="13" class="barrage-box">
           <BarrageBox
             ref="barrageBoxRef" :number="number" :start-time="startTime" :barrage-loaded="barrageLoaded"
-            style="height: 100%; width: 100%;"
+            style="height: 100%;"
           />
         </el-col>
       </el-row>
     </div>
-  </el-container>
+  </div>
 </template>
 
 <style scoped lang="scss">
-:deep(.el-carousel__container) {
+.video-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #000;
+  position: relative;
+  max-height: 960px;
+}
+
+.video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.review-container {
+  height: calc(100% - 60px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.review-content,
+.review-row {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.barrage-box {
+  min-height: 480px;
   height: 100%;
 }
 
-:deep(.el-carousel__item) {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.video-box {
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.review-row {
-  min-height: 480px;
-}
-
-.review-left,
-.review-right {
+.video-box,
+.barrage-box {
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -268,20 +281,18 @@ function download() {
   overflow: hidden;
 }
 
-.review-right {
+.barrage-box {
   background: #fafbfc;
-  /* 隐藏滚动条，兼容主流浏览器 */
-  overflow: hidden;
 }
 
 /* 隐藏所有滚动条（webkit/firefox/IE） */
-.review-left::-webkit-scrollbar,
-.review-right::-webkit-scrollbar {
+.video-box::-webkit-scrollbar,
+.barrage-box::-webkit-scrollbar {
   display: none;
 }
 
-.review-left,
-.review-right {
+.video-box,
+.barrage-box {
   -ms-overflow-style: none;
   /* IE and Edge */
   scrollbar-width: none;
@@ -297,5 +308,20 @@ function download() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+:deep(.el-carousel__container) {
+  height: 100%;
+}
+
+:deep(.el-carousel__item) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.el-card__body) {
+  height: calc(100% - 60px);
 }
 </style>
