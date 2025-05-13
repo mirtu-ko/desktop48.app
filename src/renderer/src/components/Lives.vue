@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
@@ -143,10 +143,32 @@ function record(item: any) {
 //     console.error(error)
 //   })
 // }
-// 切换tab
+
 // 直播标签页
 const activeName = ref('Home')
 const liveTabs = ref<any[]>([])
+
+// 从 localStorage 恢复标签页
+onMounted(() => {
+  const savedTabs = localStorage.getItem('liveTabs')
+  if (savedTabs) {
+    liveTabs.value = JSON.parse(savedTabs)
+    // 如果有保存的标签页，激活第一个标签
+    if (liveTabs.value.length > 0) {
+      activeName.value = liveTabs.value[0].name
+    }
+  }
+})
+
+// 监听标签页变化并保存到 localStorage
+watch(liveTabs, (newTabs) => {
+  localStorage.setItem('liveTabs', JSON.stringify(newTabs))
+}, { deep: true })
+
+// 在组件卸载时清理数据
+onUnmounted(() => {
+  localStorage.removeItem('liveTabs')
+})
 
 function onTabRemove(targetName: string) {
   activeName.value = 'Home'

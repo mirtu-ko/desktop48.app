@@ -2,7 +2,7 @@
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { cloneDeep } from 'lodash'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
@@ -27,10 +27,10 @@ const nativeVideo = ref<HTMLVideoElement | null>(null) // 原生 video 播放器
 const status = ref(0)
 const currentTime = ref(0)
 const duration = ref(0)
+// 音频流时的封面图片
 const carousels = ref<string[]>([])
 const carouselTime = ref(5000)
-// 音频流时的封面图片
-const coverImage = ref('') // 你可以根据实际需求赋值，如 member.value.avatar 或其它图片
+const coverImage = ref('')
 // 弹幕
 const barrageUrl = ref('')
 const barrageLoaded = ref(false)
@@ -41,7 +41,9 @@ const finalBarrageList = ref<any[]>([])
 const router = useRouter()
 
 // 生命周期：onMounted/onUnmounted
-onMounted(() => {
+const powerSaveBlockerId = ref<number | null>(null)
+
+onMounted(async () => {
   console.log('[ReviewPlayer.vue] onMounted', props)
   getOne()
   watch(
@@ -82,9 +84,17 @@ onMounted(() => {
     },
     { immediate: true },
   )
+  // 添加阻止休眠
+  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
 })
 
-// 获取录播信息
+onUnmounted(() => {
+  // 移除阻止休眠
+  if (powerSaveBlockerId.value !== null) {
+    window.mainAPI.allowSleep(powerSaveBlockerId.value)
+  }
+})
+
 const realName = ref('')
 function getOne() {
   Apis.instance().live(props.liveId).then((data) => {
@@ -98,6 +108,7 @@ function getOne() {
     if (isRadio.value) {
       carousels.value = data.carousels.carousels.map((carousel: any) => Tools.sourceUrl(carousel))
       carouselTime.value = Number.parseInt(data.carousels.carouselTime)
+      coverImage.value = carousels.value[0]
     }
   }).catch((error: any) => {
     console.error(error)

@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import Apis from '../assets/js/apis'
+import Tools from '../assets/js/tools'
 
 const props = defineProps({
   liveTitle: { type: String, required: true },
@@ -18,6 +19,12 @@ const retryCount = ref(0)
 const maxRetries = 3
 const isManuallyUnmounted = ref(false) // 添加手动卸载标记
 
+// 封面图片
+const isRadio = ref(false)
+const coverImage = ref('')
+// const carousels = ref<string[]>([])
+// const carouselTime = ref(5000)
+
 // 获取直播信息
 function getOne() {
   loading.value = true
@@ -25,6 +32,8 @@ function getOne() {
   Apis.instance().live(props.liveId).then((data) => {
     console.log('获取到的直播信息:', data)
     startHlsStream(data.playStreamPath)
+    isRadio.value = data.isRadio
+    coverImage.value = Tools.sourceUrl(data.coverPath)
   }).catch((error: any) => {
     console.error(error)
     ElMessage.error('获取直播信息失败')
@@ -74,20 +83,15 @@ function handleStreamError() {
   }
 }
 
-onUnmounted(() => {
-  console.log('[LivePlayer.vue] onUnmounted')
-  isManuallyUnmounted.value = true // 设置手动卸载标记
-  // 停止 HLS 转码
-  if (streamId.value) {
-    window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
-      console.error('停止转码失败:', err)
-    })
-  }
+const powerSaveBlockerId = ref<number | null>(null)
+// 添加阻止休眠
+onMounted(async () => {
+  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
 })
+
 onMounted(() => {
   console.log('[LivePlayer.vue] onMounted', props)
   getOne()
-
   watch(
     () => playStreamPath.value,
     (newPath) => {
@@ -134,6 +138,21 @@ onMounted(() => {
     { immediate: true },
   )
 })
+
+onUnmounted(() => {
+  console.log('[LivePlayer.vue] onUnmounted')
+  isManuallyUnmounted.value = true // 设置手动卸载标记
+  // 停止 HLS 转码
+  if (streamId.value) {
+    window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
+      console.error('停止转码失败:', err)
+    })
+  }
+  // 移除阻止休眠
+  if (powerSaveBlockerId.value !== null) {
+    window.mainAPI.allowSleep(powerSaveBlockerId.value)
+  }
+})
 </script>
 
 <template>
@@ -143,6 +162,7 @@ onMounted(() => {
       controls
       autoplay
       class="video-player"
+      :poster="coverImage"
     />
     <div v-if="loading" class="loading-container">
       <el-icon color="#FFFFFF" class="is-loading" size="24px">

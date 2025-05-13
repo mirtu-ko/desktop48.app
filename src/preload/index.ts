@@ -58,6 +58,11 @@ const api = {
   },
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
   // 其他
+  
+  // 阻止系统休眠
+  preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
+  // 允许系统休眠
+  allowSleep: (id: number) => ipcRenderer.invoke('allow-sleep', id),
 }
 
 // 使用 `contextBridge` API 将 Electron API 暴露给

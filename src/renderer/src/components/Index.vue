@@ -46,6 +46,8 @@ onMounted(async () => {
     await Apis.instance().syncInfo()
     console.log('[Index.vue]数据库没有成员信息, 同步完成')
   }
+  // 清空localStorage中的liveTabs缓存
+  localStorage.removeItem('liveTabs')
 })
 
 onUnmounted(() => {

@@ -57,6 +57,11 @@ export interface mainAPI {
   recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
   recordTaskError: (callback: (liveId: string, error: any) => void) => void
   recordTaskStop: (liveId: string) => void
+
+  // 休眠
+  preventSleep: () => Promise<any>
+  allowSleep: (id: number) => Promise<any>
+
   // 可继续扩展更多API
 }
 

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path, { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
+import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
 import { Database } from './database.js'
@@ -247,3 +247,17 @@ else {
     }
   })
 }
+
+// 注册阻止休眠的 IPC 处理程序
+ipcMain.handle('prevent-sleep', () => {
+  const id = powerSaveBlocker.start('prevent-display-sleep')
+  console.log('[主进程] 已阻止系统休眠，ID:', id)
+  return id
+})
+
+ipcMain.handle('allow-sleep', (_event, id: number) => {
+  if (powerSaveBlocker.isStarted(id)) {
+    powerSaveBlocker.stop(id)
+    console.log('[主进程] 已允许系统休眠，ID:', id)
+  }
+})
