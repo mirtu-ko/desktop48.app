@@ -48,6 +48,7 @@ onMounted(async () => {
   }
   // 清空localStorage中的liveTabs缓存
   localStorage.removeItem('liveTabs')
+  localStorage.removeItem('reviewTabs')
 })
 
 onUnmounted(() => {

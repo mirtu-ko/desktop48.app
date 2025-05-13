@@ -153,10 +153,6 @@ onMounted(() => {
   const savedTabs = localStorage.getItem('liveTabs')
   if (savedTabs) {
     liveTabs.value = JSON.parse(savedTabs)
-    // 如果有保存的标签页，激活第一个标签
-    if (liveTabs.value.length > 0) {
-      activeName.value = liveTabs.value[0].name
-    }
   }
 })
 

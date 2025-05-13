@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import Tools from '../assets/js/tools'
@@ -9,7 +9,7 @@ import ReviewPlayer from './ReviewPlayer.vue'
 
 // 响应式变量
 const activeName = ref('Home')
-const liveTabs = ref<any[]>([])
+const reviewTabs = ref<any[]>([])
 const reviewList = ref<any[]>([])
 const reviewNext = ref('0')
 const loading = ref(false)
@@ -117,7 +117,7 @@ function refresh() {
 
 // 点击回放
 function onReviewClick(item: any) {
-  const exists = liveTabs.value.some((tab: any) => tab.liveId === item.liveId)
+  const exists = reviewTabs.value.some((tab: any) => tab.liveId === item.liveId)
   if (exists)
     return
   const liveTab = {
@@ -127,18 +127,31 @@ function onReviewClick(item: any) {
     name: `${item.liveId}_${Math.random().toString(36).substring(2)}`,
     startTime: Number.parseInt(item.ctime),
   }
-  liveTabs.value.push(liveTab)
+  reviewTabs.value.push(liveTab)
   activeName.value = liveTab.name
 }
 
 function onTabRemove(targetName: string) {
   activeName.value = 'Home'
-  liveTabs.value = liveTabs.value.filter((tab: any) => tab.name != targetName)
+  reviewTabs.value = reviewTabs.value.filter((tab: any) => tab.name != targetName)
 }
 
 // 初始化
 onMounted(() => {
   getReviewList()
+  // 从 localStorage 中加载标签页数据
+  const savedTabs = localStorage.getItem('reviewTabs')
+  if (savedTabs) {
+    reviewTabs.value = JSON.parse(savedTabs)
+  }
+})
+
+// 监听标签页变化并保存到 localStorage
+watch(reviewTabs, (newTabs: any) => {
+  console.log('标签页变化', newTabs)
+  localStorage.setItem('reviewTabs', JSON.stringify(newTabs))
+}, {
+  deep: true,
 })
 
 // 加载更多
@@ -232,11 +245,11 @@ async function onInfiniteScroll() {
       </el-tab-pane>
 
       <el-tab-pane
-        v-for="liveTab in liveTabs" :key="liveTab.name" closable :label="liveTab.label"
-        :name="liveTab.name"
-        @close="onTabRemove(liveTab.name)"
+        v-for="reviewTab in reviewTabs" :key="reviewTab.name" closable :label="reviewTab.label"
+        :name="reviewTab.name"
+        @close="onTabRemove(reviewTab.name)"
       >
-        <ReviewPlayer :live-id="liveTab.liveId" :start-time="liveTab.startTime" :live-title="liveTab.title" />
+        <ReviewPlayer :live-id="reviewTab.liveId" :start-time="reviewTab.startTime" :live-title="reviewTab.title" />
       </el-tab-pane>
     </el-tabs>
   </div>
