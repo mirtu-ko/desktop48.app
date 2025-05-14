@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis.js'
 import Constants from '../assets/js/constants.js'
@@ -32,23 +32,25 @@ watch(
   },
 )
 
-let changeMenuHandler: any
+onBeforeMount(() => {
+// 清空localStorage中的liveTabs缓存
+  localStorage.removeItem('liveTabs')
+  localStorage.removeItem('reviewTabs')
+})
 
+let changeMenuHandler: any
 onMounted(async () => {
   changeMenuHandler = (menu: string) => {
     activeIndex.value = menu
     router.push(menu)
   }
   EventBus.on('change-selected-menu', changeMenuHandler)
-  // 仅当数据库没有成员信息时才同步
+  // 当数据库没有成员信息时
   if (!(await window.mainAPI.hasMembers?.())) {
     console.log('[Index.vue]数据库没有成员信息, 同步成员信息')
     await Apis.instance().syncInfo()
     console.log('[Index.vue]数据库没有成员信息, 同步完成')
   }
-  // 清空localStorage中的liveTabs缓存
-  localStorage.removeItem('liveTabs')
-  localStorage.removeItem('reviewTabs')
 })
 
 onUnmounted(() => {

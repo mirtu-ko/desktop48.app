@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { app, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { Database } from './database.js'
 import { serverPort } from './http-server.js'
 
@@ -34,9 +34,6 @@ function cleanupTempDir() {
     console.error('[stream.ts] 清理临时目录失败:', err)
   }
 }
-
-// 在应用启动时清理临时目录
-cleanupTempDir()
 
 ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) => {
   // 检查是否已存在相同 liveId 的进程
@@ -203,4 +200,7 @@ app.on('before-quit', () => {
   }
   // 清空进程映射
   streamProcesses.clear()
+
+  // 清理临时目录
+  cleanupTempDir()
 })
