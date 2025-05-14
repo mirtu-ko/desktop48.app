@@ -178,6 +178,21 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // 在窗口关闭前清理 localStorage
+  mainWindow.on('close', (event) => {
+    console.log('[main] 主窗口即将关闭')
+    // 阻止窗口立即关闭
+    event.preventDefault()
+
+    // 发送清理消息给渲染进程
+    mainWindow.webContents.send('cleanup-storage')
+
+    // 给渲染进程一点时间来处理清理
+    setTimeout(() => {
+      mainWindow.destroy() // 强制关闭窗口
+    }, 150)
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
@@ -191,6 +206,10 @@ function createWindow(): void {
   else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  mainWindow.on('close', () => {
+    console.log('[main] 主窗口即将关闭')
+  })
 }
 
 // 当 Electron 完成初始化时会调用此方法，

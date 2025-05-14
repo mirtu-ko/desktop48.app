@@ -32,12 +32,6 @@ watch(
   },
 )
 
-onBeforeMount(() => {
-// 清空localStorage中的liveTabs缓存
-  localStorage.removeItem('liveTabs')
-  localStorage.removeItem('reviewTabs')
-})
-
 let changeMenuHandler: any
 onMounted(async () => {
   changeMenuHandler = (menu: string) => {
@@ -51,10 +45,19 @@ onMounted(async () => {
     await Apis.instance().syncInfo()
     console.log('[Index.vue]数据库没有成员信息, 同步完成')
   }
+
+  // 监听主进程发送的清理缓存事件
+  window.electron.ipcRenderer.on('cleanup-storage', () => {
+    console.log('[Index.vue] 收到清理缓存事件')
+    localStorage.removeItem('liveTabs')
+    localStorage.removeItem('reviewTabs')
+  })
 })
 
 onUnmounted(() => {
   EventBus.off('change-selected-menu', changeMenuHandler)
+  // 移除事件监听
+  window.electron.ipcRenderer.removeAllListeners('cleanup-storage')
 })
 </script>
 
