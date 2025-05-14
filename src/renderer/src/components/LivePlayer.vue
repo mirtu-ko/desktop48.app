@@ -3,13 +3,21 @@ import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
-import Tools from '../assets/js/tools'
+
+import Constants from '../assets/js/constants'
+import EventBus from '../assets/js/event-bus'
+import RecordTask from '../assets/js/record-task'
+import Tools from '../assets/js/tools' // 添加手动卸载标记
 
 const props = defineProps({
   liveTitle: { type: String, required: true },
   liveId: { type: String, required: true },
+  startTime: { type: Number, required: true },
 })
+
+const realName = ref('')
 
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
@@ -17,7 +25,8 @@ const streamId = ref('')
 const loading = ref(true)
 const retryCount = ref(0)
 const maxRetries = 3
-const isManuallyUnmounted = ref(false) // 添加手动卸载标记
+const isManuallyUnmounted = ref(false)
+const router = useRouter()
 
 // 封面图片
 const isRadio = ref(false)
@@ -34,6 +43,7 @@ function getOne() {
     startHlsStream(data.playStreamPath)
     isRadio.value = data.isRadio
     coverImage.value = Tools.sourceUrl(data.coverPath)
+    realName.value = data.user.userName
   }).catch((error: any) => {
     console.error(error)
     ElMessage.error('获取直播信息失败')
@@ -83,8 +93,8 @@ function handleStreamError() {
   }
 }
 
-const powerSaveBlockerId = ref<number | null>(null)
 // 添加阻止休眠
+const powerSaveBlockerId = ref<number | null>(null)
 onMounted(async () => {
   powerSaveBlockerId.value = await window.mainAPI.preventSleep()
 })
@@ -139,6 +149,41 @@ onMounted(() => {
   )
 })
 
+// 检查下载目录是否存在
+function checkDownloadDirectory() {
+  window.mainAPI.getConfig('downloadDirectory').then((result: any) => {
+    if (!result) {
+      ElMessage({
+        message: '下载目录不存在，请先配置下载目录',
+        type: 'warning',
+      })
+      router.push('/setting')
+    }
+  }).catch((error: any) => {
+    console.error(error)
+    ElMessage({ message: '检查下载目录失败', type: 'error' })
+  })
+}
+
+// 调用Electron主进程暴露的record方法
+function record() {
+  checkDownloadDirectory()
+  Apis.instance().live(props.liveId).then(async (content) => {
+    const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
+    const filename = `${realName.value} ${date}.flv`
+    const recordTask: RecordTask = new RecordTask(content.playStreamPath, filename, content.liveId)
+    EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
+    router.push('/downloads')
+    setTimeout(() => {
+      // console.log('[LivePlayer.vue] 调用 record 参数:', recordTask)
+      recordTask.init()
+      EventBus.emit('record-task', recordTask)
+    })
+  }).catch((error) => {
+    console.error(error)
+  })
+}
+
 onUnmounted(() => {
   console.log('[LivePlayer.vue] onUnmounted')
   isManuallyUnmounted.value = true // 设置手动卸载标记
@@ -156,6 +201,22 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <el-header class="header-box">
+    <el-row :gutter="12" justify="space-between" style="width: 100%;">
+      <el-col :span="16">
+        <div style="display: flex; align-items: center; float: left">
+          <span>{{ liveTitle }}</span>
+        </div>
+      </el-col>
+      <el-col :span="8">
+        <div style="display: flex; align-items: center; float: right">
+          <el-button type="success" @click="record()">
+            录制
+          </el-button>
+        </div>
+      </el-col>
+    </el-row>
+  </el-header>
   <div class="video-box">
     <video
       ref="nativeVideo"
@@ -176,7 +237,7 @@ onUnmounted(() => {
 <style scoped>
 .video-box {
   width: 100%;
-  height: 100%;
+  height: calc(100% - 60px);
   display: flex;
   justify-content: center;
   align-items: center;

@@ -82,7 +82,7 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
       '-hls_time',
       '3', // 减小分片时长为2秒
       '-hls_list_size',
-      '6', // 增加列表大小为6，保持更多分片
+      '12', // 增加列表大小为12，保持更多分片
       '-hls_flags',
       'delete_segments+append_list', // 添加append_list标志，避免重写整个m3u8
       '-hls_segment_type',

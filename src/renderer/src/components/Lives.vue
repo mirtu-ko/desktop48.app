@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
-import Constants from '../assets/js/constants'
-import EventBus from '../assets/js/event-bus'
-import RecordTask from '../assets/js/record-task'
 import Tools from '../assets/js/tools'
 import LiveItem from '../components/LiveItem.vue'
 import LivePlayer from '../components/LivePlayer.vue'
@@ -14,7 +10,6 @@ const liveList = ref<any[]>([])
 const liveNext = ref('0')
 const loading = ref(false)
 const noMore = ref(false)
-const router = useRouter()
 
 const disabled = computed(() => loading.value || noMore.value)
 
@@ -87,40 +82,6 @@ function refresh() {
   noMore.value = false
   getLiveList()
 }
-// 检查下载目录是否存在
-function checkDownloadDirectory() {
-  window.mainAPI.getConfig('downloadDirectory').then((result: any) => {
-    if (!result) {
-      ElMessage({
-        message: '下载目录不存在，请先配置下载目录',
-        type: 'warning',
-      })
-      router.push('/setting')
-    }
-  }).catch((error: any) => {
-    console.error(error)
-    ElMessage({ message: '检查下载目录失败', type: 'error' })
-  })
-}
-
-// 调用Electron主进程暴露的record方法
-function record(item: any) {
-  checkDownloadDirectory()
-  Apis.instance().live(item.liveId).then(async (content) => {
-    const member = await window.mainAPI.getMember(content.user.userId)
-    const date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyyMMddhhmm')
-    const filename = `${member.realName} ${date}.flv`
-    const recordTask: RecordTask = new RecordTask(content.playStreamPath, filename, content.liveId)
-    EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
-    router.push('/downloads')
-    setTimeout(() => {
-      recordTask.init()
-      EventBus.emit('record-task', recordTask)
-    })
-  }).catch((error) => {
-    console.error(error)
-  })
-}
 
 // // 调用Electron主进程暴露的openPlayer方法
 // function play(item: any) {
@@ -182,6 +143,7 @@ function play(item: any) {
     title: item.title,
     liveId: item.liveId,
     name: `${item.liveId}_${Math.random().toString(36).substring(2)}`,
+    startTime: Number.parseInt(item.ctime),
   }
   liveTabs.value.push(liveTab)
   activeName.value = liveTab.name
@@ -214,23 +176,8 @@ function play(item: any) {
                 class="live-main"
               >
                 <div class="live-list">
-                  <div v-for="item in liveList" :key="item.liveId" class="live-item">
-                    <el-popover
-                      :ref="`popover-${item.liveId}`" placement="top" trigger="hover" :width="280"
-                    >
-                      <p>{{ item.title }}</p>
-                      <div>
-                        <el-button type="danger" size="small" @click="record(item)">
-                          录制
-                        </el-button>
-                        <el-button type="success" size="small" @click="play(item)">
-                          观看
-                        </el-button>
-                      </div>
-                      <template #reference>
-                        <LiveItem :item="item" class="live-card" />
-                      </template>
-                    </el-popover>
+                  <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">
+                    <LiveItem :item="item" class="live-card" />
                   </div>
                 </div>
               </div>
@@ -250,6 +197,7 @@ function play(item: any) {
         <LivePlayer
           :live-title="tab.title"
           :live-id="tab.liveId"
+          :start-time="tab.startTime"
         />
       </el-tab-pane>
     </el-tabs>
