@@ -57,8 +57,6 @@ const api = {
     ipcRenderer.on('recordTaskError', (_e, liveId, error) => callback(liveId, error))
   },
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
-  // 其他
-  
   // 阻止系统休眠
   preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
   // 允许系统休眠

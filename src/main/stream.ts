@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
 import { Database } from './database.js'
 import { serverPort } from './http-server.js'
 
@@ -77,11 +77,11 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
       '-f',
       'hls',
       '-hls_time',
-      '3', // 减小分片时长为2秒
+      '3', // 减小分片时长为3秒
       '-hls_list_size',
       '12', // 增加列表大小为12，保持更多分片
       '-hls_flags',
-      'delete_segments+append_list', // 添加append_list标志，避免重写整个m3u8
+      'append_list', // 添加append_list标志，避免重写整个m3u8
       '-hls_segment_type',
       'mpegts', // 明确指定分片类型
       '-hls_segment_filename',

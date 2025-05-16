@@ -133,6 +133,8 @@ defineExpose({ play, download })
 // 时间更新
 function onTimeUpdate(newTime: number) {
   if (newTime < currentTime.value) {
+    // 重新加载弹幕
+    barrageBoxRef.value?.clear()
     barrageList.value = cloneDeep(finalBarrageList.value)
   }
   currentTime.value = newTime
@@ -203,7 +205,7 @@ function download() {
 <template>
   <div class="review-container">
     <el-header class="header-box">
-      <el-row :gutter="12" justify="space-between">
+      <el-row :gutter="12" justify="space-between" style="width: 100%;">
         <el-col :span="16">
           <div style="display: flex; align-items: center; float: left">
             <span>{{ liveTitle }}</span>
