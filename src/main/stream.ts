@@ -81,7 +81,7 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
       '-hls_list_size',
       '12', // 增加列表大小为12，保持更多分片
       '-hls_flags',
-      'append_list', // 添加append_list标志，避免重写整个m3u8
+      'delete_segments+append_list', // 添加append_list标志，避免重写整个m3u8
       '-hls_segment_type',
       'mpegts', // 明确指定分片类型
       '-hls_segment_filename',
