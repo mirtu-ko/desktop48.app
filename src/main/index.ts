@@ -1,6 +1,5 @@
 /* eslint-disable style/max-statements-per-line */
 import type { IpcMainInvokeEvent } from 'electron'
-import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path, { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +7,6 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
-import { Database } from './database.js'
 import './download.js'
 import './record.js' // 录制功能主进程注册
 import './stream.js' // 流媒体相关主进程注册
