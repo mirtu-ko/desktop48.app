@@ -67,6 +67,7 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
   const outputPath = path.join(tempDir, `${liveId}.m3u8`)
 
   return new Promise((resolve, reject) => {
+    console.log('[stream.ts] ffmpegPath:', ffmpegPath)
     const ffmpeg = spawn(ffmpegPath, [
       '-i',
       rtmpUrl,
@@ -203,4 +204,16 @@ app.on('before-quit', () => {
 
   // 清理临时目录
   cleanupTempDir()
+
+  // 清理日志文件
+  const logPath = path.join(app.getPath('userData'), 'main.log')
+  if (fs.existsSync(logPath)) {
+    try {
+      fs.unlinkSync(logPath)
+      console.log('[stream.ts] 已清理日志文件', logPath)
+    }
+    catch (err) {
+      console.error('[stream.ts] 清理日志文件失败:', err)
+    }
+  }
 })

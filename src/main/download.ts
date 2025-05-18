@@ -13,10 +13,17 @@ ipcMain.handle('downloadTaskStart', async (event: IpcMainInvokeEvent, url: strin
   const saveDir: string = Database.instance().getConfig('downloadDirectory', '') as string
   if (!fs.existsSync(saveDir))
     throw new Error('保存目录不存在')
+  const ffmpegDir: string = Database.instance().getConfig('ffmpegDirectory', '') as string
+  if (!fs.existsSync(ffmpegDir))
+    throw new Error('ffmpeg 目录不存在')
+  // 检查 ffmpeg 二进制文件是否存在
+  const ffmpegPath = path.join(ffmpegDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
+  if (!fs.existsSync(ffmpegPath))
+    throw new Error('ffmpeg 二进制文件不存在')
   const filePath = path.join(saveDir, filename)
   return new Promise<string>((resolve, reject) => {
     // spawn ffmpeg to download and merge ts segments
-    const ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'info', '-y', '-i', url, '-c', 'copy', filePath])
+    const ffmpeg = spawn(ffmpegPath, ['-hide_banner', '-loglevel', 'info', '-y', '-i', url, '-c', 'copy', filePath])
     console.log('[download.ts]spawn ffmpeg start', filePath)
     // 解析 stderr 中的进度信息，推送给渲染进程
     ffmpeg.stderr.on('data', (chunk) => {

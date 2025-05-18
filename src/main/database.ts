@@ -137,7 +137,7 @@ class Database {
     this.memberTeamUpdate()
     this.lowdb.write()
     // 调试打印数据库路径
-    console.log('[数据库路径]', this.dbPath)
+    console.log('[database.ts]数据库路径', this.dbPath)
   }
 
   public saveMemberData(content: any) {

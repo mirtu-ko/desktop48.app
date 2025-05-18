@@ -11,11 +11,17 @@ ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string,
   const saveDir: string = Database.instance().getConfig('downloadDirectory', '') as string
   if (!fs.existsSync(saveDir))
     throw new Error('保存目录不存在')
+  const ffmpegDir: string = Database.instance().getConfig('ffmpegDirectory', '') as string
+  if (!fs.existsSync(ffmpegDir))
+    throw new Error('ffmpeg 目录不存在')
+  const ffmpegPath = path.join(ffmpegDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
+  if (!fs.existsSync(ffmpegPath))
+    throw new Error('ffmpeg 不存在于指定目录')
   const filePath = path.join(saveDir, filename)
   return new Promise<string>((resolve, reject) => {
     // spawn ffmpeg to record RTMP stream
     // -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 可选参数用于断线重连
-    const ffmpeg = spawn('ffmpeg', [
+    const ffmpeg = spawn(ffmpegPath, [
       '-hide_banner',
       '-loglevel',
       'info',

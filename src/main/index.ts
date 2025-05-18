@@ -1,3 +1,4 @@
+/* eslint-disable style/max-statements-per-line */
 import type { IpcMainInvokeEvent } from 'electron'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -13,11 +14,24 @@ import './record.js' // 录制功能主进程注册
 import './stream.js' // 流媒体相关主进程注册
 import './http-server.js'
 
+// 日志重定向（ESM写法，无require）
+const logPath = path.join(app.getPath('userData'), 'main.log')
+const logStream = fs.createWriteStream(logPath, { flags: 'a' })
+const origLog = console.log
+const origErr = console.error
+console.log = (...args) => { origLog(...args); logStream.write(`[LOG] ${args.join(' ')}\n`) }
+console.error = (...args) => { origErr(...args); logStream.write(`[ERR] ${args.join(' ')}\n`) }
+
 // 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// 打印日志
+console.log('[index.ts] Electron index.ts __filename:', __filename)
 console.log('[index.ts] Electron index.ts __dirname:', __dirname)
+console.log('[index.ts] 日志目录:', logPath)
+console.log('[index.ts] 主进程路径:', process.execPath)
+console.log('[index.ts] 主进程工作目录:', process.cwd())
 console.log('[index.ts] 预加载:', join(__dirname, '../preload/index.js'), fs.existsSync(join(__dirname, '../preload/index.js')))
 console.log('[index.ts] 系统平台:', process.platform)
 console.log('[index.ts] Electron 版本:', process.versions.electron)
@@ -225,9 +239,6 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
-  // IPC 测试
-  ipcMain.on('ping', () => console.log('pong'))
 
   // 创建窗口
   createWindow()
