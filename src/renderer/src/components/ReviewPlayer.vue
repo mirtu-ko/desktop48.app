@@ -101,6 +101,14 @@ function getOne() {
     console.log('获取到的录播信息:', data)
     playStreamPath.value = Tools.streamPathHandle(data.playStreamPath, props.startTime)
     isReview.value = data.review
+    if (!isReview.value) {
+      ElMessage({
+        message: '该视频不是录播',
+        type: 'warning',
+      })
+      router.push('/live')
+      return
+    }
     barrageUrl.value = data.msgFilePath
     isRadio.value = data.liveType == 2
     number.value = data.onlineNum

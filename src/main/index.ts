@@ -7,7 +7,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
-import './download.js'
+import './download.js' // 下载功能主进程注册
 import './record.js' // 录制功能主进程注册
 import './stream.js' // 流媒体相关主进程注册
 import './http-server.js'
@@ -112,7 +112,7 @@ function createWindow(): void {
 
   // 在窗口关闭前清理 localStorage
   mainWindow.on('close', (event) => {
-    console.log('[main] 主窗口即将关闭')
+    console.log('[main] 主窗口即将关闭，等待渲染进程清理')
     // 阻止窗口立即关闭
     event.preventDefault()
 
@@ -123,6 +123,7 @@ function createWindow(): void {
     setTimeout(() => {
       mainWindow.destroy() // 强制关闭窗口
     }, 150)
+    console.log('[main] 渲染进程清理完成')
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -138,10 +139,6 @@ function createWindow(): void {
   else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
-
-  mainWindow.on('close', () => {
-    console.log('[main] 主窗口即将关闭')
-  })
 }
 
 // 当 Electron 完成初始化时会调用此方法，
