@@ -1,6 +1,6 @@
 # desktop48.app
 
-Fork from [desktop48](https://github.com/Jarvay/desktop48)
+Fork from [desktop48](https://github.com/Jarvay/desktop48), build with [electron-vite](https://electron-vite.org/).
 
 ## Project Setup
 
