@@ -1,6 +1,7 @@
 node_modules
 dist
 out
+build/icons
 .vscode/
 .DS_Store
 .eslintcache
