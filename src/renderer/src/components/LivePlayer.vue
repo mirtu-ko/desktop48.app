@@ -51,6 +51,36 @@ function getOne() {
   })
 }
 
+// 定时更新直播onlineNum
+const onlineNum = ref(0)
+const onlineNumTimer = ref()
+
+// 启动定时器
+function startOnlineNumTimer() {
+  onlineNumTimer.value = setInterval(() => {
+    updateOnlineNum()
+  }, 5000)
+}
+
+// 停止定时器
+function stopOnlineNumTimer() {
+  if (onlineNumTimer.value) {
+    clearInterval(onlineNumTimer.value)
+    onlineNumTimer.value = null
+  }
+}
+
+function updateOnlineNum() {
+  Apis.instance().live(props.liveId).then((data) => {
+    console.log('获取到的直播在线人数:', data.onlineNum)
+    onlineNum.value = data.onlineNum
+  }).catch((error: any) => {
+    console.error(error)
+  })
+}
+
+startOnlineNumTimer()
+
 // 启动 HLS 流
 function startHlsStream(rtmpUrl: string) {
   window.mainAPI.convertToHls(rtmpUrl, props.liveId).then((result) => {
@@ -197,6 +227,8 @@ onUnmounted(() => {
   if (powerSaveBlockerId.value !== null) {
     window.mainAPI.allowSleep(powerSaveBlockerId.value)
   }
+  // 清理定时器
+  stopOnlineNumTimer()
 })
 </script>
 
@@ -206,6 +238,9 @@ onUnmounted(() => {
       <el-col :span="16">
         <div style="display: flex; align-items: center; float: left">
           <span>{{ liveTitle }}</span>
+          <el-text type="primary" size="small" style="margin-left: 8px">
+            (实时在线：{{ onlineNum }})
+          </el-text>
         </div>
       </el-col>
       <el-col :span="8">
