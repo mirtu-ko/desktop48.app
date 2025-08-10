@@ -95,7 +95,7 @@ function openLiveStream(showId: number) {
       <div class="shows-container">
         <h2>即将开始</h2>
         <div v-if="showToday?.length" class="showToday-list">
-          <div v-for="show in showToday" :key="show.id" class="show-item" @click="openLiveStream(show.id)" style="cursor: pointer">
+          <div v-for="show in showToday" :key="show.id" style="cursor: pointer" class="show-item" @click="openLiveStream(show.id)">
             <div class="show-image">
               <img :src="show.image" :alt="show.title">
               <span class="show-time">{{ `${formatTimestamp(show.startTime)} - ${formatTimestamp(show.endTime)}` }}</span>
