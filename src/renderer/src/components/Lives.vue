@@ -21,10 +21,6 @@ async function updateHiddenMemberIds() {
   hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
 }
 
-onMounted(async () => {
-  updateHiddenMemberIds()
-})
-
 // 加载更多
 async function getLiveList() {
   // console.log('[Lives.vue] getLiveList 方法开始执行')
@@ -35,7 +31,7 @@ async function getLiveList() {
     // console.log('获取到的直播列表:', content)
     if (noMore.value) {
       ElMessage({
-        message: '加载完毕',
+        message: '加载完毕，没有更多直播了',
         type: 'info',
       })
       noMore.value = true
@@ -70,40 +66,6 @@ async function getLiveList() {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  getLiveList()
-})
-
-// 刷新
-function refresh() {
-  liveList.value = []
-  liveNext.value = '0'
-  noMore.value = false
-  getLiveList()
-}
-
-// // 调用Electron主进程暴露的openPlayer方法
-// function play(item: any) {
-//   Apis.instance().live(item.liveId).then(async (content) => {
-//     const params = {
-//       title: `${item.userInfo.nickname} ${item.title}`,
-//       streamPath: content.playStreamPath,
-//     }
-//     console.log('[lives.vue] 调用 openPlayer 参数:', params)
-//     try {
-//       const result = await window.mainAPI.openPlayer?.(params)
-//       console.log('[lives.vue] openPlayer 调用完成:', result)
-//     }
-//     catch (err) {
-//       ElMessage.error(`openPlayer 调用失败: ${(err as any)?.message || err}`)
-//       console.error('[lives.vue] openPlayer 错误:', err)
-//     }
-//   }).catch((error: any) => {
-//     ElMessage.error(error)
-//     console.error(error)
-//   })
-// }
 
 // 直播标签页
 const activeName = ref('Home')
@@ -148,6 +110,23 @@ function play(item: any) {
   liveTabs.value.push(liveTab)
   activeName.value = liveTab.name
 }
+
+// 刷新
+function refresh() {
+  liveList.value = []
+  liveNext.value = '0'
+  noMore.value = false
+  getLiveList()
+}
+
+// onMounted
+onMounted(async () => {
+  updateHiddenMemberIds()
+})
+
+onMounted(() => {
+  getLiveList()
+})
 </script>
 
 <template>

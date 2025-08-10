@@ -78,7 +78,7 @@ async function getReviewList() {
     if (noMore.value) {
       ElMessage({
         message: '加载完毕',
-        type: 'info',
+        type: 'success',
       })
       noMore.value = true
       loading.value = false
@@ -107,14 +107,6 @@ async function getReviewList() {
   })
 }
 
-// 刷新
-function refresh() {
-  reviewList.value = []
-  reviewNext.value = '0'
-  noMore.value = false
-  getReviewList()
-}
-
 // 点击回放
 function onReviewClick(item: any) {
   const exists = reviewTabs.value.some((tab: any) => tab.liveId === item.liveId)
@@ -135,16 +127,6 @@ function onTabRemove(targetName: string) {
   activeName.value = 'Home'
   reviewTabs.value = reviewTabs.value.filter((tab: any) => tab.name != targetName)
 }
-
-// 初始化
-onMounted(() => {
-  getReviewList()
-  // 从 localStorage 中加载标签页数据
-  const savedTabs = localStorage.getItem('reviewTabs')
-  if (savedTabs) {
-    reviewTabs.value = JSON.parse(savedTabs)
-  }
-})
 
 // 监听标签页变化并保存到 localStorage
 watch(reviewTabs, (newTabs: any) => {
@@ -173,6 +155,24 @@ async function onInfiniteScroll() {
     isLoadingMore.value = false
   }
 }
+
+// 刷新
+function refresh() {
+  reviewList.value = []
+  reviewNext.value = '0'
+  noMore.value = false
+  getReviewList()
+}
+
+// 初始化
+onMounted(() => {
+  getReviewList()
+  // 从 localStorage 中加载标签页数据
+  const savedTabs = localStorage.getItem('reviewTabs')
+  if (savedTabs) {
+    reviewTabs.value = JSON.parse(savedTabs)
+  }
+})
 </script>
 
 <template>
