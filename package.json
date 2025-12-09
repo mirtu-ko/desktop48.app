@@ -20,7 +20,30 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:linux": "npm run build && electron-builder --linux",
+    "release": "npm run build && electron-builder --publish always"
+  },
+  "build": {
+    "appId": "com.mirtu.desktop48",
+    "productName": "Desktop48",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mirtu-ko",
+        "repo": "desktop48.app"
+      }
+    ],
+    "mac": {
+      "target": ["dmg", "zip"],
+      "identity": null
+    },
+    "win": {
+      "target": ["nsis"],
+      "verifyUpdateCodeSignature": false
+    },
+    "linux": {
+      "target": ["AppImage"]
+    }
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

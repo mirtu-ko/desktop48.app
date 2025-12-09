@@ -1,0 +1,35 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*' # 只有推送 v 开头的 tag 时才触发，例如 v1.0.0
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        # 这里定义你要构建的平台。
+        # 注意：构建 macOS 需要 macOS 运行环境，构建 Windows 需要 Windows 环境
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Check out git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # 根据你的项目需求选择 Node 版本
+
+      - name: Install Dependencies
+        run: npm ci # 如果你有 package-lock.json，推荐用 ci；否则用 npm install
+
+      # 构建并发布
+      # 这里的 GH_TOKEN 是 GitHub 自动生成的，无需手动设置
+      - name: Build and Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release

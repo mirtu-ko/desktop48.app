@@ -59,7 +59,7 @@ const onlineNumTimer = ref()
 function startOnlineNumTimer() {
   onlineNumTimer.value = setInterval(() => {
     updateOnlineNum()
-  }, 5000)
+  }, 15000)
 }
 
 // 停止定时器
