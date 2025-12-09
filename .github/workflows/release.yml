@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*' # 只有推送 v 开头的 tag 时才触发，例如 v1.0.0
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ${{ matrix.os }}
