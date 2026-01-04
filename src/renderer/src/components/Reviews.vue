@@ -29,6 +29,8 @@ async function updateHiddenMemberIds() {
 
 const teamOptions = ref<any[]>([])
 const groupOptions = ref<any[]>([])
+const reviewScrollRef = ref<any>(null)
+const scrollDistance = 10
 
 // 初始化
 onMounted(async () => {
@@ -140,6 +142,12 @@ watch(reviewTabs, (newTabs: any) => {
 const isLoadingMore = ref(false)
 
 async function onInfiniteScroll() {
+  const wrap: HTMLElement | undefined = reviewScrollRef.value?.wrapRef
+  if (wrap) {
+    const nearBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - scrollDistance
+    if (!nearBottom)
+      return
+  }
   console.log('触发加载更多', {
     isLoadingMore: isLoadingMore.value,
     loading: loading.value,
@@ -220,25 +228,23 @@ onMounted(() => {
             暂无回放
           </div>
           <el-scrollbar
-            wrap-class="scrollbar-wrapper"
+            ref="reviewScrollRef"
+            v-loading="loading"
+            class="scrollbar-wrapper"
+            :infinite-scroll-disabled="disabled"
+            :distance="scrollDistance"
+            @end-reached="onInfiniteScroll"
           >
-            <div
-              v-loading="loading" v-infinite-scroll="onInfiniteScroll" class="review-main"
-              :infinite-scroll-disabled="disabled"
-              infinite-scroll-delay="100"
-              infinite-scroll-distance="20"
-            >
-              <div class="review-list">
-                <div
-                  v-for="item in reviewList" :key="item.liveId" class="review-item"
-                  @click="onReviewClick(item)"
-                >
-                  <LiveItem :item="item" class="live-card" />
-                </div>
+            <div class="review-list">
+              <div
+                v-for="item in reviewList" :key="item.liveId" class="review-item"
+                @click="onReviewClick(item)"
+              >
+                <LiveItem :item="item" class="live-card" />
               </div>
-              <div v-if="isLoadingMore" class="loading-more-tip">
-                正在加载更多...
-              </div>
+            </div>
+            <div v-if="isLoadingMore" class="loading-more-tip">
+              正在加载更多...
             </div>
           </el-scrollbar>
         </div>
@@ -295,7 +301,7 @@ onMounted(() => {
 }
 
 :deep(.el-card__body) {
-  padding: 6px 0 !important;
+  padding: 6px !important;
 }
 
 :deep(.el-card__header) {

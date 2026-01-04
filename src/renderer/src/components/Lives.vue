@@ -146,18 +146,16 @@ onMounted(() => {
             </div>
 
             <!-- 有直播时显示 -->
-            <el-scrollbar v-if="!loading && liveList.length > 0" class="scrollbar-wrapper">
-              <div
-                v-infinite-scroll="getLiveList"
-                :infinite-scroll-disabled="disabled"
-                infinite-scroll-delay="100"
-                infinite-scroll-distance="20"
-                class="live-main"
-              >
-                <div class="live-list">
-                  <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">
-                    <LiveItem :item="item" class="live-card" />
-                  </div>
+            <el-scrollbar
+              v-if="!loading && liveList.length > 0"
+              :infinite-scroll-disabled="disabled"
+              class="scrollbar-wrapper"
+              :distance="10"
+              @end-reached="getLiveList"
+            >
+              <div class="live-list">
+                <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">
+                  <LiveItem :item="item" class="live-card" />
                 </div>
               </div>
             </el-scrollbar>
@@ -193,12 +191,12 @@ onMounted(() => {
 }
 
 .live-main {
-  height: calc(100% - 60px);
+  height: calc(100%);
   overflow: hidden;
 }
 
 .scrollbar-wrapper {
-  height: 100%;
+  height: calc(100% - 60px);
   overflow-x: hidden !important;
 }
 .live-info {

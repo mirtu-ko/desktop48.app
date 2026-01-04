@@ -46,17 +46,15 @@ defineProps<{ item: Item }>()
     <p class="live-date">
       {{ item.date }}
     </p>
-    <div style="display: flex;justify-content: space-between;">
-      <div class="member-info">
-        <span style="color: #000;">{{ item.userInfo.nickname }}</span>
-        <span
-          v-if="item.member && item.member.teamName"
-          class="team-badge"
-          :style="{ 'background-color': `#${item.member.teamColor}` }"
-        >
-          {{ item.member.teamName.replace('TEAM ', '') }}
-        </span>
-      </div>
+    <div class="member-info" style="display: flex; justify-content: space-between;">
+      <span style="color: #000;">{{ item.userInfo.nickname }}</span>
+      <span
+        v-if="item.member && item.member.teamName"
+        class="team-badge"
+        :style="{ 'background-color': `#${item.member.teamColor}` }"
+      >
+        {{ item.member.teamName.replace('TEAM ', '') }}
+      </span>
     </div>
   </el-card>
 </template>
