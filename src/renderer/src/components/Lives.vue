@@ -11,6 +11,9 @@ const liveNext = ref('0')
 const loading = ref(false)
 const noMore = ref(false)
 
+const liveScrollRef = ref<any>(null)
+const scrollDistance = 10
+
 const disabled = computed(() => loading.value || noMore.value)
 
 // 更新隐藏的成员ID
@@ -124,6 +127,16 @@ onMounted(async () => {
   updateHiddenMemberIds()
 })
 
+async function onInfiniteScroll() {
+  const wrap: HTMLElement | undefined = liveScrollRef.value?.wrapRef
+  if (wrap) {
+    const nearBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - scrollDistance - 1
+    if (!nearBottom)
+      return
+  }
+  await getLiveList()
+}
+
 onMounted(() => {
   getLiveList()
 })
@@ -147,11 +160,12 @@ onMounted(() => {
 
             <!-- 有直播时显示 -->
             <el-scrollbar
-              v-if="!loading && liveList.length > 0"
+              v-if="liveList.length > 0"
+              ref="liveScrollRef"
               :infinite-scroll-disabled="disabled"
               class="scrollbar-wrapper"
-              :distance="10"
-              @end-reached="getLiveList"
+              :distance="scrollDistance"
+              @end-reached="onInfiniteScroll"
             >
               <div class="live-list">
                 <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">

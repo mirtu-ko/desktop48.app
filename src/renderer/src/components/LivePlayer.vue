@@ -239,7 +239,7 @@ onUnmounted(() => {
         <div style="display: flex; align-items: center; float: left">
           <span>{{ liveTitle }}</span>
           <el-text type="primary" size="small" style="margin-left: 8px">
-            (实时在线：{{ onlineNum }})
+            (累计在线：{{ onlineNum }})
           </el-text>
         </div>
       </el-col>
