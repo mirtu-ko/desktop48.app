@@ -234,23 +234,20 @@ onUnmounted(() => {
 
 <template>
   <el-header class="header-box">
-    <el-row :gutter="12" justify="space-between" style="width: 100%;">
-      <el-col :span="16">
-        <div style="display: flex; align-items: center; float: left">
-          <span>{{ liveTitle }}</span>
-          <el-text type="primary" size="small" style="margin-left: 8px">
-            (累计在线：{{ onlineNum }})
-          </el-text>
-        </div>
-      </el-col>
-      <el-col :span="8">
-        <div style="display: flex; align-items: center; float: right">
-          <el-button type="success" @click="record()">
-            录制
-          </el-button>
-        </div>
-      </el-col>
-    </el-row>
+    <div style="display: flex; align-items: center; width: 100%;">
+      <span
+        style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;"
+        :title="liveTitle"
+      >
+        {{ liveTitle }}
+      </span>
+      <el-text type="primary" size="small" style="flex-shrink: 0; margin-right: 12px;">
+        (累计在线：{{ onlineNum }})
+      </el-text>
+      <el-button type="success" style="flex-shrink: 0;" @click="record()">
+        录制
+      </el-button>
+    </div>
   </el-header>
   <div class="video-box">
     <video
