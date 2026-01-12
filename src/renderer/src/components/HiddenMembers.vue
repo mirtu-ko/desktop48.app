@@ -70,7 +70,7 @@ async function removeHidMember(memberId: number) {
     <div style="margin-top: 8px;">
       <el-tag
         v-for="member in hiddenMembers" :key="member.userId" closable
-        :color="`#${member.team.teamColor}`"
+        :color="`#${member.teamColor}`"
         effect="dark"
         @close="removeHidMember(member.userId)"
       >
@@ -83,6 +83,7 @@ async function removeHidMember(memberId: number) {
 <style lang="scss">
 .el-tag {
   margin: 4px;
+  border-color: #fff !important;
 }
 
 :deep(.--el-tag-text-color) {
