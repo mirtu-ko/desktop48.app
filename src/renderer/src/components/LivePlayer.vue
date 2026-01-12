@@ -18,6 +18,7 @@ const props = defineProps({
 })
 
 const realName = ref('')
+const userAvatar = ref('')
 
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
@@ -44,6 +45,7 @@ function getOne() {
     isRadio.value = data.isRadio
     coverImage.value = Tools.sourceUrl(data.coverPath)
     realName.value = data.user.userName
+    userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
   }).catch((error: any) => {
     console.error(error)
     ElMessage.error('获取直播信息失败')
@@ -235,6 +237,7 @@ onUnmounted(() => {
 <template>
   <el-header class="header-box">
     <div style="display: flex; align-items: center; width: 100%;">
+      <img :src="userAvatar" alt="Logo" style="width: 32px; height: 32px; margin-right: 12px; border-radius: 50%;">
       <span
         style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;"
         :title="liveTitle"
