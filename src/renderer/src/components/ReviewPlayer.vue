@@ -96,6 +96,7 @@ onUnmounted(() => {
 })
 
 const realName = ref('')
+const userAvatar = ref('')
 function getOne() {
   Apis.instance().live(props.liveId).then((data) => {
     console.log('获取到的录播信息:', data)
@@ -113,6 +114,7 @@ function getOne() {
     isRadio.value = data.liveType == 2
     number.value = data.onlineNum
     realName.value = data.user.userName
+    userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
     if (isRadio.value) {
       carousels.value = data.carousels.carousels.map((carousel: any) => Tools.sourceUrl(carousel))
       carouselTime.value = Number.parseInt(data.carousels.carouselTime)
@@ -213,25 +215,20 @@ function download() {
 <template>
   <div class="review-container">
     <el-header class="header-box">
-      <el-row :gutter="12" justify="space-between" style="width: 100%;">
-        <el-col :span="16">
-          <div style="display: flex; align-items: center; float: left">
-            <span>{{ liveTitle }}</span>
-          </div>
-        </el-col>
-        <el-col :span="8">
-          <div style="display: flex; align-items: center; float: right">
-            <el-tooltip :content="playStreamPath">
-              <el-button type="primary">
-                视频地址
-              </el-button>
-            </el-tooltip>
-            <el-button type="success" @click="download">
-              下载
-            </el-button>
-          </div>
-        </el-col>
-      </el-row>
+      <div style="display: flex; align-items: center; width: 100%;">
+        <img :src="userAvatar" alt="Logo" style="width: 32px; height: 32px; margin-right: 12px; border-radius: 50%;">
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;" :title="liveTitle">
+          {{ liveTitle }}
+        </span>
+        <el-tooltip style="flex-shrink: 0;" :content="playStreamPath">
+          <el-button type="primary">
+            视频地址
+          </el-button>
+        </el-tooltip>
+        <el-button type="success" style="flex-shrink: 0;" @click="download">
+          下载
+        </el-button>
+      </div>
     </el-header>
 
     <div class="review-content">
