@@ -81,7 +81,7 @@ function confirmFfmpegDir() {
 }
 
 async function openFfmpegDirectory() {
-  window.mainAPI.showItemInFolder(downloadDirectory.value)
+  window.mainAPI.showItemInFolder(ffmpegDirectory.value)
 }
 
 // User-Agent
