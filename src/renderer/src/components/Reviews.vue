@@ -32,11 +32,24 @@ const groupOptions = ref<any[]>([])
 const reviewScrollRef = ref<any>(null)
 const scrollDistance = 10
 
+function filterMethod(node: any, keyword: string) {
+  const label = node.text || node.label
+  const pinyin = node.data?.pinyin.replace(/\s+/g, '') || ''
+  const abbr = node.data?.abbr.replace(/\s+/g, '') || ''
+  const searchText = keyword.toLowerCase()
+  return (
+    (label && label.toLowerCase().includes(searchText))
+    || (pinyin && pinyin.toLowerCase().includes(searchText))
+    || (abbr && abbr.toLowerCase().includes(searchText))
+  )
+}
+
 // 初始化
 onMounted(async () => {
   teamOptions.value = await window.mainAPI.getTeamOptions()
   groupOptions.value = await window.mainAPI.getGroupOptions()
   memberOption.value = await window.mainAPI.getMemberTree()
+  console.log('memberOption.value', memberOption.value)
   updateHiddenMemberIds()
 })
 
@@ -197,7 +210,7 @@ onMounted(() => {
             <div style="margin-left: 8px;">
               <el-cascader
                 v-if="reviewScreen === Constants.REVIEW_SCREEN.USER" v-model="selectedUser" transfer
-                style="width: 320px;" clearable placeholder="请选择成员" filterable :options="memberOption" :props="{
+                style="width: 320px;" clearable placeholder="请选择成员" filterable :filter-method="filterMethod" :options="memberOption" :props="{
                   label: 'label',
                   value: 'value',
                   children: 'children',

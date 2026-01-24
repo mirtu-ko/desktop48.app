@@ -175,6 +175,18 @@ app.on('window-all-closed', () => {
   }
 })
 
+// 监听 dock 栏退出事件
+app.on('before-quit', () => {
+  const windows = BrowserWindow.getAllWindows()
+  windows.forEach((window) => {
+    window.webContents.send('cleanup-storage')
+    window.removeAllListeners('close')
+    setTimeout(() => {
+      window.close()
+    }, 150)
+  })
+})
+
 // 在此文件中，您可以包含应用主进程的其他特定代码，
 // 也可以将它们放在单独文件中并在此处引入。
 
