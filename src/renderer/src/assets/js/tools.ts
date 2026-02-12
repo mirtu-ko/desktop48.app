@@ -21,7 +21,7 @@ class Tools {
   }
 
   public static sourceUrl(sourcePath: string) {
-    if (sourcePath.includes('http://')) {
+    if (sourcePath.includes('http://') || sourcePath.includes('https://')) {
       return sourcePath
     }
     else {
