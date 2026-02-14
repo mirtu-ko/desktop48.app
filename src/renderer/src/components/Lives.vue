@@ -95,6 +95,7 @@ onUnmounted(() => {
 function onTabRemove(targetName: string) {
   activeName.value = 'Home'
   liveTabs.value = liveTabs.value.filter((tab: any) => tab.name != targetName)
+  refresh()
 }
 
 // 修改播放方法
@@ -189,6 +190,7 @@ onMounted(() => {
           :live-title="tab.title"
           :live-id="tab.liveId"
           :start-time="tab.startTime"
+          @close="onTabRemove(tab.name)"
         />
       </el-tab-pane>
     </el-tabs>

@@ -17,8 +17,13 @@ const props = defineProps({
   startTime: { type: Number, required: true },
 })
 
+const emit = defineEmits(['close'])
+
 const realName = ref('')
 const userAvatar = ref('')
+
+const liveType = ref(0)
+const liveMode = ref(0)
 
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
@@ -137,10 +142,13 @@ function getOne() {
     coverImage.value = Tools.sourceUrl(data.coverPath)
     realName.value = data.user.userName
     userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
+    liveType.value = data.liveType
+    liveMode.value = data.liveMode
   }).catch((error: any) => {
-    console.error(error)
+    console.error('getOne()', error)
     ElMessage.error('获取直播信息失败')
     loading.value = false
+    emit('close')
   })
 }
 
@@ -295,11 +303,11 @@ onMounted(() => {
           })
 
           // 监听视频尺寸变化
-          hls.on(Hls.Events.FRAG_CHANGED, () => {
-            setTimeout(() => {
-              updateVideoDimensions()
-            }, 100)
-          })
+          // hls.on(Hls.Events.FRAG_CHANGED, () => {
+          //   setTimeout(() => {
+          //     updateVideoDimensions()
+          //   }, 100)
+          // })
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (isManuallyUnmounted.value) {
@@ -407,13 +415,13 @@ onUnmounted(() => {
       >
         {{ liveTitle }}
       </span>
-      <el-text type="primary" size="small" style="flex-shrink: 0; margin-right: 12px;">
+      <el-text v-if="onlineNum > 0" type="primary" size="small" style="flex-shrink: 0; margin-right: 12px;">
         (累计在线：{{ onlineNum }})
       </el-text>
       <el-button type="success" style="flex-shrink: 0; margin-right: 8px;" @click="record()">
         录制
       </el-button>
-      <el-button-group style="flex-shrink: 0;">
+      <el-button-group v-if="liveType === 1 && liveMode === 1" style="flex-shrink: 0;">
         <el-button title="向左旋转90°" @click="rotateLeft">
           ↺
         </el-button>
