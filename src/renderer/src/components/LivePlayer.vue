@@ -15,15 +15,14 @@ const props = defineProps({
   liveTitle: { type: String, required: true },
   liveId: { type: String, required: true },
   startTime: { type: Number, required: true },
+  liveType: { type: Number, required: true },
+  liveMode: { type: Number, required: true },
 })
 
 const emit = defineEmits(['close'])
 
 const realName = ref('')
 const userAvatar = ref('')
-
-const liveType = ref(0)
-const liveMode = ref(0)
 
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
@@ -64,10 +63,6 @@ const videoWrapperStyle = computed(() => {
 
   if (vertical && videoWidth.value > 0 && videoHeight.value > 0 && boxWidth > 0 && boxHeight > 0) {
     // 视频旋转90度或270度时，视频的实际显示宽高交换了
-    // 原始宽度 w1 = videoWidth，原始高度 h1 = videoHeight
-    // 旋转后显示宽度 = h1，显示高度 = w1
-    // 需要让 h1 * scale <= boxWidth 且 w1 * scale <= boxHeight
-    // 即 scale <= boxWidth/h1 且 scale <= boxHeight/w1
     const boxWH = boxWidth / boxHeight
     let videoW = 1
     let videoH = 1
@@ -126,7 +121,6 @@ const videoStyle = computed(() => {
 const router = useRouter()
 
 // 封面图片
-const isRadio = ref(false)
 const coverImage = ref('')
 // const carousels = ref<string[]>([])
 // const carouselTime = ref(5000)
@@ -138,12 +132,9 @@ function getOne() {
   Apis.instance().live(props.liveId).then((data) => {
     console.log('获取到的直播信息:', data)
     startHlsStream(data.playStreamPath)
-    isRadio.value = data.isRadio
     coverImage.value = Tools.sourceUrl(data.coverPath)
     realName.value = data.user.userName
     userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
-    liveType.value = data.liveType
-    liveMode.value = data.liveMode
   }).catch((error: any) => {
     console.error('getOne()', error)
     ElMessage.error('获取直播信息失败')
@@ -160,7 +151,7 @@ const onlineNumTimer = ref()
 function startOnlineNumTimer() {
   onlineNumTimer.value = setInterval(() => {
     updateOnlineNum()
-  }, 15000)
+  }, 30000)
 }
 
 // 视频旋转控制
@@ -451,6 +442,17 @@ onUnmounted(() => {
       </el-icon>
       <span class="loading-text">正在加载直播...</span>
     </div>
+    <div class="tag-container">
+      <el-tag v-if="liveType === 1 && liveMode === 0">
+        直播
+      </el-tag>
+      <el-tag v-else-if="liveType === 1 && liveMode === 1" type="success">
+        录屏
+      </el-tag>
+      <el-tag v-else type="warning">
+        电台
+      </el-tag>
+    </div>
   </div>
 </template>
 
@@ -506,6 +508,17 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  z-index: 10;
+}
+
+.tag-container {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  transform: translate(0%, 0%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   z-index: 10;
 }
 

@@ -109,6 +109,8 @@ function play(item: any) {
     title: item.title,
     liveId: item.liveId,
     name: `${item.liveId}_${Math.random().toString(36).substring(2)}`,
+    liveType: item.liveType,
+    liveMode: item.liveMode,
     startTime: Number.parseInt(item.ctime),
   }
   liveTabs.value.push(liveTab)
@@ -190,6 +192,8 @@ onMounted(() => {
           :live-title="tab.title"
           :live-id="tab.liveId"
           :start-time="tab.startTime"
+          :live-type="tab.liveType"
+          :live-mode="tab.liveMode"
           @close="onTabRemove(tab.name)"
         />
       </el-tab-pane>
