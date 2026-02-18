@@ -26,6 +26,7 @@ const userAvatar = ref('')
 
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
+const nativeAudio = ref<HTMLAudioElement | null>(null)
 const streamId = ref('')
 const videoBoxRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
@@ -122,6 +123,7 @@ const router = useRouter()
 
 // 封面图片
 const coverImage = ref('')
+const isRadio = computed(() => props.liveType !== 1)
 // const carousels = ref<string[]>([])
 // const carouselTime = ref(5000)
 
@@ -250,6 +252,9 @@ let resizeObserver: ResizeObserver | null = null
 onMounted(async () => {
   powerSaveBlockerId.value = await window.mainAPI.preventSleep()
 
+  if (isRadio.value)
+    return
+
   // 初始化容器尺寸
   if (videoBoxRef.value) {
     boxDimensions.value = {
@@ -268,9 +273,8 @@ onMounted(async () => {
     }
   })
 
-  if (videoBoxRef.value) {
+  if (videoBoxRef.value)
     resizeObserver.observe(videoBoxRef.value)
-  }
 })
 
 onMounted(() => {
@@ -279,18 +283,20 @@ onMounted(() => {
   watch(
     () => playStreamPath.value,
     (newPath) => {
-      if (nativeVideo.value && newPath) {
+      const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
+      if (mediaElement && newPath) {
         if (Hls.isSupported()) {
           const hls = new Hls()
           hls.loadSource(newPath)
-          hls.attachMedia(nativeVideo.value)
+          hls.attachMedia(mediaElement)
 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             loading.value = false
-            // 获取视频尺寸用于计算缩放
-            setTimeout(() => {
-              updateVideoDimensions()
-            }, 100)
+            if (!isRadio.value) {
+              setTimeout(() => {
+                updateVideoDimensions()
+              }, 100)
+            }
           })
 
           // 监听视频尺寸变化
@@ -318,16 +324,17 @@ onMounted(() => {
             }
           })
         }
-        else if (nativeVideo.value.canPlayType('application/vnd.apple.mpegurl')) {
-          nativeVideo.value.src = newPath
-          nativeVideo.value.oncanplay = () => {
+        else if (mediaElement.canPlayType('application/vnd.apple.mpegurl')) {
+          mediaElement.src = newPath
+          mediaElement.oncanplay = () => {
             loading.value = false
-            // 获取视频尺寸用于计算缩放
-            setTimeout(() => {
-              updateVideoDimensions()
-            }, 100)
+            if (!isRadio.value) {
+              setTimeout(() => {
+                updateVideoDimensions()
+              }, 100)
+            }
           }
-          nativeVideo.value.onerror = () => {
+          mediaElement.onerror = () => {
             loading.value = false
             handleStreamError()
           }
@@ -425,8 +432,17 @@ onUnmounted(() => {
       </el-button-group>
     </div>
   </el-header>
-  <div ref="videoBoxRef" class="video-box" :class="{ 'vertical-rotation': isVerticalRotation }">
-    <div class="video-wrapper" :style="videoWrapperStyle">
+  <div ref="videoBoxRef" class="video-box" :class="{ 'vertical-rotation': !isRadio && isVerticalRotation, 'video-box-background': !isRadio }">
+    <div v-if="isRadio" class="radio-box">
+      <img :src="coverImage" class="radio-cover" alt="cover">
+      <audio
+        ref="nativeAudio"
+        controls
+        autoplay
+        class="audio-player"
+      />
+    </div>
+    <div v-else class="video-wrapper" :style="videoWrapperStyle">
       <video
         ref="nativeVideo"
         controls
@@ -463,11 +479,14 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #000;
   position: relative;
   overflow: hidden;
   /* 确保容器有足够的空间 */
   min-height: 200px;
+}
+
+.video-box-background {
+  background: #0c0c0c;
 }
 
 /* 视频包装器 - 用于旋转 */
@@ -497,6 +516,26 @@ onUnmounted(() => {
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+.radio-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 16px;
+}
+
+.radio-cover {
+  max-width: 60%;
+  max-height: 80%;
+  object-fit: contain;
+}
+
+.audio-player {
+  width: min(600px, 90%);
 }
 
 .loading-container {
