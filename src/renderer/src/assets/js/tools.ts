@@ -3,6 +3,20 @@ const YI_ZHI_BO_HOST = 'alcdn.hls.xiaoka.tv'
 class Tools {
   public static readonly APP_DATA_PATH: string = '' // Electron环境下需通过主进程或window.electron暴露;
 
+  private static readonly STREAM_PATH_REGEX = /^(http|https):\/\/([^/]+)\/(\d+)/
+
+  private static readonly DATE_FORMAT_REGEXES: Record<string, RegExp> = {
+    'M+': /(M+)/,
+    'd+': /(d+)/,
+    'h+': /(h+)/,
+    'm+': /(m+)/,
+    's+': /(s+)/,
+    'q+': /(q+)/,
+    'S': /(S)/,
+  }
+
+  private static readonly YEAR_REGEX = /(y+)/
+
   /**
    * 将逗号分隔的图片路径转换为完整的URL数组
    * @param picturesStr 逗号分隔的图片路径字符串
@@ -65,7 +79,7 @@ class Tools {
     const date = new Date(timestamp)
     const liveDate = `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`
     // window.mainAPI?.showItemInFolder?.(this.getFilePath())
-    return streamPath.replace(/^(http|https):\/\/([^/]+)\/(\d+)/, (pathPrefix, protocol, host) => {
+    return streamPath.replace(Tools.STREAM_PATH_REGEX, (pathPrefix, protocol, host) => {
       if (host.toLowerCase() !== YI_ZHI_BO_HOST) {
         return pathPrefix
       }
@@ -86,14 +100,14 @@ class Tools {
       'S': date.getMilliseconds(), // 毫秒
     }
     // Replace year token (e.g., 'yyyy', 'yy')
-    const yearMatch = /(y+)/.exec(fmt)
+    const yearMatch = Tools.YEAR_REGEX.exec(fmt)
     if (yearMatch) {
       const yStr = yearMatch[1]
       fmt = fmt.replace(yStr, `${date.getFullYear()}`.substring(4 - yStr.length))
     }
     // Replace other tokens
     for (const k in o) {
-      const regex = new RegExp(`(${k})`)
+      const regex = Tools.DATE_FORMAT_REGEXES[k]
       const match = regex.exec(fmt)
       if (match) {
         const matchStr = match[1]

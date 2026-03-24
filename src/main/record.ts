@@ -5,6 +5,8 @@ import path from 'node:path'
 import { ipcMain } from 'electron'
 import { Database } from './database.js'
 
+const TIME_REGEX = /time=(\d+:\d+:\d+\.\d+)/
+
 // IPC handler: start recording RTMP stream via ffmpeg
 ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string, filename: string, liveId: string) => {
   // 获取保存目录
@@ -37,7 +39,7 @@ ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string,
     console.log('[record.ts]spawn ffmpeg start', filePath)
     ffmpeg.stderr.on('data', (chunk) => {
       const msg = chunk.toString()
-      const match = msg.match(/time=(\d+:\d+:\d+\.\d+)/)
+      const match = msg.match(TIME_REGEX)
       if (match && match[1]) {
         console.log('[record.ts]spawn ffmpeg progress', match[1])
         event.sender.send('recordTaskProgress', liveId, match[1])

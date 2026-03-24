@@ -31,11 +31,13 @@ const teamOptions = ref<any[]>([])
 const groupOptions = ref<any[]>([])
 const reviewScrollRef = ref<any>(null)
 const scrollDistance = 10
+const pinyinRegex = /\s+/g
+const abbrRegex = /\s+/g
 
 function filterMethod(node: any, keyword: string) {
   const label = node.text || node.label
-  const pinyin = node.data?.pinyin.replace(/\s+/g, '') || ''
-  const abbr = node.data?.abbr.replace(/\s+/g, '') || ''
+  const pinyin = node.data?.pinyin.replace(pinyinRegex, '') || ''
+  const abbr = node.data?.abbr.replace(abbrRegex, '') || ''
   const searchText = keyword.toLowerCase()
   return (
     (label && label.toLowerCase().includes(searchText))

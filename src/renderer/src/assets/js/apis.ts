@@ -9,6 +9,10 @@ export default class Apis {
 
   private static apis: Apis = new Apis()
 
+  private static readonly SHOWS_REGEX = /<li class="starts">\s*<div class="startimg">\s*<img src="([^"]+)"[^>]*>\s*<span class="starttime">(\d+)日&nbsp;(\d+:\d+)<\/span>\s*<\/div>\s*<p>([^<]+)<\/p>/g
+
+  private static readonly WATCH_CONTENT_REGEX = /<div class="watchcontent">[\s\S]*?<div class="v-img"><a[^>]*?href="[^"]*?\/id\/(\d+)"[^>]*><img src="([^"]+)"[^>]*><\/a><\/div>[\s\S]*?<h2>([^<]+)<\/h2>[\s\S]*?<p>&nbsp;&nbsp;([^<]+)<\/p>[\s\S]*?<input[^>]*?id="start_time_\d+"[^>]*?value="(\d+)"[^>]*>[\s\S]*?<input[^>]*?id="end_time_\d+"[^>]*?value="(\d+)"[^>]*>/g
+
   /**
    * 同步成员信息
    */
@@ -190,7 +194,8 @@ export default class Apis {
     }> = []
 
     // 使用正则表达式匹配演出信息
-    const regex = /<li class="starts">\s*<div class="startimg">\s*<img src="([^"]+)"[^>]*>\s*<span class="starttime">(\d+)日&nbsp;(\d+:\d+)<\/span>\s*<\/div>\s*<p>([^<]+)<\/p>/g
+    const regex = Apis.SHOWS_REGEX
+    regex.lastIndex = 0 // 重置正则表达式的状态
     let match: RegExpExecArray | null
 
     // eslint-disable-next-line no-cond-assign
@@ -226,7 +231,8 @@ export default class Apis {
     }> = []
 
     // 使用正则表达式匹配watchcontent信息
-    const regex = /<div class="watchcontent">[\s\S]*?<div class="v-img"><a[^>]*?href="[^"]*?\/id\/(\d+)"[^>]*><img src="([^"]+)"[^>]*><\/a><\/div>[\s\S]*?<h2>([^<]+)<\/h2>[\s\S]*?<p>&nbsp;&nbsp;([^<]+)<\/p>[\s\S]*?<input[^>]*?id="start_time_\d+"[^>]*?value="(\d+)"[^>]*>[\s\S]*?<input[^>]*?id="end_time_\d+"[^>]*?value="(\d+)"[^>]*>/g
+    const regex = Apis.WATCH_CONTENT_REGEX
+    regex.lastIndex = 0 // 重置正则表达式的状态
 
     let match: RegExpExecArray | null
     // eslint-disable-next-line no-cond-assign

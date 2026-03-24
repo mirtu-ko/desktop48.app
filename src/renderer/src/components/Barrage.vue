@@ -3,6 +3,7 @@ import { onUpdated, ref } from 'vue'
 import Constants from '../assets/js/constants'
 
 const barrageList = ref<any[]>([])
+const timeRegex = /\.\d*/
 
 onUpdated(() => {
   const barrageUl: any = document.getElementById('barrage-ul')
@@ -19,7 +20,7 @@ function shoot(barrage: any) {
     content: barrage.content,
     username: barrage.username,
     level: barrage.level,
-    time: barrage.time.replace(/\.\d*/, ''),
+    time: barrage.time.replace(timeRegex, ''),
   })
 }
 

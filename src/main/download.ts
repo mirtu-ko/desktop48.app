@@ -7,6 +7,8 @@ import { ipcMain } from 'electron'
 
 import { Database } from './database.js'
 
+const TIME_REGEX = /time=(\d+:\d+:\d+\.\d+)/
+
 // IPC handler: start downloading m3u8 stream via ffmpeg
 ipcMain.handle('downloadTaskStart', async (event: IpcMainInvokeEvent, url: string, filename: string, liveId: string) => {
   // 获取保存目录
@@ -28,7 +30,7 @@ ipcMain.handle('downloadTaskStart', async (event: IpcMainInvokeEvent, url: strin
     // 解析 stderr 中的进度信息，推送给渲染进程
     ffmpeg.stderr.on('data', (chunk) => {
       const msg = chunk.toString()
-      const match = msg.match(/time=(\d+:\d+:\d+\.\d+)/)
+      const match = msg.match(TIME_REGEX)
       if (match && match[1]) {
         console.log('[download.ts]spawn ffmpeg progress', match[1])
         event.sender.send('downloadTaskProgress', liveId, match[1])
