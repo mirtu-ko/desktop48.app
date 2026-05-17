@@ -39,6 +39,10 @@ export default class DownloadTask {
     return this._filePath
   }
 
+  public getFilename(): string {
+    return this._filename
+  }
+
   public getLiveId() {
     return this._liveId
   }

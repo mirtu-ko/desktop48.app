@@ -8,6 +8,32 @@ import { serverPort } from './http-server.js'
 // 存储正在运行的转码进程
 const streamProcesses = new Map()
 
+function cleanupLiveFiles(tempDir: string, liveId: string) {
+  const m3u8File = path.join(tempDir, `${liveId}.m3u8`)
+  const allTsFiles = fs.readdirSync(tempDir).filter(file =>
+    file.startsWith(`${liveId}_`) && file.endsWith('.ts'),
+  )
+
+  allTsFiles.forEach((tsFile) => {
+    const tsPath = path.join(tempDir, tsFile)
+    try {
+      fs.unlinkSync(tsPath)
+    }
+    catch (err) {
+      console.error(`[stream.ts] 删除ts文件失败: ${tsPath}`, err)
+    }
+  })
+
+  if (fs.existsSync(m3u8File)) {
+    try {
+      fs.unlinkSync(m3u8File)
+    }
+    catch (err) {
+      console.error(`[stream.ts] 删除m3u8文件失败: ${m3u8File}`, err)
+    }
+  }
+}
+
 // 清理临时目录
 function cleanupTempDir() {
   try {
@@ -68,6 +94,8 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
 
   return new Promise((resolve, reject) => {
     console.log('[stream.ts] ffmpegPath:', ffmpegPath)
+    let settled = false
+    let checkFile: NodeJS.Timeout | null = null
     const ffmpeg = spawn(ffmpegPath, [
       '-i',
       rtmpUrl,
@@ -92,17 +120,30 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
 
     streamProcesses.set(liveId, ffmpeg)
 
+    const cleanupCheck = () => {
+      if (checkFile) {
+        clearInterval(checkFile)
+        checkFile = null
+      }
+    }
+
     ffmpeg.stderr.on('data', (data) => {
       console.log(`[stream.ts] ffmpeg stderr: ${data}`)
     })
 
     ffmpeg.on('error', (err) => {
       console.error('[stream.ts] ffmpeg error:', err)
-      reject(err)
+      cleanupCheck()
+      streamProcesses.delete(liveId)
+      if (!settled) {
+        settled = true
+        cleanupLiveFiles(tempDir, liveId)
+        reject(err)
+      }
     })
 
     // 等待生成两个分片文件后返回
-    const checkFile = setInterval(() => {
+    checkFile = setInterval(() => {
       if (fs.existsSync(outputPath)) {
         // 检查是否有至少两个ts文件
         const tsFiles = fs.readdirSync(tempDir).filter(file =>
@@ -110,22 +151,39 @@ ipcMain.handle('convertToHls', async (_event, rtmpUrl: string, liveId: string) =
         )
 
         if (tsFiles.length >= 2) {
-          clearInterval(checkFile)
-          resolve({
-            url: `http://localhost:${serverPort()}/${liveId}.m3u8`,
-            liveId,
-          })
+          cleanupCheck()
+          if (!settled) {
+            settled = true
+            resolve({
+              url: `http://localhost:${serverPort()}/${liveId}.m3u8`,
+              liveId,
+            })
+          }
         }
       }
     }, 1000)
+
+    ffmpeg.on('close', (code, signal) => {
+      cleanupCheck()
+      streamProcesses.delete(liveId)
+      console.log(`[stream.ts] ffmpeg closed: ${liveId}, code=${code}, signal=${signal}`)
+
+      if (!settled) {
+        settled = true
+        cleanupLiveFiles(tempDir, liveId)
+        reject(new Error(`[stream.ts] ffmpeg exited before HLS became ready, code=${code}, signal=${signal}`))
+      }
+    })
   })
 })
 
 // 清理进程
 ipcMain.handle('stopHlsConvert', async (_event, liveId: string) => {
   const process = streamProcesses.get(liveId)
-  if (process) {
-    try {
+  const tempDir = path.join(app.getPath('temp'), 'desktop48_hls')
+
+  try {
+    if (process) {
       // 创建一个 Promise 来等待进程结束
       await new Promise<void>((resolve, reject) => {
         // 监听进程退出事件
@@ -142,44 +200,18 @@ ipcMain.handle('stopHlsConvert', async (_event, liveId: string) => {
         // 终止 ffmpeg 进程
         process.kill('SIGTERM') // 使用 SIGTERM 信号优雅地终止进程
       })
-
-      // 获取临时文件路径
-      const tempDir = path.join(app.getPath('temp'), 'desktop48_hls')
-      const m3u8File = path.join(tempDir, `${liveId}.m3u8`)
-
-      // 读取目录中所有与当前直播相关的ts文件
-      const allTsFiles = fs.readdirSync(tempDir).filter(file =>
-        file.startsWith(`${liveId}_`) && file.endsWith('.ts'),
-      )
-      // 删除所有相关的ts文件
-      allTsFiles.forEach((tsFile) => {
-        const tsPath = path.join(tempDir, tsFile)
-        try {
-          fs.unlinkSync(tsPath)
-        }
-        catch (err) {
-          console.error(`[stream.ts] 删除ts文件失败: ${tsPath}`, err)
-        }
-      })
-
-      // 删除 m3u8 文件
-      if (fs.existsSync(m3u8File)) {
-        try {
-          fs.unlinkSync(m3u8File)
-        }
-        catch (err) {
-          console.error(`[stream.ts] 删除m3u8文件失败: ${m3u8File}`, err)
-        }
-      }
-
-      // 从进程映射中移除
-      streamProcesses.delete(liveId)
-      console.log(`[stream.ts] 已停止转码进程: ${liveId}`)
     }
-    catch (err) {
-      console.error(`[stream.ts] 停止转码进程失败: ${liveId}`, err)
-      throw err
-    }
+
+    if (fs.existsSync(tempDir))
+      cleanupLiveFiles(tempDir, liveId)
+
+    // 从进程映射中移除
+    streamProcesses.delete(liveId)
+    console.log(`[stream.ts] 已停止转码进程: ${liveId}`)
+  }
+  catch (err) {
+    console.error(`[stream.ts] 停止转码进程失败: ${liveId}`, err)
+    throw err
   }
 })
 

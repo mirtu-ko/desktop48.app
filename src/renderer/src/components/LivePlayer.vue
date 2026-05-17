@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RecordTaskPayload } from '../assets/js/task-payload'
 import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
@@ -8,8 +9,18 @@ import Apis from '../assets/js/apis'
 
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
-import RecordTask from '../assets/js/record-task'
 import Tools from '../assets/js/tools' // 添加手动卸载标记
+
+interface LiveDetail {
+  playStreamPath: string
+  coverPath: string
+  user: {
+    userName: string
+    userAvatar: string
+  }
+  onlineNum?: number
+  liveId?: string
+}
 
 const props = defineProps({
   liveTitle: { type: String, required: true },
@@ -33,6 +44,11 @@ const loading = ref(true)
 const retryCount = ref(0)
 const maxRetries = 3
 const isManuallyUnmounted = ref(false)
+const streamRestartToken = ref(0)
+const isRecoveringStream = ref(false)
+let activeStreamRequestId = 0
+let hlsInstance: Hls | null = null
+let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
 
 // 视频旋转相关
 const rotationAngle = ref(0)
@@ -124,29 +140,44 @@ const router = useRouter()
 // 封面图片
 const coverImage = ref('')
 const isRadio = computed(() => props.liveType !== 1)
+const onlineNum = ref(0)
 // const carousels = ref<string[]>([])
 // const carouselTime = ref(5000)
 
+function applyLiveDetail(data: LiveDetail) {
+  coverImage.value = Tools.sourceUrl(data.coverPath)
+  realName.value = data.user.userName
+  userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
+  if (typeof data.onlineNum === 'number')
+    onlineNum.value = data.onlineNum
+}
+
+async function fetchLiveDetail(): Promise<LiveDetail> {
+  return await Apis.instance().live(props.liveId)
+}
+
 // 获取直播信息
-function getOne() {
+async function getOne() {
   loading.value = true
-  retryCount.value = 0 // 重置重试计数
-  Apis.instance().live(props.liveId).then((data) => {
+  retryCount.value = 0
+  isRecoveringStream.value = false
+  try {
+    const data = await fetchLiveDetail()
+    if (isManuallyUnmounted.value)
+      return
     console.log('获取到的直播信息:', data)
-    startHlsStream(data.playStreamPath)
-    coverImage.value = Tools.sourceUrl(data.coverPath)
-    realName.value = data.user.userName
-    userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
-  }).catch((error: any) => {
+    applyLiveDetail(data)
+    await restartHlsStream(data.playStreamPath)
+  }
+  catch (error: any) {
     console.error('getOne()', error)
     ElMessage.error('获取直播信息失败')
     loading.value = false
     emit('close')
-  })
+  }
 }
 
 // 定时更新直播onlineNum
-const onlineNum = ref(0)
 const onlineNumTimer = ref()
 
 // 启动定时器
@@ -201,17 +232,73 @@ function updateOnlineNum() {
 
 startOnlineNumTimer()
 
+function clearStreamRetryTimer() {
+  if (streamRetryTimer) {
+    clearTimeout(streamRetryTimer)
+    streamRetryTimer = null
+  }
+}
+
+function destroyHlsInstance() {
+  if (hlsInstance) {
+    hlsInstance.destroy()
+    hlsInstance = null
+  }
+}
+
+function resetMediaElement() {
+  const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
+  if (!mediaElement)
+    return
+
+  mediaElement.pause()
+  mediaElement.removeAttribute('src')
+  mediaElement.load()
+  mediaElement.onerror = null
+  mediaElement.oncanplay = null
+}
+
+async function stopCurrentHlsConvert() {
+  const currentStreamId = streamId.value || props.liveId
+  streamId.value = ''
+  try {
+    await window.mainAPI.stopHlsConvert(currentStreamId)
+  }
+  catch (err) {
+    console.error('停止转码失败:', err)
+  }
+}
+
 // 启动 HLS 流
-function startHlsStream(rtmpUrl: string) {
-  window.mainAPI.convertToHls(rtmpUrl, props.liveId).then((result) => {
-    console.log('转换后的 HLS 流地址:', result)
-    playStreamPath.value = result.url
-    streamId.value = result.liveId
-  }).catch((error) => {
-    console.error('转换直播流失败:', error)
-    ElMessage.error('转换直播流失败')
-    loading.value = false
-  })
+async function startHlsStream(rtmpUrl: string, requestId: number) {
+  const result = await window.mainAPI.convertToHls(rtmpUrl, props.liveId)
+
+  if (isManuallyUnmounted.value || requestId !== activeStreamRequestId) {
+    try {
+      await window.mainAPI.stopHlsConvert(result.liveId || props.liveId)
+    }
+    catch (err) {
+      console.error('关闭过期转码失败:', err)
+    }
+    return false
+  }
+
+  console.log('转换后的 HLS 流地址:', result)
+  streamId.value = result.liveId
+  playStreamPath.value = `${result.url}?t=${Date.now()}&r=${streamRestartToken.value}`
+  return true
+}
+
+async function restartHlsStream(rtmpUrl: string) {
+  const requestId = ++activeStreamRequestId
+  clearStreamRetryTimer()
+  destroyHlsInstance()
+  resetMediaElement()
+  await stopCurrentHlsConvert()
+  if (isManuallyUnmounted.value || requestId !== activeStreamRequestId)
+    return false
+  streamRestartToken.value++
+  return await startHlsStream(rtmpUrl, requestId)
 }
 
 // 处理流错误和重试
@@ -222,17 +309,42 @@ function handleStreamError() {
     return
   }
 
+  if (isRecoveringStream.value) {
+    console.log('[LivePlayer.vue] 当前正在恢复直播流，跳过重复重试')
+    return
+  }
+
   if (retryCount.value < maxRetries) {
     retryCount.value++
+    isRecoveringStream.value = true
     console.log(`[LivePlayer.vue] 直播流中断，正在进行第 ${retryCount.value} 次重试`)
     loading.value = true
-    setTimeout(() => {
-      getOne()
+    clearStreamRetryTimer()
+    streamRetryTimer = setTimeout(async () => {
+      try {
+        const data = await fetchLiveDetail()
+        if (isManuallyUnmounted.value)
+          return
+        console.log('[LivePlayer.vue] 重试获取到的直播信息:', data)
+        applyLiveDetail(data)
+        await restartHlsStream(data.playStreamPath)
+      }
+      catch (error) {
+        console.error('[LivePlayer.vue] 重试恢复直播流失败:', error)
+        isRecoveringStream.value = false
+        handleStreamError()
+        return
+      }
+      finally {
+        if (loading.value)
+          isRecoveringStream.value = false
+      }
     }, 2000)
   }
   else {
     console.log('[LivePlayer.vue] 重试次数已达上限，停止播放')
     loading.value = false
+    isRecoveringStream.value = false
     ElMessage.warning('直播已结束')
     // 清理资源
     if (streamId.value) {
@@ -285,13 +397,16 @@ onMounted(() => {
     (newPath) => {
       const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
       if (mediaElement && newPath) {
+        destroyHlsInstance()
         if (Hls.isSupported()) {
           const hls = new Hls()
+          hlsInstance = hls
           hls.loadSource(newPath)
           hls.attachMedia(mediaElement)
 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             loading.value = false
+            isRecoveringStream.value = false
             if (!isRadio.value) {
               setTimeout(() => {
                 updateVideoDimensions()
@@ -309,6 +424,8 @@ onMounted(() => {
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (isManuallyUnmounted.value) {
               hls.destroy()
+              if (hlsInstance === hls)
+                hlsInstance = null
               console.log('[LivePlayer.vue] 组件手动卸载，不进行重试')
               return
             }
@@ -328,6 +445,7 @@ onMounted(() => {
           mediaElement.src = newPath
           mediaElement.oncanplay = () => {
             loading.value = false
+            isRecoveringStream.value = false
             if (!isRadio.value) {
               setTimeout(() => {
                 updateVideoDimensions()
@@ -346,33 +464,43 @@ onMounted(() => {
 })
 
 // 检查下载目录是否存在
-function checkDownloadDirectory() {
-  window.mainAPI.getConfig('downloadDirectory').then((result: any) => {
+async function checkDownloadDirectory(): Promise<boolean> {
+  try {
+    const result = await window.mainAPI.getConfig('downloadDirectory')
     if (!result) {
       ElMessage({
         message: '下载目录不存在，请先配置下载目录',
         type: 'warning',
       })
       router.push('/setting')
+      return false
     }
-  }).catch((error: any) => {
+    return true
+  }
+  catch (error: any) {
     console.error(error)
     ElMessage({ message: '检查下载目录失败', type: 'error' })
-  })
+    return false
+  }
 }
 
 // 调用Electron主进程暴露的record方法
-function record() {
-  checkDownloadDirectory()
+async function record() {
+  const valid = await checkDownloadDirectory()
+  if (!valid)
+    return
+
   Apis.instance().live(props.liveId).then(async (content) => {
     const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
     const filename = `${realName.value} ${date}.flv`
-    const recordTask: RecordTask = new RecordTask(content.playStreamPath, filename, content.liveId)
+    const recordTask: RecordTaskPayload = {
+      url: content.playStreamPath,
+      filename,
+      liveId: content.liveId,
+    }
     EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
     router.push('/downloads')
     setTimeout(() => {
-      // console.log('[LivePlayer.vue] 调用 record 参数:', recordTask)
-      recordTask.init()
       EventBus.emit('record-task', recordTask)
     })
   }).catch((error) => {
@@ -383,12 +511,14 @@ function record() {
 onUnmounted(() => {
   console.log('[LivePlayer.vue] onUnmounted')
   isManuallyUnmounted.value = true // 设置手动卸载标记
+  activeStreamRequestId++
+  clearStreamRetryTimer()
+  destroyHlsInstance()
+  resetMediaElement()
   // 停止 HLS 转码
-  if (streamId.value) {
-    window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
-      console.error('停止转码失败:', err)
-    })
-  }
+  window.mainAPI.stopHlsConvert(streamId.value || props.liveId).catch((err) => {
+    console.error('停止转码失败:', err)
+  })
   // 移除阻止休眠
   if (powerSaveBlockerId.value !== null) {
     window.mainAPI.allowSleep(powerSaveBlockerId.value)

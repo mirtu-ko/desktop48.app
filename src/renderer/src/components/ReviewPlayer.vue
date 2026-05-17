@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DownloadTaskPayload } from '../assets/js/task-payload'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { cloneDeep } from 'lodash'
@@ -6,7 +7,6 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
-import DownloadTask from '../assets/js/download-task'
 
 import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
@@ -182,28 +182,40 @@ function getBarrages() {
 }
 
 // 检查下载目录是否存在
-function checkDownloadDirectory() {
-  window.mainAPI.getConfig('downloadDirectory').then((result: any) => {
+async function checkDownloadDirectory(): Promise<boolean> {
+  try {
+    const result = await window.mainAPI.getConfig('downloadDirectory')
     if (!result) {
       ElMessage({
         message: '下载目录不存在，请先配置下载目录',
         type: 'warning',
       })
       router.push('/setting')
+      return false
     }
-  }).catch((error: any) => {
+    return true
+  }
+  catch (error: any) {
     console.error(error)
     ElMessage({ message: '检查下载目录失败', type: 'error' })
-  })
+    return false
+  }
 }
 
 // 下载录播
-function download() {
-  checkDownloadDirectory()
+async function download() {
+  const valid = await checkDownloadDirectory()
+  if (!valid)
+    return
+
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
   const filename = `${realName.value}${date}.mp4`
   console.log('[ReviewPlayer.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
-  const downloadTask: any = new DownloadTask(playStreamPath.value, filename, props.liveId)
+  const downloadTask: DownloadTaskPayload = {
+    url: playStreamPath.value,
+    filename,
+    liveId: props.liveId,
+  }
   EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
   router.push('/downloads')
   setTimeout(() => {

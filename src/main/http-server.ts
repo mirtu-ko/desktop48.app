@@ -9,6 +9,9 @@ const tempDir = path.join(app.getPath('temp'), 'desktop48_hls')
 let _serverPort = 8080
 export const serverPort = () => _serverPort
 
+// Regular expression for normalizing path
+const leadingSlashesRegex = /^\/+/
+
 // 创建服务器实例
 const server = http.createServer((req, res) => {
   // Add CORS headers
@@ -23,12 +26,15 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  const filePath = path.join(tempDir, req.url!)
+  const requestUrl = new URL(req.url || '/', 'http://localhost')
+  const requestPath = decodeURIComponent(requestUrl.pathname)
+  const normalizedPath = requestPath.replace(leadingSlashesRegex, '')
+  const filePath = path.join(tempDir, normalizedPath)
 
-  if (req.url?.endsWith('.m3u8')) {
+  if (requestPath.endsWith('.m3u8')) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl')
   }
-  else if (req.url?.endsWith('.ts')) {
+  else if (requestPath.endsWith('.ts')) {
     res.setHeader('Content-Type', 'video/MP2T')
   }
 
