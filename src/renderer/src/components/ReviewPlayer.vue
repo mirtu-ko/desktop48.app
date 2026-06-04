@@ -3,11 +3,9 @@ import type { DownloadTaskPayload } from '../assets/js/task-payload'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { cloneDeep } from 'lodash'
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
-import Constants from '../assets/js/constants'
-
 import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
 
@@ -23,84 +21,148 @@ const playStreamPath = ref('')
 const isReview = ref(false)
 const isRadio = ref(false)
 const number = ref(0)
-const nativeVideo = ref<HTMLVideoElement | null>(null) // 原生 video 播放器
-const status = ref(0)
+const nativeVideo = ref<HTMLVideoElement | null>(null)
+const nativeAudio = ref<HTMLAudioElement | null>(null)
 const currentTime = ref(0)
-const duration = ref(0)
-// 音频流时的封面图片
+const coverImage = ref('')
 const carousels = ref<string[]>([])
 const carouselTime = ref(5000)
-const coverImage = ref('')
-// 弹幕
 const barrageUrl = ref('')
 const barrageLoaded = ref(false)
 const barrageList = ref<any[]>([])
 const barrageBoxRef = ref()
 const finalBarrageList = ref<any[]>([])
-// 路由
-const router = useRouter()
-
-// 生命周期：onMounted/onUnmounted
-const powerSaveBlockerId = ref<number | null>(null)
-
-onMounted(async () => {
-  console.log('[ReviewPlayer.vue] onMounted', props)
-  getOne()
-  watch(
-    () => playStreamPath.value,
-    (newPath) => {
-      if (nativeVideo.value && newPath) {
-        if (newPath.endsWith('.m3u8')) {
-          if (Hls.isSupported()) {
-            const hls = new Hls()
-            hls.loadSource(newPath)
-            hls.attachMedia(nativeVideo.value)
-          }
-          else if (nativeVideo.value.canPlayType('application/vnd.apple.mpegurl')) {
-            nativeVideo.value.src = newPath
-          }
-        }
-        else if (newPath.endsWith('.mp4')) {
-          nativeVideo.value.src = newPath
-          nativeVideo.value.load()
-        }
-
-        // 绑定原生 video 事件 (适用于 MP4 和部分 M3U8 场景)
-        // 对于 Hls.js 控制的 M3U8，这些事件也应该在 video 元素上触发
-        nativeVideo.value.ontimeupdate = (e) => {
-          const video = (e?.target as HTMLVideoElement) || nativeVideo.value
-          if (!video)
-            return
-          onTimeUpdate(video.currentTime)
-        }
-        nativeVideo.value.onloadedmetadata = (e) => {
-          const video = (e?.target as HTMLVideoElement) || nativeVideo.value
-          if (!video)
-            return
-          duration.value = video.duration
-          getBarrages()
-        }
-      }
-    },
-    { immediate: true },
-  )
-  // 添加阻止休眠
-  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
-})
-
-onUnmounted(() => {
-  // 移除阻止休眠
-  if (powerSaveBlockerId.value !== null) {
-    window.mainAPI.allowSleep(powerSaveBlockerId.value)
-  }
-})
-
+const loadedBarrageUrl = ref('')
 const realName = ref('')
 const userAvatar = ref('')
-function getOne() {
-  Apis.instance().live(props.liveId).then((data) => {
+const powerSaveBlockerId = ref<number | null>(null)
+
+const router = useRouter()
+
+let hlsInstance: Hls | null = null
+let stopPlayPathWatch: (() => void) | null = null
+
+// 录播页只做两类事情：
+// 1. 按播放地址选择 HLS 或原生 MP4 播放
+// 2. 按录播资源加载弹幕，并在回退/重播时重置弹幕状态
+function getActiveMediaElement() {
+  return isRadio.value ? nativeAudio.value : nativeVideo.value
+}
+
+function resetMediaElement(mediaElement: HTMLMediaElement | null) {
+  if (!mediaElement)
+    return
+
+  mediaElement.pause()
+  mediaElement.removeAttribute('src')
+  mediaElement.load()
+  mediaElement.ontimeupdate = null
+  mediaElement.onloadedmetadata = null
+  mediaElement.onerror = null
+}
+
+function destroyPlayer() {
+  if (hlsInstance) {
+    hlsInstance.destroy()
+    hlsInstance = null
+  }
+
+  resetMediaElement(nativeVideo.value)
+  resetMediaElement(nativeAudio.value)
+}
+
+function resetBarragesForPlayback() {
+  barrageBoxRef.value?.clear?.()
+  barrageList.value = cloneDeep(finalBarrageList.value)
+  currentTime.value = 0
+}
+
+function attemptAutoplay(mediaElement: HTMLMediaElement) {
+  mediaElement.autoplay = true
+  void Promise.resolve(mediaElement.play()).catch((error) => {
+    console.error('[ReviewPlayer.vue] 自动播放失败:', error)
+  })
+}
+
+async function ensureBarragesLoaded() {
+  if (!barrageUrl.value || loadedBarrageUrl.value === barrageUrl.value)
+    return
+
+  try {
+    const response = await Apis.instance().barrage(barrageUrl.value)
+    barrageLoaded.value = true
+    loadedBarrageUrl.value = barrageUrl.value
+    finalBarrageList.value = Tools.lyricsParse(response)
+    resetBarragesForPlayback()
+  }
+  catch (error: any) {
+    console.error(error)
+    ElMessage({ message: '弹幕加载失败', type: 'error' })
+  }
+}
+
+function bindMediaEvents(mediaElement: HTMLMediaElement) {
+  mediaElement.ontimeupdate = (e) => {
+    const target = (e?.target as HTMLMediaElement) || getActiveMediaElement()
+    if (!target)
+      return
+    onTimeUpdate(target.currentTime)
+  }
+
+  mediaElement.onloadedmetadata = async (e) => {
+    const target = (e?.target as HTMLMediaElement) || getActiveMediaElement()
+    if (!target)
+      return
+
+    await ensureBarragesLoaded()
+    attemptAutoplay(target)
+  }
+
+  mediaElement.onerror = () => {
+    console.error('[ReviewPlayer.vue] 录播播放失败:', playStreamPath.value)
+  }
+}
+
+// 录播是 VOD 场景，保留 HLS 最合适；如果是 MP4 则直接交给原生 video。
+function attachPlaybackSource(newPath: string) {
+  const mediaElement = getActiveMediaElement()
+  if (!mediaElement)
+    return
+
+  destroyPlayer()
+
+  if (newPath.endsWith('.m3u8')) {
+    if (Hls.isSupported()) {
+      const hls = new Hls()
+      hlsInstance = hls
+      hls.loadSource(newPath)
+      hls.attachMedia(mediaElement)
+    }
+    else if (mediaElement.canPlayType('application/vnd.apple.mpegurl')) {
+      mediaElement.src = newPath
+    }
+    else {
+      ElMessage.error('当前环境不支持录播 HLS 播放')
+      return
+    }
+  }
+  else {
+    mediaElement.src = newPath
+    mediaElement.load()
+  }
+
+  bindMediaEvents(mediaElement)
+  attemptAutoplay(mediaElement)
+}
+
+async function getOne() {
+  try {
+    const data = await Apis.instance().live(props.liveId)
     console.log('获取到的录播信息:', data)
-    playStreamPath.value = Tools.streamPathHandle(data.playStreamPath, props.startTime)
+
+    const nextPlayStreamPath = Tools.streamPathHandle(data.playStreamPath, props.startTime)
+    const nextBarrageUrl = data.msgFilePath || ''
+
     isReview.value = data.review
     if (!isReview.value) {
       ElMessage({
@@ -110,55 +172,65 @@ function getOne() {
       router.push('/live')
       return
     }
-    barrageUrl.value = data.msgFilePath
-    isRadio.value = data.liveType == 2
+
+    isRadio.value = data.liveType === 2
     number.value = data.onlineNum
     realName.value = data.user.userName
     userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
-    if (isRadio.value) {
-      carousels.value = data.carousels.carousels.map((carousel: any) => Tools.sourceUrl(carousel))
-      carouselTime.value = Number.parseInt(data.carousels.carouselTime)
-      coverImage.value = carousels.value[0]
+    carousels.value = isRadio.value && data.carousels?.carousels?.length
+      ? data.carousels.carousels.map((carousel: string) => Tools.sourceUrl(carousel))
+      : []
+    carouselTime.value = isRadio.value && data.carousels?.carouselTime
+      ? Number.parseInt(data.carousels.carouselTime)
+      : 5000
+    coverImage.value = carousels.value[0] || ''
+
+    const barrageSourceChanged = barrageUrl.value !== nextBarrageUrl
+    barrageUrl.value = nextBarrageUrl
+    playStreamPath.value = nextPlayStreamPath
+
+    if (barrageSourceChanged) {
+      barrageLoaded.value = false
+      loadedBarrageUrl.value = ''
+      finalBarrageList.value = []
+      barrageList.value = []
     }
-  }).catch((error: any) => {
+  }
+  catch (error: any) {
     console.error(error)
-  })
+    ElMessage({ message: '获取录播信息失败', type: 'error' })
+  }
 }
 
-// 播放/暂停
 function play() {
-  if (nativeVideo.value) {
-    nativeVideo.value.play()
-    status.value = Constants.STATUS_PLAYING
-    console.log('play')
+  const mediaElement = getActiveMediaElement()
+  if (mediaElement) {
+    void mediaElement.play()
   }
   else {
-    console.warn('nativeVideo is null')
+    console.warn('active media element is null')
   }
 }
 
-// 暴露方法给模板
 defineExpose({ play, download })
 
-// 时间更新
 function onTimeUpdate(newTime: number) {
   if (newTime < currentTime.value) {
-    // 重新加载弹幕
-    barrageBoxRef.value?.clear()
-    barrageList.value = cloneDeep(finalBarrageList.value)
+    resetBarragesForPlayback()
+    currentTime.value = newTime
   }
-  currentTime.value = newTime
-  // 重新加载弹幕
+  else {
+    currentTime.value = newTime
+  }
+
   for (let i = 0; i < barrageList.value.length;) {
     const item = barrageList.value[i]
     if (Tools.timeToSecond(item.time) <= newTime - 1) {
-      if (barrageBoxRef.value && barrageBoxRef.value.shoot) {
-        barrageBoxRef.value.shoot({
-          content: item.content,
-          username: item.username,
-          time: item.time,
-        })
-      }
+      barrageBoxRef.value?.shoot?.({
+        content: item.content,
+        username: item.username,
+        time: item.time,
+      })
       barrageList.value.shift()
     }
     else {
@@ -167,21 +239,6 @@ function onTimeUpdate(newTime: number) {
   }
 }
 
-// 加载弹幕
-function getBarrages() {
-  if (!barrageUrl.value || barrageUrl.value.length === 0)
-    return
-  Apis.instance().barrage(barrageUrl.value).then((response: any) => {
-    barrageLoaded.value = true
-    finalBarrageList.value = Tools.lyricsParse(response)
-    barrageList.value = cloneDeep(finalBarrageList.value)
-  }).catch((error: any) => {
-    console.error(error)
-    ElMessage({ message: '弹幕加载失败', type: 'error' })
-  })
-}
-
-// 检查下载目录是否存在
 async function checkDownloadDirectory(): Promise<boolean> {
   try {
     const result = await window.mainAPI.getConfig('downloadDirectory')
@@ -202,26 +259,61 @@ async function checkDownloadDirectory(): Promise<boolean> {
   }
 }
 
-// 下载录播
+function getReviewDownloadFilename() {
+  const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
+  const extension = playStreamPath.value.endsWith('.m3u8') ? 'mp4' : 'mp4'
+  return `${realName.value}${date}.${extension}`
+}
+
 async function download() {
   const valid = await checkDownloadDirectory()
   if (!valid)
     return
 
-  const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  const filename = `${realName.value}${date}.mp4`
-  console.log('[ReviewPlayer.vue]playStreamPath:', playStreamPath.value, 'filename:', filename, 'liveId:', props.liveId)
+  const filename = getReviewDownloadFilename()
   const downloadTask: DownloadTaskPayload = {
     url: playStreamPath.value,
     filename,
     liveId: props.liveId,
   }
-  EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
+  EventBus.emit('change-selected-menu', 'downloads')
   router.push('/downloads')
   setTimeout(() => {
     EventBus.emit('download-task', downloadTask)
   })
 }
+
+onMounted(async () => {
+  console.log('[ReviewPlayer.vue] onMounted', props)
+  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
+  stopPlayPathWatch = watch(
+    () => playStreamPath.value,
+    async (newPath) => {
+      if (!newPath)
+        return
+
+      // 电台录播会在 isRadio 切换后把 <video> 替换成 <audio>，
+      // 这里等一轮 DOM 更新，确保拿到正确的媒体节点再挂载播放源。
+      await nextTick()
+      attachPlaybackSource(newPath)
+    },
+    {
+      immediate: true,
+      flush: 'post',
+    },
+  )
+  await getOne()
+})
+
+onUnmounted(() => {
+  destroyPlayer()
+  if (stopPlayPathWatch) {
+    stopPlayPathWatch()
+    stopPlayPathWatch = null
+  }
+  if (powerSaveBlockerId.value !== null)
+    window.mainAPI.allowSleep(powerSaveBlockerId.value)
+})
 </script>
 
 <template>
@@ -246,9 +338,37 @@ async function download() {
     <div class="review-content">
       <el-row justify="space-between" class="review-row">
         <el-col :span="10" class="video-box">
+          <div v-if="isRadio" class="radio-player">
+            <div class="radio-carousel">
+              <el-carousel
+                v-if="carousels.length > 0"
+                :interval="carouselTime"
+                indicator-position="none"
+                arrow="never"
+                height="100%"
+              >
+                <el-carousel-item v-for="carousel in carousels" :key="carousel">
+                  <img :src="carousel" class="radio-cover" alt="cover">
+                </el-carousel-item>
+              </el-carousel>
+              <div v-else class="radio-cover-placeholder">
+                <img v-if="coverImage" :src="coverImage" class="radio-cover" alt="cover">
+              </div>
+            </div>
+            <audio
+              ref="nativeAudio"
+              controls
+              autoplay
+              class="audio-player"
+            />
+          </div>
           <video
-            ref="nativeVideo" class="video-player" controls :poster="isRadio ? coverImage : ''"
-            :style="isRadio ? 'background: #000; object-fit: contain;' : ''"
+            v-else
+            ref="nativeVideo"
+            class="video-player"
+            controls
+            autoplay
+            :poster="coverImage"
           />
         </el-col>
         <el-col :span="13" class="barrage-box">
@@ -283,6 +403,40 @@ async function download() {
   left: 0;
 }
 
+.radio-player {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.radio-carousel {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.radio-cover,
+.radio-cover-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.radio-cover {
+  object-fit: contain;
+  display: block;
+}
+
+.audio-player {
+  width: min(560px, 100%);
+  flex-shrink: 0;
+}
+
 .review-container {
   height: calc(100% - 60px);
   overflow: hidden;
@@ -307,7 +461,6 @@ async function download() {
   height: 100%;
   display: flex;
   flex-direction: column;
-  /* 不显示滚动条 */
   overflow: hidden;
 }
 
@@ -315,7 +468,6 @@ async function download() {
   background: #fafbfc;
 }
 
-/* 隐藏所有滚动条（webkit/firefox/IE） */
 .video-box::-webkit-scrollbar,
 .barrage-box::-webkit-scrollbar {
   display: none;
@@ -324,23 +476,15 @@ async function download() {
 .video-box,
 .barrage-box {
   -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
 }
 
 :deep(.el-carousel__container) {
   height: 100%;
 }
 
-:deep(.el-carousel__item) {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-:deep(.el-carousel__container) {
+:deep(.el-carousel) {
+  width: 100%;
   height: 100%;
 }
 

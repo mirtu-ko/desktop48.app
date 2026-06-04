@@ -60,31 +60,43 @@ const isVerticalRotation = computed(() => {
   return normalizedAngle === 90 || normalizedAngle === 270
 })
 
-const videoWrapperStyle = computed(() => {
-  const angle = rotationAngle.value
-  const vertical = isVerticalRotation.value
-  const box = boxDimensions.value
-  const boxWidth = box.width || videoBoxRef.value?.clientWidth || 0
-  const boxHeight = box.height || videoBoxRef.value?.clientHeight || 0
-  let scale = 1
+// 旋转 90/270 度时，视频显示宽高会交换，这里单独计算一个缩放系数，
+// 保证旋转后的画面仍然完整落在容器内。
+function calculateRotationScale() {
+  if (!isVerticalRotation.value)
+    return 1
 
-  if (vertical && videoWidth.value > 0 && videoHeight.value > 0 && boxWidth > 0 && boxHeight > 0) {
-    const boxWH = boxWidth / boxHeight
-    let videoW = 1
-    let videoH = 1
-    if (videoWH.value < boxWH) {
-      videoH = boxHeight
-      videoW = boxHeight * videoWH.value
-    }
-    else {
-      videoW = boxWidth
-      videoH = videoW / videoWH.value
-    }
-    scale = Math.min(boxWidth / videoH, boxHeight / videoW)
+  const boxWidth = boxDimensions.value.width || videoBoxRef.value?.clientWidth || 0
+  const boxHeight = boxDimensions.value.height || videoBoxRef.value?.clientHeight || 0
+  const sourceWidth = videoWidth.value
+  const sourceHeight = videoHeight.value
+
+  if (boxWidth <= 0 || boxHeight <= 0 || sourceWidth <= 0 || sourceHeight <= 0)
+    return 1
+
+  const videoRatio = sourceWidth / sourceHeight
+  const boxRatio = boxWidth / boxHeight
+  let renderedWidth = 0
+  let renderedHeight = 0
+
+  if (videoRatio < boxRatio) {
+    renderedHeight = boxHeight
+    renderedWidth = renderedHeight * videoRatio
+  }
+  else {
+    renderedWidth = boxWidth
+    renderedHeight = renderedWidth / videoRatio
   }
 
+  return Math.min(boxWidth / renderedHeight, boxHeight / renderedWidth)
+}
+
+const videoWrapperStyle = computed(() => {
+  const angle = rotationAngle.value
+  const scale = calculateRotationScale()
+
   return {
-    transform: `rotate(${angle}deg) scale(${vertical ? scale : 1})`,
+    transform: `rotate(${angle}deg) scale(${scale})`,
   }
 })
 
@@ -180,10 +192,17 @@ function resetRotation() {
 
 function updateVideoDimensions() {
   if (nativeVideo.value) {
-    videoWidth.value = nativeVideo.value.videoWidth || 0
-    videoHeight.value = nativeVideo.value.videoHeight || 0
-    videoWH.value = videoWidth.value / videoHeight.value
+    const nextVideoWidth = nativeVideo.value.videoWidth || 0
+    const nextVideoHeight = nativeVideo.value.videoHeight || 0
+
+    videoWidth.value = nextVideoWidth
+    videoHeight.value = nextVideoHeight
+    videoWH.value = nextVideoHeight > 0 ? nextVideoWidth / nextVideoHeight : 0
   }
+}
+
+function handleNativeVideoResize() {
+  updateVideoDimensions()
 }
 
 // 这一组方法只处理“本地直播流会话”与播放器实例的清理，不涉及列表/录制逻辑。
@@ -372,6 +391,9 @@ onMounted(async () => {
 
     resizeObserver.observe(videoBoxRef.value)
   }
+
+  if (nativeVideo.value)
+    nativeVideo.value.addEventListener('resize', handleNativeVideoResize)
 })
 
 onMounted(() => {
@@ -424,11 +446,12 @@ onMounted(() => {
         loading.value = false
         isRecoveringStream.value = false
         if (!isRadio.value) {
-          setTimeout(() => {
-            updateVideoDimensions()
-          }, 100)
+          updateVideoDimensions()
         }
       }
+
+      if (!isRadio.value)
+        mediaElement.onloadedmetadata = () => updateVideoDimensions()
 
       mediaElement.onerror = () => {
         handleStreamError('native media error')
@@ -466,6 +489,8 @@ onUnmounted(() => {
   }
   destroyLivePlayer()
   resetMediaElement()
+  if (nativeVideo.value)
+    nativeVideo.value.removeEventListener('resize', handleNativeVideoResize)
   if (streamId.value) {
     window.mainAPI.stopLiveStream(streamId.value).catch((err) => {
       console.error('停止直播流失败:', err)
