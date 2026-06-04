@@ -36,6 +36,7 @@ const loadedBarrageUrl = ref('')
 const realName = ref('')
 const userAvatar = ref('')
 const powerSaveBlockerId = ref<number | null>(null)
+const lastPlaybackError = ref('')
 
 const router = useRouter()
 
@@ -84,6 +85,14 @@ function attemptAutoplay(mediaElement: HTMLMediaElement) {
   })
 }
 
+function notifyPlaybackError(message: string) {
+  if (lastPlaybackError.value === message)
+    return
+
+  lastPlaybackError.value = message
+  ElMessage.error(message)
+}
+
 async function ensureBarragesLoaded() {
   if (!barrageUrl.value || loadedBarrageUrl.value === barrageUrl.value)
     return
@@ -114,12 +123,14 @@ function bindMediaEvents(mediaElement: HTMLMediaElement) {
     if (!target)
       return
 
+    lastPlaybackError.value = ''
     await ensureBarragesLoaded()
     attemptAutoplay(target)
   }
 
   mediaElement.onerror = () => {
     console.error('[ReviewPlayer.vue] 录播播放失败:', playStreamPath.value)
+    notifyPlaybackError('录播播放失败，请稍后重试或检查播放地址是否有效')
   }
 }
 
@@ -130,6 +141,7 @@ function attachPlaybackSource(newPath: string) {
     return
 
   destroyPlayer()
+  lastPlaybackError.value = ''
 
   if (newPath.endsWith('.m3u8')) {
     if (Hls.isSupported()) {
@@ -137,6 +149,22 @@ function attachPlaybackSource(newPath: string) {
       hlsInstance = hls
       hls.loadSource(newPath)
       hls.attachMedia(mediaElement)
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        console.error('[ReviewPlayer.vue] HLS 录播播放失败:', data)
+
+        if (!data.fatal)
+          return
+
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          notifyPlaybackError('录播加载失败，播放地址可能已失效或网络不可用')
+        }
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          notifyPlaybackError('录播播放失败，媒体内容可能已损坏或编码不受支持')
+        }
+        else {
+          notifyPlaybackError('录播播放失败，请稍后重试')
+        }
+      })
     }
     else if (mediaElement.canPlayType('application/vnd.apple.mpegurl')) {
       mediaElement.src = newPath
