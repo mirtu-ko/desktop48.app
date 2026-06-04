@@ -28,7 +28,7 @@ jobs:
           node-version: 20 # 根据你的项目需求选择 Node 版本
 
       - name: Install Dependencies
-        run: npm ci # 如果你有 package-lock.json，推荐用 ci；否则用 npm install
+        run: npm ci --legacy-peer-deps # 当前依赖树包含 vite/electron-vite 的 peer 冲突，发布流程按本地安装方式忽略 peer 校验
 
       # 构建并发布
       # 这里的 GH_TOKEN 是 GitHub 自动生成的，无需手动设置
