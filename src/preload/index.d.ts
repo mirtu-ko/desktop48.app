@@ -41,8 +41,8 @@ export interface mainAPI {
 
   // 播放
   openPlayer: (params: { title: string, streamPath: string, ffplayPath?: string }) => Promise<any>
-  convertToHls: (rtmpUrl: string, liveId) => Promise<any>
-  stopHlsConvert: (liveId: string) => Promise<any>
+  createLiveStream: (rtmpUrl: string, liveId: string) => Promise<any>
+  stopLiveStream: (liveId: string) => Promise<any>
 
   // 下载
   downloadTaskStart: (url: string, filename: string, liveId: string) => Promise<any>

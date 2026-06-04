@@ -2,14 +2,14 @@
 import type { RecordTaskPayload } from '../assets/js/task-payload'
 import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import Hls from 'hls.js'
+import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
-import Tools from '../assets/js/tools' // 添加手动卸载标记
+import Tools from '../assets/js/tools'
 
 interface LiveDetail {
   playStreamPath: string
@@ -34,7 +34,6 @@ const emit = defineEmits(['close'])
 
 const realName = ref('')
 const userAvatar = ref('')
-
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
 const nativeAudio = ref<HTMLAudioElement | null>(null)
@@ -46,40 +45,30 @@ const maxRetries = 3
 const isManuallyUnmounted = ref(false)
 const streamRestartToken = ref(0)
 const isRecoveringStream = ref(false)
-let activeStreamRequestId = 0
-let hlsInstance: Hls | null = null
-let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
-
-// 视频旋转相关
 const rotationAngle = ref(0)
 const videoWidth = ref(0)
 const videoHeight = ref(0)
 const videoWH = ref(0)
-
-// 容器尺寸响应式变量，用于触发重新计算
 const boxDimensions = ref({ width: 0, height: 0 })
+const coverImage = ref('')
+const onlineNum = ref(0)
+const powerSaveBlockerId = ref<number | null>(null)
 
-// 判断是否垂直旋转（90度或270度）
+const isRadio = computed(() => props.liveType !== 1)
 const isVerticalRotation = computed(() => {
   const normalizedAngle = ((rotationAngle.value % 360) + 360) % 360
   return normalizedAngle === 90 || normalizedAngle === 270
 })
 
-// 视频包装器的样式
 const videoWrapperStyle = computed(() => {
   const angle = rotationAngle.value
   const vertical = isVerticalRotation.value
-
-  // 访问 boxDimensions 以触发重新计算
   const box = boxDimensions.value
   const boxWidth = box.width || videoBoxRef.value?.clientWidth || 0
   const boxHeight = box.height || videoBoxRef.value?.clientHeight || 0
-
-  // 计算缩放因子
   let scale = 1
 
   if (vertical && videoWidth.value > 0 && videoHeight.value > 0 && boxWidth > 0 && boxHeight > 0) {
-    // 视频旋转90度或270度时，视频的实际显示宽高交换了
     const boxWH = boxWidth / boxHeight
     let videoW = 1
     let videoH = 1
@@ -91,39 +80,16 @@ const videoWrapperStyle = computed(() => {
       videoW = boxWidth
       videoH = videoW / videoWH.value
     }
-    const scale1 = boxWidth / videoH
-    const scale2 = boxHeight / videoW
-    scale = Math.min(scale1, scale2)
-
-    console.log('[视频缩放计算] 垂直旋转:', vertical)
-    console.log('[视频缩放计算] 容器尺寸: boxWidth =', boxWidth, ', boxHeight =', boxHeight)
-    console.log('[视频缩放计算] 视频原始尺寸: videoWidth =', videoW, ', videoHeight =', videoH)
-    console.log('[视频缩放计算] scale1 = boxWidth / videoHeight =', boxWidth, '/', videoH, '=', scale1)
-    console.log('[视频缩放计算] scale2 = boxHeight / videoWidth =', boxHeight, '/', videoW, '=', scale2)
-    console.log('[视频缩放计算] 最终 scale = min(scale1, scale2) =', scale)
-  }
-  else {
-    console.log('[视频缩放计算] 非垂直旋转或尺寸无效:', { vertical, videoWidth: videoWidth.value, videoHeight: videoHeight.value, boxWidth, boxHeight })
-  }
-
-  if (vertical) {
-    // 垂直旋转时，应用缩放
-    return {
-      transform: `rotate(${angle}deg) scale(${scale})`,
-    }
+    scale = Math.min(boxWidth / videoH, boxHeight / videoW)
   }
 
   return {
-    transform: `rotate(${angle}deg) scale(1)`,
+    transform: `rotate(${angle}deg) scale(${vertical ? scale : 1})`,
   }
 })
 
-// 视频元素的样式 - 处理垂直旋转时的宽高适配
 const videoStyle = computed(() => {
-  const vertical = isVerticalRotation.value
-
-  if (vertical) {
-    // 旋转90度或270度时，使用 contain 模式确保完整显示
+  if (isVerticalRotation.value) {
     return {
       objectFit: 'contain' as const,
       maxWidth: '100%',
@@ -135,15 +101,17 @@ const videoStyle = computed(() => {
 
   return {}
 })
+
 const router = useRouter()
+const onlineNumTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
-// 封面图片
-const coverImage = ref('')
-const isRadio = computed(() => props.liveType !== 1)
-const onlineNum = ref(0)
-// const carousels = ref<string[]>([])
-// const carouselTime = ref(5000)
+let activeStreamRequestId = 0
+let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
+let playerWatchStopHandle: (() => void) | null = null
+let resizeObserver: ResizeObserver | null = null
+let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
 
+// 这一组方法只负责“直播详情”和界面状态同步，不直接处理播放器。
 function applyLiveDetail(data: LiveDetail) {
   coverImage.value = Tools.sourceUrl(data.coverPath)
   realName.value = data.user.userName
@@ -156,7 +124,7 @@ async function fetchLiveDetail(): Promise<LiveDetail> {
   return await Apis.instance().live(props.liveId)
 }
 
-// 获取直播信息
+// 首次进入直播页时，先拿最新直播地址，再创建本地 HTTP-FLV 播放入口。
 async function getOne() {
   loading.value = true
   retryCount.value = 0
@@ -167,7 +135,7 @@ async function getOne() {
       return
     console.log('获取到的直播信息:', data)
     applyLiveDetail(data)
-    await restartHlsStream(data.playStreamPath)
+    await restartLiveStream(data.playStreamPath)
   }
   catch (error: any) {
     console.error('getOne()', error)
@@ -177,17 +145,27 @@ async function getOne() {
   }
 }
 
-// 定时更新直播onlineNum
-const onlineNumTimer = ref()
-
-// 启动定时器
 function startOnlineNumTimer() {
   onlineNumTimer.value = setInterval(() => {
     updateOnlineNum()
   }, 30000)
 }
 
-// 视频旋转控制
+function stopOnlineNumTimer() {
+  if (onlineNumTimer.value) {
+    clearInterval(onlineNumTimer.value)
+    onlineNumTimer.value = null
+  }
+}
+
+function updateOnlineNum() {
+  Apis.instance().live(props.liveId).then((data) => {
+    onlineNum.value = data.onlineNum
+  }).catch((error: any) => {
+    console.error(error)
+  })
+}
+
 function rotateLeft() {
   rotationAngle.value = (rotationAngle.value - 90) % 360
 }
@@ -200,38 +178,15 @@ function resetRotation() {
   rotationAngle.value = 0
 }
 
-// 获取视频尺寸
 function updateVideoDimensions() {
   if (nativeVideo.value) {
     videoWidth.value = nativeVideo.value.videoWidth || 0
     videoHeight.value = nativeVideo.value.videoHeight || 0
     videoWH.value = videoWidth.value / videoHeight.value
-    console.log('[updateVideoDimensions] 获取到视频尺寸: videoWidth =', videoWidth.value, ', videoHeight =', videoHeight.value)
-  }
-  else {
-    console.log('[updateVideoDimensions] nativeVideo.value 为空')
   }
 }
 
-// 停止定时器
-function stopOnlineNumTimer() {
-  if (onlineNumTimer.value) {
-    clearInterval(onlineNumTimer.value)
-    onlineNumTimer.value = null
-  }
-}
-
-function updateOnlineNum() {
-  Apis.instance().live(props.liveId).then((data) => {
-    console.log('获取到的直播在线人数:', data.onlineNum)
-    onlineNum.value = data.onlineNum
-  }).catch((error: any) => {
-    console.error(error)
-  })
-}
-
-startOnlineNumTimer()
-
+// 这一组方法只处理“本地直播流会话”与播放器实例的清理，不涉及列表/录制逻辑。
 function clearStreamRetryTimer() {
   if (streamRetryTimer) {
     clearTimeout(streamRetryTimer)
@@ -239,10 +194,10 @@ function clearStreamRetryTimer() {
   }
 }
 
-function destroyHlsInstance() {
-  if (hlsInstance) {
-    hlsInstance.destroy()
-    hlsInstance = null
+function destroyLivePlayer() {
+  if (livePlayer) {
+    livePlayer.destroy()
+    livePlayer = null
   }
 }
 
@@ -258,66 +213,58 @@ function resetMediaElement() {
   mediaElement.oncanplay = null
 }
 
-async function stopCurrentHlsConvert() {
-  const currentStreamId = streamId.value || props.liveId
+async function stopCurrentLiveStream() {
+  const currentStreamId = streamId.value
+  if (!currentStreamId)
+    return
+
   streamId.value = ''
   try {
-    await window.mainAPI.stopHlsConvert(currentStreamId)
+    await window.mainAPI.stopLiveStream(currentStreamId)
   }
   catch (err) {
-    console.error('停止转码失败:', err)
+    console.error('停止直播流失败:', err)
   }
 }
 
-// 启动 HLS 流
-async function startHlsStream(rtmpUrl: string, requestId: number) {
-  const result = await window.mainAPI.convertToHls(rtmpUrl, props.liveId)
+async function startLiveStream(rtmpUrl: string, requestId: number) {
+  const result = await window.mainAPI.createLiveStream(rtmpUrl, props.liveId)
 
   if (isManuallyUnmounted.value || requestId !== activeStreamRequestId) {
     try {
-      await window.mainAPI.stopHlsConvert(result.liveId || props.liveId)
+      await window.mainAPI.stopLiveStream(result.liveId || props.liveId)
     }
     catch (err) {
-      console.error('关闭过期转码失败:', err)
+      console.error('关闭过期直播流失败:', err)
     }
     return false
   }
 
-  console.log('转换后的 HLS 流地址:', result)
   streamId.value = result.liveId
   playStreamPath.value = `${result.url}?t=${Date.now()}&r=${streamRestartToken.value}`
   return true
 }
 
-async function restartHlsStream(rtmpUrl: string) {
+async function restartLiveStream(rtmpUrl: string) {
   const requestId = ++activeStreamRequestId
   clearStreamRetryTimer()
-  destroyHlsInstance()
+  destroyLivePlayer()
   resetMediaElement()
-  await stopCurrentHlsConvert()
+  await stopCurrentLiveStream()
   if (isManuallyUnmounted.value || requestId !== activeStreamRequestId)
     return false
   streamRestartToken.value++
-  return await startHlsStream(rtmpUrl, requestId)
+  return await startLiveStream(rtmpUrl, requestId)
 }
 
-// 处理流错误和重试
-function handleStreamError() {
-  // 如果是手动卸载，不进行重试
-  if (isManuallyUnmounted.value) {
-    console.log('[LivePlayer.vue] 组件手动卸载，不进行重试')
+// 网络抖动、链接过期等都走这里的统一重试节奏，避免并发重连。
+function scheduleStreamRetry() {
+  if (isManuallyUnmounted.value || isRecoveringStream.value)
     return
-  }
-
-  if (isRecoveringStream.value) {
-    console.log('[LivePlayer.vue] 当前正在恢复直播流，跳过重复重试')
-    return
-  }
 
   if (retryCount.value < maxRetries) {
     retryCount.value++
     isRecoveringStream.value = true
-    console.log(`[LivePlayer.vue] 直播流中断，正在进行第 ${retryCount.value} 次重试`)
     loading.value = true
     clearStreamRetryTimer()
     streamRetryTimer = setTimeout(async () => {
@@ -325,14 +272,13 @@ function handleStreamError() {
         const data = await fetchLiveDetail()
         if (isManuallyUnmounted.value)
           return
-        console.log('[LivePlayer.vue] 重试获取到的直播信息:', data)
         applyLiveDetail(data)
-        await restartHlsStream(data.playStreamPath)
+        await restartLiveStream(data.playStreamPath)
       }
       catch (error) {
         console.error('[LivePlayer.vue] 重试恢复直播流失败:', error)
         isRecoveringStream.value = false
-        handleStreamError()
+        scheduleStreamRetry()
         return
       }
       finally {
@@ -342,128 +288,25 @@ function handleStreamError() {
     }, 2000)
   }
   else {
-    console.log('[LivePlayer.vue] 重试次数已达上限，停止播放')
     loading.value = false
     isRecoveringStream.value = false
     ElMessage.warning('直播已结束')
-    // 清理资源
     if (streamId.value) {
-      window.mainAPI.stopHlsConvert(streamId.value).catch((err) => {
-        console.error('停止转码失败:', err)
+      window.mainAPI.stopLiveStream(streamId.value).catch((err) => {
+        console.error('停止直播流失败:', err)
       })
     }
   }
 }
 
-// 添加阻止休眠
-const powerSaveBlockerId = ref<number | null>(null)
+function handleStreamError(reason: string) {
+  console.error('[LivePlayer.vue] 直播播放异常:', reason)
+  destroyLivePlayer()
+  loading.value = false
+  scheduleStreamRetry()
+}
 
-// ResizeObserver 用于监听容器尺寸变化
-let resizeObserver: ResizeObserver | null = null
-
-onMounted(async () => {
-  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
-
-  if (isRadio.value)
-    return
-
-  // 初始化容器尺寸
-  if (videoBoxRef.value) {
-    boxDimensions.value = {
-      width: videoBoxRef.value.clientWidth,
-      height: videoBoxRef.value.clientHeight,
-    }
-  }
-
-  // 监听容器尺寸变化
-  resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      boxDimensions.value = {
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      }
-    }
-  })
-
-  if (videoBoxRef.value)
-    resizeObserver.observe(videoBoxRef.value)
-})
-
-onMounted(() => {
-  console.log('[LivePlayer.vue] onMounted', props)
-  getOne()
-  watch(
-    () => playStreamPath.value,
-    (newPath) => {
-      const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
-      if (mediaElement && newPath) {
-        destroyHlsInstance()
-        if (Hls.isSupported()) {
-          const hls = new Hls()
-          hlsInstance = hls
-          hls.loadSource(newPath)
-          hls.attachMedia(mediaElement)
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            loading.value = false
-            isRecoveringStream.value = false
-            if (!isRadio.value) {
-              setTimeout(() => {
-                updateVideoDimensions()
-              }, 100)
-            }
-          })
-
-          // 监听视频尺寸变化
-          // hls.on(Hls.Events.FRAG_CHANGED, () => {
-          //   setTimeout(() => {
-          //     updateVideoDimensions()
-          //   }, 100)
-          // })
-
-          hls.on(Hls.Events.ERROR, (_event, data) => {
-            if (isManuallyUnmounted.value) {
-              hls.destroy()
-              if (hlsInstance === hls)
-                hlsInstance = null
-              console.log('[LivePlayer.vue] 组件手动卸载，不进行重试')
-              return
-            }
-            console.error('[LivePlayer.vue] HLS 错误:', data)
-            if (data.fatal) {
-              loading.value = false
-              handleStreamError()
-            }
-            if (data.type === 'networkError') {
-              loading.value = true
-              console.log('[LivePlayer.vue] 网络错误，正在重试')
-              handleStreamError()
-            }
-          })
-        }
-        else if (mediaElement.canPlayType('application/vnd.apple.mpegurl')) {
-          mediaElement.src = newPath
-          mediaElement.oncanplay = () => {
-            loading.value = false
-            isRecoveringStream.value = false
-            if (!isRadio.value) {
-              setTimeout(() => {
-                updateVideoDimensions()
-              }, 100)
-            }
-          }
-          mediaElement.onerror = () => {
-            loading.value = false
-            handleStreamError()
-          }
-        }
-      }
-    },
-    { immediate: true },
-  )
-})
-
-// 检查下载目录是否存在
+// 录制走原始 RTMP 地址直存文件，和页面播放的 HTTP-FLV 链路保持解耦。
 async function checkDownloadDirectory(): Promise<boolean> {
   try {
     const result = await window.mainAPI.getConfig('downloadDirectory')
@@ -484,7 +327,6 @@ async function checkDownloadDirectory(): Promise<boolean> {
   }
 }
 
-// 调用Electron主进程暴露的record方法
 async function record() {
   const valid = await checkDownloadDirectory()
   if (!valid)
@@ -508,24 +350,130 @@ async function record() {
   })
 }
 
+startOnlineNumTimer()
+
+onMounted(async () => {
+  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
+
+  if (!isRadio.value && videoBoxRef.value) {
+    boxDimensions.value = {
+      width: videoBoxRef.value.clientWidth,
+      height: videoBoxRef.value.clientHeight,
+    }
+
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        boxDimensions.value = {
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        }
+      }
+    })
+
+    resizeObserver.observe(videoBoxRef.value)
+  }
+})
+
+onMounted(() => {
+  console.log('[LivePlayer.vue] onMounted', props)
+  getOne()
+  playerWatchStopHandle = watch(
+    () => playStreamPath.value,
+    (newPath) => {
+      const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
+      if (!mediaElement || !newPath)
+        return
+
+      // 播放地址变化时，销毁旧实例并按最新本地 FLV 地址重新挂载。
+      destroyLivePlayer()
+
+      if (!mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
+        loading.value = false
+        ElMessage.error('当前环境不支持 HTTP-FLV 直播播放')
+        return
+      }
+
+      const player = mpegts.createPlayer({
+        type: 'flv',
+        isLive: true,
+        cors: true,
+        withCredentials: false,
+        url: newPath,
+      }, {
+        enableWorker: true,
+        enableStashBuffer: false,
+        isLive: true,
+        lazyLoad: false,
+        liveBufferLatencyChasing: true,
+        liveBufferLatencyMaxLatency: 1.5,
+        liveBufferLatencyMinRemain: 0.3,
+        liveSync: true,
+        liveSyncMaxLatency: 1.2,
+        liveSyncTargetLatency: 0.6,
+        liveSyncPlaybackRate: 1.2,
+      })
+
+      livePlayer = player
+      player.attachMediaElement(mediaElement)
+      player.load()
+      void Promise.resolve(player.play()).catch((error) => {
+        console.error('[LivePlayer.vue] 自动播放失败:', error)
+      })
+
+      mediaElement.oncanplay = () => {
+        loading.value = false
+        isRecoveringStream.value = false
+        if (!isRadio.value) {
+          setTimeout(() => {
+            updateVideoDimensions()
+          }, 100)
+        }
+      }
+
+      mediaElement.onerror = () => {
+        handleStreamError('native media error')
+      }
+
+      player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+        if (isManuallyUnmounted.value) {
+          player.destroy()
+          if (livePlayer === player)
+            livePlayer = null
+          return
+        }
+
+        console.error('[LivePlayer.vue] HTTP-FLV 错误:', errorType, errorDetail, errorInfo)
+        if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
+          loading.value = true
+          scheduleStreamRetry()
+          return
+        }
+
+        handleStreamError(`${errorType}:${errorDetail}`)
+      })
+    },
+    { immediate: true },
+  )
+})
+
 onUnmounted(() => {
-  console.log('[LivePlayer.vue] onUnmounted')
-  isManuallyUnmounted.value = true // 设置手动卸载标记
+  isManuallyUnmounted.value = true
   activeStreamRequestId++
   clearStreamRetryTimer()
-  destroyHlsInstance()
-  resetMediaElement()
-  // 停止 HLS 转码
-  window.mainAPI.stopHlsConvert(streamId.value || props.liveId).catch((err) => {
-    console.error('停止转码失败:', err)
-  })
-  // 移除阻止休眠
-  if (powerSaveBlockerId.value !== null) {
-    window.mainAPI.allowSleep(powerSaveBlockerId.value)
+  if (playerWatchStopHandle) {
+    playerWatchStopHandle()
+    playerWatchStopHandle = null
   }
-  // 清理定时器
+  destroyLivePlayer()
+  resetMediaElement()
+  if (streamId.value) {
+    window.mainAPI.stopLiveStream(streamId.value).catch((err) => {
+      console.error('停止直播流失败:', err)
+    })
+  }
+  if (powerSaveBlockerId.value !== null)
+    window.mainAPI.allowSleep(powerSaveBlockerId.value)
   stopOnlineNumTimer()
-  // 清理 ResizeObserver
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -549,7 +497,7 @@ onUnmounted(() => {
       <el-button type="success" style="flex-shrink: 0; margin-right: 8px;" @click="record()">
         录制
       </el-button>
-      <el-button-group v-if="liveType === 1 && liveMode === 1" style="flex-shrink: 0;">
+      <el-button-group v-if="liveType === 1" style="flex-shrink: 0;">
         <el-button title="向左旋转90°" @click="rotateLeft">
           ↺
         </el-button>
@@ -611,7 +559,6 @@ onUnmounted(() => {
   align-items: center;
   position: relative;
   overflow: hidden;
-  /* 确保容器有足够的空间 */
   min-height: 200px;
 }
 
@@ -619,7 +566,6 @@ onUnmounted(() => {
   background: #0c0c0c;
 }
 
-/* 视频包装器 - 用于旋转 */
 .video-wrapper {
   display: flex;
   justify-content: center;
@@ -630,13 +576,11 @@ onUnmounted(() => {
   height: 100%;
 }
 
-/* 垂直旋转时的样式 - 自适应窗口大小 */
 .video-box.vertical-rotation {
   overflow: hidden;
 }
 
 .video-box.vertical-rotation .video-wrapper {
-  /* 旋转90/270度时，交换宽高并缩放以适应容器 */
   width: 100%;
   height: 100%;
 }
