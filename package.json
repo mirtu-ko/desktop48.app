@@ -78,7 +78,7 @@
     "eslint-plugin-format": "^2.0.1",
     "prettier": "^3.9.6",
     "sass-embedded": "^1.100.0",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vite": "^8.1.5",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0",
