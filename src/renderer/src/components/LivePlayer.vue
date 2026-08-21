@@ -53,6 +53,7 @@ const boxDimensions = ref({ width: 0, height: 0 })
 const coverImage = ref('')
 const onlineNum = ref(0)
 const powerSaveBlockerId = ref<number | null>(null)
+const elapsedTime = ref(0)
 
 const isRadio = computed(() => props.liveType !== 1)
 const isVerticalRotation = computed(() => {
@@ -119,6 +120,7 @@ const onlineNumTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 let activeStreamRequestId = 0
 let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
+let elapsedTimer: ReturnType<typeof setInterval> | null = null
 let playerWatchStopHandle: (() => void) | null = null
 let resizeObserver: ResizeObserver | null = null
 let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
@@ -169,6 +171,29 @@ function stopOnlineNumTimer() {
     onlineNumTimer.value = null
   }
 }
+
+// 直播已播时长：每秒刷新，基于开播时间戳（毫秒）累加。
+function startElapsedTimer() {
+  elapsedTimer = setInterval(() => {
+    elapsedTime.value = Date.now() - props.startTime
+  }, 1000)
+}
+
+function stopElapsedTimer() {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer)
+    elapsedTimer = null
+  }
+}
+
+const liveElapsedText = computed(() => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedTime.value / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+})
 
 function updateOnlineNum() {
   Apis.instance().live(props.liveId).then((data) => {
@@ -373,6 +398,7 @@ startOnlineNumTimer()
 
 onMounted(async () => {
   powerSaveBlockerId.value = await window.mainAPI.preventSleep()
+  startElapsedTimer()
 
   if (!isRadio.value && videoBoxRef.value) {
     boxDimensions.value = {
@@ -483,6 +509,7 @@ onUnmounted(() => {
   isManuallyUnmounted.value = true
   activeStreamRequestId++
   clearStreamRetryTimer()
+  stopElapsedTimer()
   if (playerWatchStopHandle) {
     playerWatchStopHandle()
     playerWatchStopHandle = null
@@ -572,6 +599,11 @@ onUnmounted(() => {
         电台
       </el-tag>
     </div>
+    <div class="live-status">
+      <span class="live-dot" />
+      <span class="live-label">LIVE</span>
+      <span class="live-elapsed">{{ liveElapsedText }}</span>
+    </div>
   </div>
 </template>
 
@@ -652,12 +684,71 @@ onUnmounted(() => {
 .tag-container {
   position: absolute;
   top: 10px;
-  left: 10px;
+  right: 10px;
   transform: translate(0%, 0%);
   display: flex;
   flex-direction: column;
   align-items: center;
   z-index: 10;
+}
+
+/* 直播模式下原生时间轴无意义（不可拖动），隐藏之，保留播放/音量/全屏等控件 */
+.video-player::-webkit-media-controls-timeline {
+  display: none !important;
+}
+
+/* 电台（音频）模式：直播无进度概念，隐藏进度条与时间文本，已播时长由 LIVE 徽标展示 */
+/* .audio-player::-webkit-media-controls-timeline,
+.audio-player::-webkit-media-controls-current-time-display,
+.audio-player::-webkit-media-controls-time-remaining-display {
+  display: none !important;
+} */
+
+.live-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 10;
+  user-select: none;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f56c6c;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+.live-label {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.live-elapsed {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.5);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 4px rgba(245, 108, 108, 0);
+  }
 }
 
 .loading-text {
