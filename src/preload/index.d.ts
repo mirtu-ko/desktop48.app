@@ -17,7 +17,6 @@ export interface mainAPI {
   saveMemberData: (content: any) => Promise<any>
   getTeamOptions: () => Promise<Array<{ label: string, value: number }>>
   getGroupOptions: () => Promise<Array<{ label: string, value: number }>>
-  getTeam: (teamId: number) => Promise<any>
   hasMembers: () => Promise<any>
 
   // 数据库相关
@@ -29,8 +28,6 @@ export interface mainAPI {
   removeHiddenMember: (userId: number) => Promise<any>
   getConfig: (key: string, defaultValue?: any) => Promise<any>
   setConfig: (key: string, value: any) => Promise<any>
-  getDownloadDir: () => Promise<any>
-  setFfmpegDir: (dir: string) => Promise<any>
 
   // 文件夹目录
   showItemInFolder: (filePath: string) => Promise<any>
@@ -40,7 +37,6 @@ export interface mainAPI {
   pathJoin: (...paths: string[]) => Promise<string>
 
   // 播放
-  openPlayer: (params: { title: string, streamPath: string, ffplayPath?: string }) => Promise<any>
   createLiveStream: (rtmpUrl: string, liveId: string) => Promise<any>
   stopLiveStream: (liveId: string) => Promise<any>
 

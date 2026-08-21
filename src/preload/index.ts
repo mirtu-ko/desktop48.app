@@ -15,7 +15,6 @@ const api = {
   getHiddenMembers: () => ipcRenderer.invoke('getHiddenMembers'),
   setHiddenMembers: (ids: number[]) => ipcRenderer.invoke('setHiddenMembers', ids),
   removeHiddenMember: (userId: number) => ipcRenderer.invoke('removeHiddenMember', userId),
-  getTeam: (teamId: number) => ipcRenderer.invoke('getTeam', teamId),
   hasMembers: () => ipcRenderer.invoke('hasMembers'),
   // 配置相关
   getConfig: (key: string, defaultValue: any) => ipcRenderer.invoke('getConfig', key, defaultValue),
@@ -23,7 +22,6 @@ const api = {
   // 网络
   netRequest: (options: any) => ipcRenderer.invoke('net-request', options),
   // 播放
-  openPlayer: (params: { title: string, streamPath: string, ffplayPath?: string }) => ipcRenderer.invoke('open-player', params),
   createLiveStream: (rtmpUrl: string, liveId: string) => ipcRenderer.invoke('createLiveStream', rtmpUrl, liveId),
   stopLiveStream: (liveId: string) => ipcRenderer.invoke('stopLiveStream', liveId),
   // 文件夹目录
@@ -35,25 +33,25 @@ const api = {
   pathJoin: (...paths: string[]) => ipcRenderer.invoke('path-join', ...paths),
   // 下载
   downloadTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('downloadTaskStart', url, filename, liveId),
-  downloadTaskProgress: (callback: (liveId: string, time: string) => void) => {
+  downloadTaskProgress: (callback: (_liveId: string, _time: string) => void) => {
     ipcRenderer.on('downloadTaskProgress', (_e, liveId, time) => callback(liveId, time))
   },
-  downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => {
+  downloadTaskEnd: (callback: (_liveId: string, _filePath: string) => void) => {
     ipcRenderer.on('downloadTaskEnd', (_e, liveId, filePath) => callback(liveId, filePath))
   },
-  downloadTaskError: (callback: (liveId: string, error: any) => void) => {
+  downloadTaskError: (callback: (_liveId: string, _error: any) => void) => {
     ipcRenderer.on('downloadTaskError', (_e, liveId, error) => callback(liveId, error))
   },
   downloadTaskStop: (liveId: string) => ipcRenderer.send(`downloadTaskStop:${liveId}`),
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('recordTaskStart', url, filename, liveId),
-  recordTaskProgress: (callback: (liveId: string, time: string) => void) => {
+  recordTaskProgress: (callback: (_liveId: string, _time: string) => void) => {
     ipcRenderer.on('recordTaskProgress', (_e, liveId, time) => callback(liveId, time))
   },
-  recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => {
+  recordTaskEnd: (callback: (_liveId: string, _filePath: string) => void) => {
     ipcRenderer.on('recordTaskEnd', (_e, liveId, filePath) => callback(liveId, filePath))
   },
-  recordTaskError: (callback: (liveId: string, error: any) => void) => {
+  recordTaskError: (callback: (_liveId: string, _error: any) => void) => {
     ipcRenderer.on('recordTaskError', (_e, liveId, error) => callback(liveId, error))
   },
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),

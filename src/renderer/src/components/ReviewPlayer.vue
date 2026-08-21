@@ -112,7 +112,8 @@ function getDanmakuContainerHeight(): number {
 }
 
 function initTextMeasure() {
-  if (textMeasureCtx) return
+  if (textMeasureCtx)
+    return
   const canvas = document.createElement('canvas')
   textMeasureCtx = canvas.getContext('2d')
   if (textMeasureCtx) {
@@ -130,28 +131,34 @@ function measureTextWidth(text: string): number {
 
 function findAvailableTrack(): number {
   const height = getDanmakuContainerHeight()
-  if (height <= 0) return -1
+  if (height <= 0)
+    return -1
   const maxTracks = Math.floor((height - 10) / TRACK_HEIGHT)
-  if (maxTracks <= 0) return -1
+  if (maxTracks <= 0)
+    return -1
   for (let i = 0; i < maxTracks; i++) {
     const hasVisible = danmakuOverlayItems.value.some(
       item => item.track === i && item.x + item.width > 0,
     )
-    if (!hasVisible) return i
+    if (!hasVisible)
+      return i
   }
   return -1
 }
 
 function addDanmakuToOverlay(item: any) {
   const containerWidth = getDanmakuContainerWidth()
-  if (containerWidth <= 0) return
+  if (containerWidth <= 0)
+    return
 
   const text = item.content || ''
-  if (!text) return
+  if (!text)
+    return
 
   const textWidth = measureTextWidth(text) + 20
   const track = findAvailableTrack()
-  if (track < 0) return
+  if (track < 0)
+    return
 
   danmakuOverlayItems.value = [
     ...danmakuOverlayItems.value,
@@ -561,7 +568,9 @@ onUnmounted(() => {
                 :key="item.id"
                 class="danmaku-item"
                 :style="{ transform: `translate(${item.x}px, ${item.track * TRACK_HEIGHT + 4}px)` }"
-              >{{ item.content }}</div>
+              >
+                {{ item.content }}
+              </div>
             </div>
           </div>
         </el-col>
