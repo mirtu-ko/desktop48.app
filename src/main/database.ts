@@ -215,14 +215,6 @@ class Database {
     this.lowdb.write()
   }
 
-  public getTeamInfo() {
-    return this.teamsDB
-  }
-
-  public getTeam(teamId: number) {
-    return (this.teamsDB || []).find((t: any) => String(t.teamId) === String(teamId))
-  }
-
   public hasMembers() {
     return Array.isArray(this.membersDB) && this.membersDB.length > 0
   }
@@ -265,7 +257,6 @@ ipcMain.handle('removeHiddenMember', async (_event, userId) => Database.instance
 ipcMain.handle('hasMembers', async () => Database.instance().hasMembers())
 ipcMain.handle('getConfig', async (_event, key, defaultValue?: any) => Database.instance().getConfig(key, defaultValue))
 ipcMain.handle('setConfig', async (_event, key, value) => Database.instance().setConfig(key, value))
-ipcMain.handle('getTeamInfo', async () => Database.instance().getTeamInfo())
 ipcMain.handle('getTeamOptions', async () => Database.instance().getTeamOptions())
 ipcMain.handle('getGroupOptions', async () => Database.instance().getGroupOptions())
 ipcMain.handle('getMemberTree', async () => Database.instance().db.memberTree)

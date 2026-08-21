@@ -17,7 +17,7 @@ const streamSessions = new Map<string, StreamSession>()
 const activeStreamProcesses = new Map<string, Set<ReturnType<typeof spawn>>>()
 
 function getSafeLiveId(liveId: string) {
-  return liveId.replace(/[^0-9A-Za-z_-]/g, '_') || 'live'
+  return liveId.replace(/[^\w-]/g, '_') || 'live'
 }
 
 // 对外暴露的直播地址统一走本地 HTTP-FLV 路由，渲染进程不感知底层 FFmpeg 细节。

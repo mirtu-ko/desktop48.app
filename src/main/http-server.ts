@@ -42,7 +42,7 @@ const server = http.createServer((req, res) => {
 
     res.writeHead(200, {
       'Content-Type': 'video/x-flv',
-      Connection: 'close',
+      'Connection': 'close',
     })
 
     // 浏览器标签切换、播放器销毁或用户关闭页面时，都要尽快结束对应 FFmpeg。
