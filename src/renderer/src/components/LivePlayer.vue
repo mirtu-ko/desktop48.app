@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RecordTaskPayload } from '../assets/js/task-payload'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, Refresh, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -551,13 +551,19 @@ onUnmounted(() => {
       </el-button>
       <el-button-group v-if="liveType === 1" style="flex-shrink: 0;">
         <el-button title="向左旋转90°" @click="rotateLeft">
-          ↺
+          <el-icon>
+            <RefreshLeft />
+          </el-icon>
         </el-button>
         <el-button title="重置旋转" @click="resetRotation">
-          <svg t="1770917205717" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2776" width="12" height="12"><path d="M0 0.004h1023.996V1024H0z" fill-opacity="0" p-id="2777" /><path d="M502.698 58.304l-126.5-54.7c-26.5-10.3-56.3 2.2-67.6 28.3s0.1 56.4 25.7 68.6C157.3 174.403 46.9 352.901 60 544.301S206.6 897.6 391.999 946.7c4.5 1.1 9.2 1.7 13.8 1.8 26.5 0 48.8-19.7 52.3-45.9s-13.1-51-38.6-57.9c-144-38.3-246.7-165.399-254-314.298s82.7-285.3 222.3-337.399l-8.4 19.5c-5.5 12.9-5.7 27.4-0.4 40.4 5.2 13 15.4 23.3 28.3 28.8 6.5 2.9 13.5 4.3 20.6 4.4 20.9 0.2 40-12 48.6-31.1l53.699-127.4c11.3-26.9-0.9-57.7-27.5-69.3z m460.298 451.498c5.4-202.3-125.2-383.199-318.998-441.698-18.3-6.3-38.6-2-52.8 11s-20.2 32.9-15.6 51.7 19.2 33.5 38 38.3c133.6 39.899 229.799 156.699 243.199 295.498s-58.6 271.8-182.2 336.499c14-25.5 4.6-57.5-20.8-71.5-25.5-14-57.5-4.6-71.5 20.8l-71.899 117.2c-7.5 11.9-9.9 26.3-6.6 40 3.3 13.7 11.9 25.5 23.9 32.8l117.1 72.799c16.1 12.1 37.6 14.1 55.6 5s29.2-27.6 29-47.7c-0.2-20.1-11.8-38.4-30-47.1l-16-10c165.099-66.9 274.898-225.399 279.598-403.598z" fill="#4C4C4C" p-id="2778" /></svg>
+          <el-icon>
+            <Refresh />
+          </el-icon>
         </el-button>
         <el-button title="向右旋转90°" @click="rotateRight">
-          ↻
+          <el-icon>
+            <RefreshRight />
+          </el-icon>
         </el-button>
       </el-button-group>
     </div>
