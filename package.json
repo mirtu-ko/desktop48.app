@@ -24,7 +24,7 @@
     "release": "npm run build && electron-builder --publish always"
   },
   "build": {
-    "appId": "com.mirtu.desktop48",
+    "appId": "com.electron.desktop48",
     "productName": "Desktop48",
     "publish": [
       {

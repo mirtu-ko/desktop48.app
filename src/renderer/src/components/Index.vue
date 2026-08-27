@@ -33,6 +33,14 @@ watch(
 )
 
 let changeMenuHandler: any
+
+// 用原生 beforeunload 在页面卸载前同步清理 localStorage，
+// 避免依赖主进程发消息+强制销毁窗口的脆弱时序（localStorage 是同步 API）
+function handleBeforeUnload() {
+  localStorage.removeItem('liveTabs')
+  localStorage.removeItem('reviewTabs')
+}
+
 onMounted(async () => {
   changeMenuHandler = (menu: string) => {
     activeIndex.value = menu
@@ -46,18 +54,13 @@ onMounted(async () => {
     console.log('[Index.vue]数据库没有成员信息, 同步完成')
   }
 
-  // 监听主进程发送的清理缓存事件
-  window.electron.ipcRenderer.on('cleanup-storage', () => {
-    console.log('[Index.vue] 收到清理缓存事件')
-    localStorage.removeItem('liveTabs')
-    localStorage.removeItem('reviewTabs')
-  })
+  // 页面卸载前清理缓存（窗口关闭/刷新都会触发）
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 onUnmounted(() => {
   EventBus.off('change-selected-menu', changeMenuHandler)
-  // 移除事件监听
-  window.electron.ipcRenderer.removeAllListeners('cleanup-storage')
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 

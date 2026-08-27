@@ -14,10 +14,22 @@ export default class DownloadTask {
   private _status: number = Constants.DownloadStatus.Prepared
   private _liveId!: string
 
+  // 保存已注册的 IPC 监听器取消函数，任务结束时统一移除，避免监听器泄漏
+  private _unsubscribers: Array<() => void> = []
+
   public constructor(url: string, filename: string, liveId: string) {
     this._url = url
     this._filename = filename
     this._liveId = liveId
+  }
+
+  /**
+   * 移除所有已注册的 IPC 监听器
+   */
+  private cleanupListeners() {
+    for (const unsubscribe of this._unsubscribers)
+      unsubscribe()
+    this._unsubscribers = []
   }
 
   /**
@@ -64,25 +76,27 @@ export default class DownloadTask {
       console.info('[download-task.ts] download task start:', this._url, this._filename, this._liveId)
       window.mainAPI.downloadTaskStart(this._url, this._filename, this._liveId)
       // 监听下载进度
-      window.mainAPI.downloadTaskProgress((liveId: string, time: string) => {
+      this._unsubscribers.push(window.mainAPI.downloadTaskProgress((liveId: string, time: string) => {
         if (liveId === this._liveId) {
           console.log('[download-task.ts] download task progress:', liveId, time)
         }
-      })
+      }))
       // 监听下载完成
-      window.mainAPI.downloadTaskEnd((liveId: string, _filePath: string) => {
+      this._unsubscribers.push(window.mainAPI.downloadTaskEnd((liveId: string, _filePath: string) => {
         if (liveId === this._liveId) {
           this._filePath = _filePath
           this._status = Constants.DownloadStatus.Finish
+          this.cleanupListeners()
           this._onEnd()
         }
-      })
+      }))
       // 监听下载错误
-      window.mainAPI.downloadTaskError((liveId: string, error: any) => {
+      this._unsubscribers.push(window.mainAPI.downloadTaskError((liveId: string, error: any) => {
         if (liveId === this._liveId) {
           console.error('[download-task] download error', error)
+          this.cleanupListeners()
         }
-      })
+      }))
     })
   }
 
@@ -100,6 +114,7 @@ export default class DownloadTask {
     }
     window.mainAPI.downloadTaskStop(this._liveId)
     this._status = Constants.DownloadStatus.Finish
+    this.cleanupListeners()
     console.info('download task stop')
     // invoke end callback
     this._onEnd()

@@ -36,25 +36,37 @@ const api = {
   // 下载
   downloadTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('downloadTaskStart', url, filename, liveId),
   downloadTaskProgress: (callback: (liveId: string, time: string) => void) => {
-    ipcRenderer.on('downloadTaskProgress', (_e, liveId, time) => callback(liveId, time))
+    const listener = (_e: Electron.IpcRendererEvent, liveId: string, time: string) => callback(liveId, time)
+    ipcRenderer.on('downloadTaskProgress', listener)
+    return () => ipcRenderer.removeListener('downloadTaskProgress', listener)
   },
   downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => {
-    ipcRenderer.on('downloadTaskEnd', (_e, liveId, filePath) => callback(liveId, filePath))
+    const listener = (_e: Electron.IpcRendererEvent, liveId: string, filePath: string) => callback(liveId, filePath)
+    ipcRenderer.on('downloadTaskEnd', listener)
+    return () => ipcRenderer.removeListener('downloadTaskEnd', listener)
   },
   downloadTaskError: (callback: (liveId: string, error: any) => void) => {
-    ipcRenderer.on('downloadTaskError', (_e, liveId, error) => callback(liveId, error))
+    const listener = (_e: Electron.IpcRendererEvent, liveId: string, error: any) => callback(liveId, error)
+    ipcRenderer.on('downloadTaskError', listener)
+    return () => ipcRenderer.removeListener('downloadTaskError', listener)
   },
   downloadTaskStop: (liveId: string) => ipcRenderer.send(`downloadTaskStop:${liveId}`),
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('recordTaskStart', url, filename, liveId),
   recordTaskProgress: (callback: (liveId: string, time: string) => void) => {
-    ipcRenderer.on('recordTaskProgress', (_e, liveId, time) => callback(liveId, time))
+    const listener = (_e: Electron.IpcRendererEvent, liveId: string, time: string) => callback(liveId, time)
+    ipcRenderer.on('recordTaskProgress', listener)
+    return () => ipcRenderer.removeListener('recordTaskProgress', listener)
   },
   recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => {
-    ipcRenderer.on('recordTaskEnd', (_e, liveId, filePath) => callback(liveId, filePath))
+    const listener = (_e: Electron.IpcRendererEvent, liveId: string, filePath: string) => callback(liveId, filePath)
+    ipcRenderer.on('recordTaskEnd', listener)
+    return () => ipcRenderer.removeListener('recordTaskEnd', listener)
   },
   recordTaskError: (callback: (liveId: string, error: any) => void) => {
-    ipcRenderer.on('recordTaskError', (_e, liveId, error) => callback(liveId, error))
+    const listener = (_e: Electron.IpcRendererEvent, liveId: string, error: any) => callback(liveId, error)
+    ipcRenderer.on('recordTaskError', listener)
+    return () => ipcRenderer.removeListener('recordTaskError', listener)
   },
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
   // 阻止系统休眠

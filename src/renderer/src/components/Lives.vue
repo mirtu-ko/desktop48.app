@@ -29,7 +29,7 @@ async function getLiveList() {
   // console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
   try {
-    updateHiddenMemberIds()
+    await updateHiddenMemberIds()
     const content = await Apis.instance().lives(liveNext.value)
     // console.log('获取到的直播列表:', content)
     if (noMore.value) {
@@ -45,14 +45,17 @@ async function getLiveList() {
       noMore.value = true
     }
     liveNext.value = content.next
-    for (const item of content.liveList) {
-      if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
-        continue
+
+    // 先过滤掉被屏蔽的成员，再并行补全成员信息，避免逐条串行 await 拖慢列表加载
+    const visibleItems = content.liveList.filter(
+      (item: any) => !hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
+    )
+    await Promise.all(visibleItems.map(async (item: any) => {
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.isReview = true
       item.date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyy-MM-dd hh:mm:ss')
-      // 异步补全成员信息
+      // 并行补全成员信息
       try {
         item.member = await window.mainAPI.getMember(item.userInfo.userId)
       }
@@ -60,8 +63,8 @@ async function getLiveList() {
         item.member = null
         console.error('获取成员信息失败:', e)
       }
-      liveList.value.push(item)
-    }
+    }))
+    liveList.value.push(...visibleItems)
     loading.value = false
   }
   catch (error) {
@@ -127,7 +130,8 @@ function refresh() {
 
 // onMounted
 onMounted(async () => {
-  updateHiddenMemberIds()
+  await updateHiddenMemberIds()
+  getLiveList()
 })
 
 async function onInfiniteScroll() {
@@ -139,10 +143,6 @@ async function onInfiniteScroll() {
   }
   await getLiveList()
 }
-
-onMounted(() => {
-  getLiveList()
-})
 </script>
 
 <template>
