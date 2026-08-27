@@ -28,3 +28,18 @@ $ npm run build:mac
 # For Linux
 $ npm run build:linux
 ```
+
+## macOS 常见问题
+
+### 打开提示"已损坏，无法打开"
+
+从 GitHub Releases 直接下载的 macOS 应用未经 Apple 公证，会被 Gatekeeper 拦截。
+
+**临时解决**：
+
+```bash
+# 移除 quarantine 属性
+sudo xattr -rd com.apple.quarantine /Applications/Desktop48.app
+```
+
+或者在访达中右键应用 → 选择「打开」（而非双击），在弹出的对话框中点击「打开」。

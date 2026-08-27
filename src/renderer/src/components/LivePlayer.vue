@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RecordTaskPayload } from '../assets/js/task-payload'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, Refresh, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -53,6 +53,7 @@ const boxDimensions = ref({ width: 0, height: 0 })
 const coverImage = ref('')
 const onlineNum = ref(0)
 const powerSaveBlockerId = ref<number | null>(null)
+const elapsedTime = ref(0)
 
 const isRadio = computed(() => props.liveType !== 1)
 const isVerticalRotation = computed(() => {
@@ -119,6 +120,7 @@ const onlineNumTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 let activeStreamRequestId = 0
 let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
+let elapsedTimer: ReturnType<typeof setInterval> | null = null
 let playerWatchStopHandle: (() => void) | null = null
 let resizeObserver: ResizeObserver | null = null
 let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
@@ -169,6 +171,29 @@ function stopOnlineNumTimer() {
     onlineNumTimer.value = null
   }
 }
+
+// 直播已播时长：每秒刷新，基于开播时间戳（毫秒）累加。
+function startElapsedTimer() {
+  elapsedTimer = setInterval(() => {
+    elapsedTime.value = Date.now() - props.startTime
+  }, 1000)
+}
+
+function stopElapsedTimer() {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer)
+    elapsedTimer = null
+  }
+}
+
+const liveElapsedText = computed(() => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedTime.value / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+})
 
 function updateOnlineNum() {
   Apis.instance().live(props.liveId).then((data) => {
@@ -373,6 +398,7 @@ startOnlineNumTimer()
 
 onMounted(async () => {
   powerSaveBlockerId.value = await window.mainAPI.preventSleep()
+  startElapsedTimer()
 
   if (!isRadio.value && videoBoxRef.value) {
     boxDimensions.value = {
@@ -483,6 +509,7 @@ onUnmounted(() => {
   isManuallyUnmounted.value = true
   activeStreamRequestId++
   clearStreamRetryTimer()
+  stopElapsedTimer()
   if (playerWatchStopHandle) {
     playerWatchStopHandle()
     playerWatchStopHandle = null
@@ -524,13 +551,19 @@ onUnmounted(() => {
       </el-button>
       <el-button-group v-if="liveType === 1" style="flex-shrink: 0;">
         <el-button title="向左旋转90°" @click="rotateLeft">
-          ↺
+          <el-icon>
+            <RefreshLeft />
+          </el-icon>
         </el-button>
         <el-button title="重置旋转" @click="resetRotation">
-          <svg t="1770917205717" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2776" width="12" height="12"><path d="M0 0.004h1023.996V1024H0z" fill-opacity="0" p-id="2777" /><path d="M502.698 58.304l-126.5-54.7c-26.5-10.3-56.3 2.2-67.6 28.3s0.1 56.4 25.7 68.6C157.3 174.403 46.9 352.901 60 544.301S206.6 897.6 391.999 946.7c4.5 1.1 9.2 1.7 13.8 1.8 26.5 0 48.8-19.7 52.3-45.9s-13.1-51-38.6-57.9c-144-38.3-246.7-165.399-254-314.298s82.7-285.3 222.3-337.399l-8.4 19.5c-5.5 12.9-5.7 27.4-0.4 40.4 5.2 13 15.4 23.3 28.3 28.8 6.5 2.9 13.5 4.3 20.6 4.4 20.9 0.2 40-12 48.6-31.1l53.699-127.4c11.3-26.9-0.9-57.7-27.5-69.3z m460.298 451.498c5.4-202.3-125.2-383.199-318.998-441.698-18.3-6.3-38.6-2-52.8 11s-20.2 32.9-15.6 51.7 19.2 33.5 38 38.3c133.6 39.899 229.799 156.699 243.199 295.498s-58.6 271.8-182.2 336.499c14-25.5 4.6-57.5-20.8-71.5-25.5-14-57.5-4.6-71.5 20.8l-71.899 117.2c-7.5 11.9-9.9 26.3-6.6 40 3.3 13.7 11.9 25.5 23.9 32.8l117.1 72.799c16.1 12.1 37.6 14.1 55.6 5s29.2-27.6 29-47.7c-0.2-20.1-11.8-38.4-30-47.1l-16-10c165.099-66.9 274.898-225.399 279.598-403.598z" fill="#4C4C4C" p-id="2778" /></svg>
+          <el-icon>
+            <Refresh />
+          </el-icon>
         </el-button>
         <el-button title="向右旋转90°" @click="rotateRight">
-          ↻
+          <el-icon>
+            <RefreshRight />
+          </el-icon>
         </el-button>
       </el-button-group>
     </div>
@@ -571,6 +604,11 @@ onUnmounted(() => {
       <el-tag v-else type="warning">
         电台
       </el-tag>
+    </div>
+    <div class="live-status">
+      <span class="live-dot" />
+      <span class="live-label">LIVE</span>
+      <span class="live-elapsed">{{ liveElapsedText }}</span>
     </div>
   </div>
 </template>
@@ -652,12 +690,71 @@ onUnmounted(() => {
 .tag-container {
   position: absolute;
   top: 10px;
-  left: 10px;
+  right: 10px;
   transform: translate(0%, 0%);
   display: flex;
   flex-direction: column;
   align-items: center;
   z-index: 10;
+}
+
+/* 直播模式下原生时间轴无意义（不可拖动），隐藏之，保留播放/音量/全屏等控件 */
+.video-player::-webkit-media-controls-timeline {
+  display: none !important;
+}
+
+/* 电台（音频）模式：直播无进度概念，隐藏进度条与时间文本，已播时长由 LIVE 徽标展示 */
+/* .audio-player::-webkit-media-controls-timeline,
+.audio-player::-webkit-media-controls-current-time-display,
+.audio-player::-webkit-media-controls-time-remaining-display {
+  display: none !important;
+} */
+
+.live-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 10;
+  user-select: none;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f56c6c;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+.live-label {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.live-elapsed {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.5);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 4px rgba(245, 108, 108, 0);
+  }
 }
 
 .loading-text {
