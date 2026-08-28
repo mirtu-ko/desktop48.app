@@ -90,21 +90,18 @@ function formatTime(stime: string): string {
 .team-logos {
   position: absolute;
   top: 10px;
-  left: 10px;
+  right: 10px;
   z-index: 1;
   display: flex;
+  gap: 4px;
 }
 
 .team-logo {
   position: relative;
   width: 24px;
   height: 24px;
-  margin-left: -10px;
   object-fit: contain;
-}
-
-.team-logo:first-child {
-  margin-left: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .show-info h3 {

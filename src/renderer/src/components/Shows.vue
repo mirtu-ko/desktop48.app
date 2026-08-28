@@ -14,7 +14,7 @@ const showList = ref<OpenLive[]>([])
 const next = ref('0')
 const loading = ref(false)
 /** 当前团体 groupId：0=全部 10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT */
-const groupId = ref('10')
+const groupId = ref('0')
 
 /** 加载失败的封面 liveId（空 URL 或 404 都走占位图） */
 const brokenImages = ref(new Set<string>())
