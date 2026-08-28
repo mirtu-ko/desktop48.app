@@ -1,6 +1,6 @@
 {
   "name": "desktop48",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "desktop48",
   "author": "Zack",
   "homepage": "https://electron-vite.org",
@@ -52,7 +52,6 @@
     }
   },
   "dependencies": {
-    "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@element-plus/icons-vue": "^2.3.2",
     "element-plus": "^2.14.5",

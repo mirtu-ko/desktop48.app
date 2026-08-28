@@ -1,5 +1,6 @@
 import http from 'node:http'
-import { createFlvStreamProcess } from './stream.js'
+import { error, log } from './logger'
+import { createFlvStreamProcess } from './stream'
 
 let _serverPort = 8080
 export const serverPort = () => _serverPort
@@ -55,7 +56,7 @@ const server = http.createServer((req, res) => {
         ffmpeg.stdout.unpipe(res)
       }
       catch (err) {
-        console.error('[http-server.ts] 断开直播流管道失败:', err)
+        error('[http-server.ts] 断开直播流管道失败:', err)
       }
 
       try {
@@ -63,7 +64,7 @@ const server = http.createServer((req, res) => {
           ffmpeg.kill('SIGKILL')
       }
       catch (err) {
-        console.error('[http-server.ts] 关闭直播流进程失败:', err)
+        error('[http-server.ts] 关闭直播流进程失败:', err)
       }
     }
 
@@ -77,7 +78,7 @@ const server = http.createServer((req, res) => {
     })
 
     ffmpeg.stdout.on('error', (err) => {
-      console.error('[http-server.ts] 读取直播流失败:', err)
+      error('[http-server.ts] 读取直播流失败:', err)
       if (!res.headersSent)
         res.writeHead(500)
       res.end('Read error')
@@ -101,7 +102,7 @@ const server = http.createServer((req, res) => {
     ffmpeg.stdout.pipe(res)
   }
   catch (err: any) {
-    console.error('[http-server.ts] 创建直播流失败:', err)
+    error('[http-server.ts] 创建直播流失败:', err)
     res.writeHead(500)
     res.end(err?.message || 'Stream error')
   }
@@ -115,21 +116,21 @@ function tryListen() {
   server.listen(port)
     .on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
-        console.log(`[http-server.ts] 端口 ${port} 已被占用，尝试下一个端口`)
+        log(`[http-server.ts] 端口 ${port} 已被占用，尝试下一个端口`)
         if (port < maxPort) {
           port++
           tryListen()
         }
         else {
-          console.error('[http-server.ts] 无法找到可用端口')
+          error('[http-server.ts] 无法找到可用端口')
         }
       }
       else {
-        console.error('[http-server.ts] 服务器错误:', err)
+        error('[http-server.ts] 服务器错误:', err)
       }
     })
     .on('listening', () => {
-      console.log(`[http-server.ts] 本地流媒体服务器监听端口 ${port}`)
+      log(`[http-server.ts] 本地流媒体服务器监听端口 ${port}`)
       _serverPort = port
     })
 }
@@ -137,5 +138,5 @@ function tryListen() {
 tryListen()
 
 server.on('error', (err) => {
-  console.error('[http-server.ts] 本地流媒体服务器错误:', err)
+  error('[http-server.ts] 本地流媒体服务器错误:', err)
 })

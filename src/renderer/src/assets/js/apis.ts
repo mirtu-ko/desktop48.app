@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import ApiUrls from './api-urls.js'
-import Request from './request.js'
+import ApiUrls from './api-urls'
+import Request from './request'
 
 export default class Apis {
   public static instance() {

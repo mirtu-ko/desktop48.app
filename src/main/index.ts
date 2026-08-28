@@ -1,4 +1,3 @@
-/* eslint-disable style/max-statements-per-line */
 import type { IpcMainInvokeEvent } from 'electron'
 import fs from 'node:fs'
 import path, { join } from 'node:path'
@@ -7,37 +6,64 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
-import './download.js' // 下载功能主进程注册
-import './record.js' // 录制功能主进程注册
-import './stream.js' // 流媒体相关主进程注册
-import './http-server.js'
-
-// 日志重定向（ESM写法，无require）
-const logPath = path.join(app.getPath('userData'), 'main.log')
-const logStream = fs.createWriteStream(logPath, { flags: 'a' })
-const origLog = console.log
-const origErr = console.error
-console.log = (...args) => { origLog(...args); logStream.write(`[LOG] ${args.join(' ')}\n`) }
-console.error = (...args) => { origErr(...args); logStream.write(`[ERR] ${args.join(' ')}\n`) }
+import { Database } from './database'
+import { getLogPathForDisplay, log } from './logger'
+import './download' // 下载功能主进程注册
+import './record' // 录制功能主进程注册
+import './stream' // 流媒体相关主进程注册
+import './http-server'
 
 // 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // 打印日志
-console.log('[index.ts] Electron index.ts __filename:', __filename)
-console.log('[index.ts] Electron index.ts __dirname:', __dirname)
-console.log('[index.ts] 日志目录:', logPath)
-console.log('[index.ts] 主进程路径:', process.execPath)
-console.log('[index.ts] 主进程工作目录:', process.cwd())
-console.log('[index.ts] 预加载:', join(__dirname, '../preload/index.js'), fs.existsSync(join(__dirname, '../preload/index.js')))
-console.log('[index.ts] 系统平台:', process.platform)
-console.log('[index.ts] Electron 版本:', process.versions.electron)
-console.log('[index.ts] Node.js 版本:', process.versions.node)
-console.log('[index.ts] Chromium 版本:', process.versions.chrome)
+log('[index.ts] Electron index.ts __filename:', __filename)
+log('[index.ts] Electron index.ts __dirname:', __dirname)
+log('[index.ts] 日志目录:', getLogPathForDisplay())
+log('[index.ts] 主进程路径:', process.execPath)
+log('[index.ts] 主进程工作目录:', process.cwd())
+log('[index.ts] 预加载:', join(__dirname, '../preload/index.js'), fs.existsSync(join(__dirname, '../preload/index.js')))
+log('[index.ts] 系统平台:', process.platform)
+log('[index.ts] Electron 版本:', process.versions.electron)
+log('[index.ts] Node.js 版本:', process.versions.node)
+log('[index.ts] Chromium 版本:', process.versions.chrome)
 
 // IPC 事件注册
-ipcMain.handle('show-item-in-folder', (_event: IpcMainInvokeEvent, filePath: string) => {
+
+// 网络请求域名白名单
+const ALLOWED_HOSTS = ['pocketapi.48.cn', 'live.48.cn', 'source.48.cn', 'cdns.48.cn', 'api.snh48.com']
+
+function isAllowedHost(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return ALLOWED_HOSTS.includes(parsed.hostname) || parsed.hostname.endsWith('.48.cn') || parsed.hostname.endsWith('.snh48.com')
+  }
+  catch {
+    return false
+  }
+}
+
+ipcMain.handle('show-item-in-folder', async (_event: IpcMainInvokeEvent, filePath: string) => {
+  // 校验路径：允许系统标准用户目录 + 用户配置的下载目录/ffmpeg目录
+  const allowedRoots = [
+    app.getPath('desktop'),
+    app.getPath('downloads'),
+    app.getPath('documents'),
+    app.getPath('videos'),
+    app.getPath('pictures'),
+    app.getPath('music'),
+    app.getPath('userData'),
+  ]
+  for (const key of ['downloadDirectory', 'ffmpegDirectory']) {
+    const dir = Database.instance().getConfig(key, '') as string
+    if (dir)
+      allowedRoots.push(dir)
+  }
+  const resolved = path.resolve(filePath)
+  if (!allowedRoots.some(root => resolved.startsWith(path.resolve(root)))) {
+    throw new Error(`路径不在允许范围内: ${filePath}`)
+  }
   shell.showItemInFolder(filePath)
 })
 
@@ -51,9 +77,13 @@ ipcMain.handle('select-directory', async () => {
 // path处理
 ipcMain.handle('path-join', (_event: IpcMainInvokeEvent, ...paths: string[]) => path.join(...paths))
 
-// 网络请求
+// 网络请求 - 域名白名单校验
 if (!ipcMain.eventNames().includes('net-request')) {
   ipcMain.handle('net-request', async (_event: IpcMainInvokeEvent, options: any) => {
+    const url: string = typeof options === 'string' ? options : options?.url
+    if (!url || !isAllowedHost(url)) {
+      throw new Error(`请求被拒绝：域名不在白名单中 (${url})`)
+    }
     return new Promise((resolve, reject) => {
       const request = net.request(options)
       if (options.headers) {
@@ -102,7 +132,7 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      sandbox: true,
     },
   })
 
@@ -184,13 +214,13 @@ else {
 // 注册阻止休眠的 IPC 处理程序
 ipcMain.handle('prevent-sleep', () => {
   const id = powerSaveBlocker.start('prevent-display-sleep')
-  console.log('[主进程] 已阻止系统休眠，ID:', id)
+  log('[主进程] 已阻止系统休眠，ID:', id)
   return id
 })
 
 ipcMain.handle('allow-sleep', (_event, id: number) => {
   if (powerSaveBlocker.isStarted(id)) {
     powerSaveBlocker.stop(id)
-    console.log('[主进程] 已允许系统休眠，ID:', id)
+    log('[主进程] 已允许系统休眠，ID:', id)
   }
 })

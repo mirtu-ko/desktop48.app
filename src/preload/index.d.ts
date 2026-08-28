@@ -1,11 +1,21 @@
-import type { electronAPI } from '@electron-toolkit/preload'
-
 // 网络请求参数类型
 export interface NetRequestOptions {
   url: string
   method: string
   headers?: Record<string, string>
   body?: any
+}
+
+// 最小化 electronAPI 类型（替代 @electron-toolkit/preload）
+export interface electronAPI {
+  process: {
+    platform: string
+    versions: {
+      electron: string
+      chrome: string
+      node: string
+    }
+  }
 }
 
 // 主 API 类型定义

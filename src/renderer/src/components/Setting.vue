@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, ref } from 'vue'
-import Apis from '../assets/js/apis.js'
-import Constants from '../assets/js/constants.js'
+import Apis from '../assets/js/apis'
+import Constants from '../assets/js/constants'
 import HiddenMembers from '../components/HiddenMembers.vue'
 
 const isUpdating = ref(false)
@@ -72,7 +72,7 @@ async function setFfmpegDirectory() {
 function confirmFfmpegDir() {
   ElMessageBox.confirm('选择的目录下没有ffmpeg或ffplay', {
     confirmButtonText: '重新选择',
-    cancelButtonText: '就这样吧',
+    cancelButtonText: '取消',
   }).then(() => {
     setFfmpegDirectory()
   }).catch(() => {

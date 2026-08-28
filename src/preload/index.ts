@@ -1,7 +1,17 @@
-import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
-console.log('[preload/index.ts]preload')
+// 替代 @electron-toolkit/preload，仅暴露渲染进程实际需要的最小 API
+// sandbox 模式下 require 只能加载 electron 内置模块，无法 require 第三方包
+const electronAPI = {
+  process: {
+    platform: process.platform,
+    versions: {
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+    },
+  },
+}
 
 // 渲染进程的自定义 API
 const api = {
@@ -77,5 +87,4 @@ const api = {
 // 渲染进程（启用上下文隔离时），否则
 // 直接添加到全局 window。
 contextBridge.exposeInMainWorld('electron', electronAPI)
-contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('mainAPI', api)

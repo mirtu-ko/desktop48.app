@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Apis from '../assets/js/apis.js'
-import Constants from '../assets/js/constants.js'
-import EventBus from '../assets/js/event-bus.js'
+import Apis from '../assets/js/apis'
+import Constants from '../assets/js/constants'
+import EventBus from '../assets/js/event-bus'
 
 const router = useRouter()
 const route = useRoute()
