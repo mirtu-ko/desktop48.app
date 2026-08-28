@@ -5,6 +5,7 @@ build/icons
 .idea/
 .qoder/
 .vscode/
+.workbuddy/
 .DS_Store
 .eslintcache
 *.log*
