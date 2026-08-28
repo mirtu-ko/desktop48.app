@@ -28,6 +28,10 @@ const props = defineProps({
   startTime: { type: Number, required: true },
   liveType: { type: Number, required: true },
   liveMode: { type: Number, required: true },
+  /** 数据源：user=用户直播(getLiveOne)，open=开放公演(getOpenLiveOne) */
+  source: { type: String, default: 'user' },
+  /** open 模式下的顶部头像（队伍 logo，完整 URL） */
+  avatarUrl: { type: String, default: '' },
 })
 
 const emit = defineEmits(['close'])
@@ -129,12 +133,29 @@ let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
 function applyLiveDetail(data: LiveDetail) {
   coverImage.value = Tools.sourceUrl(data.coverPath)
   realName.value = data.user.userName
-  userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
+  // open 模式优先用传入的队伍 logo 作为顶部头像
+  userAvatar.value = props.source === 'open' && props.avatarUrl
+    ? props.avatarUrl
+    : Tools.sourceUrl(data.user.userAvatar)
   if (typeof data.onlineNum === 'number')
     onlineNum.value = data.onlineNum
 }
 
 async function fetchLiveDetail(): Promise<LiveDetail> {
+  if (props.source === 'open') {
+    // 开放公演：getOpenLiveOne 返回 playStreams 数组，选高清（streamType 2），
+    // 没有用户信息，用标题兜底
+    const data = await Apis.instance().openLive(props.liveId)
+    const streams: Array<{ streamPath: string, streamType: number }> = data.playStreams || []
+    const stream = streams.find(s => s.streamType === 2 && s.streamPath)
+      || streams.find(s => s.streamPath)
+    return {
+      playStreamPath: stream?.streamPath || '',
+      coverPath: data.coverPath || '',
+      user: { userName: data.subTitle || data.title || '开放公演', userAvatar: '' },
+      liveId: data.liveId,
+    }
+  }
   return await Apis.instance().live(props.liveId)
 }
 
@@ -196,6 +217,10 @@ const liveElapsedText = computed(() => {
 })
 
 function updateOnlineNum() {
+  // 开放公演接口没有在线人数字段，跳过轮询
+  if (props.source === 'open') {
+    return
+  }
   Apis.instance().live(props.liveId).then((data) => {
     onlineNum.value = data.onlineNum
   }).catch((error: any) => {
@@ -376,13 +401,13 @@ async function record() {
   if (!valid)
     return
 
-  Apis.instance().live(props.liveId).then(async (content) => {
+  fetchLiveDetail().then(async (detail) => {
     const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
     const filename = `${realName.value} ${date}.flv`
     const recordTask: RecordTaskPayload = {
-      url: content.playStreamPath,
+      url: detail.playStreamPath,
       filename,
-      liveId: content.liveId,
+      liveId: props.liveId,
     }
     EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
     router.push('/downloads')
@@ -536,7 +561,7 @@ onUnmounted(() => {
 <template>
   <el-header class="header-box">
     <div style="display: flex; align-items: center; width: 100%;">
-      <img :src="userAvatar" alt="Logo" style="width: 32px; height: 32px; margin-right: 12px; border-radius: 50%;">
+      <img v-if="userAvatar" :src="userAvatar" alt="Logo" style="width: 32px; height: 32px; margin-right: 12px; border-radius: 50%; object-fit: contain;">
       <span
         style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;"
         :title="liveTitle"

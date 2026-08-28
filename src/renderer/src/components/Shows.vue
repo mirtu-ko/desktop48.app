@@ -1,128 +1,166 @@
 <script setup lang="ts">
-import type { TabsPaneContext } from 'element-plus'
-import { onMounted, ref, watch } from 'vue'
+import type { OpenLive } from '../assets/js/apis'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
+import Constants from '../assets/js/constants'
+import EventBus from '../assets/js/event-bus'
+import Tools from '../assets/js/tools'
+import ShowCard from '../components/ShowCard.vue'
 
-interface Show {
-  id: number
-  title: string
-  image: string
-  date: string
-  time: string
+const router = useRouter()
+
+const showList = ref<OpenLive[]>([])
+const next = ref('0')
+const loading = ref(false)
+/** 当前团体 groupId：0=全部 10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT */
+const groupId = ref('10')
+
+/** 加载失败的封面 liveId（空 URL 或 404 都走占位图） */
+const brokenImages = ref(new Set<string>())
+
+function markBroken(liveId: string) {
+  brokenImages.value.add(liveId)
 }
 
-interface watchcontent {
-  id: number
-  title: string
-  image: string
-  description: string
-  startTime: number
-  endTime: number
-  status: string
+function isBroken(show: OpenLive): boolean {
+  return !show.coverPath || brokenImages.value.has(show.liveId)
 }
 
-const shows = ref<Show[]>([])
-
-const showToday = ref<watchcontent[]>()
-
-const key = ref('1')
-
-async function fetchShows() {
+/** 获取开放公演列表（排期/进行中），按开演时间升序 */
+async function fetchShows(append = false) {
+  loading.value = true
   try {
-    const showsData = await Apis.instance().shows(key.value)
-    shows.value = showsData.shows
-    if (showsData.watchContent) {
-      showToday.value = showsData.watchContent
+    const content = await Apis.instance().openLives(Number.parseInt(groupId.value), next.value, false)
+    const list: OpenLive[] = [...(content.liveList || [])]
+      .sort((a, b) => Number.parseInt(a.stime) - Number.parseInt(b.stime))
+    // coverPath / teamLogo 可能是相对路径（如 /mediasource/...），统一补全为 source.48.cn 完整 URL
+    list.forEach((item) => {
+      if (item.coverPath) {
+        item.coverPath = Tools.sourceUrl(item.coverPath)
+      }
+      item.teamList?.forEach((team) => {
+        if (team.teamLogo) {
+          team.teamLogo = Tools.sourceUrl(team.teamLogo)
+        }
+      })
+    })
+    if (append) {
+      showList.value.push(...list)
     }
+    else {
+      showList.value = list
+    }
+    next.value = content.next || '0'
+    console.log('获取演出信息成功:', showList.value)
   }
   catch (error) {
     console.error('获取演出信息失败:', error)
   }
+  finally {
+    loading.value = false
+  }
+}
+
+async function loadMore() {
+  await fetchShows(true)
 }
 
 onMounted(async () => {
   await fetchShows()
 })
 
-watch(key, async () => {
+/** 切换团体：重置翻页游标后重新拉取 */
+watch(groupId, async () => {
+  next.value = '0'
   await fetchShows()
 })
 
-// 格式化时间戳的函数
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp * 1000) // 转换为毫秒
-  return date.toLocaleString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
+/** 分组：当日开演 → “即将开始”，其余 → “最近公演” */
+function isToday(stime: string): boolean {
+  const d = new Date(Number.parseInt(stime))
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate()
+}
+
+const todayShows = computed(() => showList.value.filter(show => isToday(show.stime)))
+const recentShows = computed(() => showList.value.filter(show => !isToday(show.stime)))
+
+/** 进行中的公演：双通道打开直播 tab——事件给已挂载的 Lives（即时、可重复点同一场），query 兜底冷启动 */
+function openLiveStream(show: OpenLive) {
+  if (show.status !== 2) {
+    return
+  }
+  EventBus.emit('open-live-tab', {
+    liveId: show.liveId,
+    title: show.subTitle || show.title,
+    startTime: Number.parseInt(show.stime),
+    avatar: show.teamList?.[0]?.teamLogo || '',
   })
-}
-
-function handleClick(tab: TabsPaneContext) {
-  console.log(tab.props.label)
-  if (tab.props.label === 'SNH48') {
-    key.value = '1'
-  }
-  if (tab.props.label === 'BEJ48') {
-    key.value = '2'
-  }
-  if (tab.props.label === 'GNZ48') {
-    key.value = '3'
-  }
-  if (tab.props.label === 'CKG48') {
-    key.value = '5'
-  }
-  if (tab.props.label === 'CGT48') {
-    key.value = '6'
-  }
-}
-
-function openLiveStream(showId: number) {
-  window.open(`https://live.48.cn/Index/inlive/id/${showId}`, '_blank')
+  EventBus.emit('change-selected-menu', Constants.Menu.LIVES)
+  router.push({
+    path: '/lives',
+    query: {
+      openLiveId: show.liveId,
+      openTitle: show.subTitle || show.title,
+      openStartTime: String(Number.parseInt(show.stime)),
+      openAvatar: show.teamList?.[0]?.teamLogo || '',
+    },
+  })
 }
 </script>
 
 <template>
-  <div class="container">
-    <el-tabs @tab-click="handleClick">
-      <el-tab-pane label="SNH48" />
-      <el-tab-pane label="BEJ48" />
-      <el-tab-pane label="GNZ48" />
-      <el-tab-pane label="CKG48" />
-      <el-tab-pane label="CGT48" />
+  <div v-loading="loading" class="container">
+    <el-tabs v-model="groupId">
+      <el-tab-pane label="全部" name="0" />
+      <el-tab-pane label="SNH48" name="10" />
+      <el-tab-pane label="BEJ48" name="11" />
+      <el-tab-pane label="GNZ48" name="12" />
+      <el-tab-pane label="CKG48" name="13" />
+      <el-tab-pane label="CGT48" name="14" />
     </el-tabs>
     <el-scrollbar wrap-class="scrollbar-wrapper">
       <div class="shows-container">
-        <h2>即将开始</h2>
-        <div v-if="showToday?.length" class="showToday-list">
-          <div v-for="show in showToday" :key="show.id" style="cursor: pointer" class="show-item" @click="openLiveStream(show.id)">
-            <div class="show-image">
-              <img :src="show.image" :alt="show.title">
-              <span class="show-time">{{ `${formatTimestamp(show.startTime)} - ${formatTimestamp(show.endTime)}` }}</span>
-            </div>
-            <div class="show-info">
-              <h3>{{ show.title }}</h3>
-              <el-text>
-                {{ show.description }}
-              </el-text>
+        <template v-if="todayShows.length">
+          <h2>即将开始</h2>
+          <div class="shows-list">
+            <div
+              v-for="show in todayShows"
+              :key="show.liveId"
+              class="show-item"
+              :class="{ clickable: show.status === 2 }"
+              @click="openLiveStream(show)"
+            >
+              <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
             </div>
           </div>
-        </div>
-        <div v-else>
-          <p>暂无演出信息</p>
-        </div>
-        <h2>最近公演</h2>
-        <div v-if="shows.length" class="shows-list">
-          <div v-for="show in shows" :key="show.id" class="show-item">
-            <div class="show-image">
-              <img :src="show.image" :alt="show.title">
-              <span class="show-time">{{ show.date }}日 {{ show.time }}</span>
+        </template>
+
+        <template v-if="recentShows.length">
+          <h2>最近公演</h2>
+          <div class="shows-list">
+            <div
+              v-for="show in recentShows"
+              :key="show.liveId"
+              class="show-item"
+              :class="{ clickable: show.status === 2 }"
+              @click="openLiveStream(show)"
+            >
+              <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
             </div>
-            <h3>{{ show.title }}</h3>
           </div>
-        </div>
-        <div v-else>
+        </template>
+
+        <div v-if="!showList.length && !loading">
           <p>暂无演出信息</p>
+        </div>
+        <div v-if="next !== '0'" class="load-more">
+          <el-button :loading="loading" @click="loadMore">
+            加载更多
+          </el-button>
         </div>
       </div>
     </el-scrollbar>
@@ -150,12 +188,6 @@ function openLiveStream(showId: number) {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
-.showToday-list {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-}
-
 .show-item {
   border: 1px solid #eee;
   border-radius: 8px;
@@ -165,39 +197,18 @@ function openLiveStream(showId: number) {
   transition: transform 0.2s ease-in-out;
 }
 
-.show-image {
-  position: relative;
-  width: 100%;
-  padding-top: 48%; /* 4:3 aspect ratio */
+.show-item.clickable {
+  cursor: pointer;
 }
 
-.show-image img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.show-item.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.show-info {
-  padding: 5px 10px;
-}
-
-.show-time {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.show-item h3 {
-  margin: 10px;
-  font-size: 16px;
-  color: #333;
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
 }
 </style>

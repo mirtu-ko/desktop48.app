@@ -1,4 +1,6 @@
 export default class ApiUrls {
+  public static readonly OPEN_LIVE_LIST_URL = 'https://pocketapi.48.cn/live/api/v1/live/getOpenLiveList'
+  public static readonly OPEN_LIVE_URL = 'https://pocketapi.48.cn/live/api/v1/live/getOpenLiveOne'
   public static readonly LIVE_LIST_URL = 'https://pocketapi.48.cn/live/api/v1/live/getLiveList'
   public static readonly LIVE_ONE_URL = 'https://pocketapi.48.cn/live/api/v1/live/getLiveOne'
   public static readonly UPDATE_INFO_URL = 'https://pocketapi.48.cn/user/api/v1/client/update/group_team_star'
@@ -26,9 +28,4 @@ export default class ApiUrls {
   public static readonly CHECK_IN_URL = 'https://pocketapi.48.cn/user/api/v1/checkin'
 
   public static readonly TRIP_LIST_URL = 'https://pocketapi.48.cn/trip/api/trip/v1/list'
-  public static readonly SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/1'
-  public static readonly BEJ_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/2'
-  public static readonly GNZ_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/3'
-  public static readonly CKG_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/5'
-  public static readonly CGT_SHOW_LIST_URL = 'https://live.48.cn/Index/main/club/6'
 }
