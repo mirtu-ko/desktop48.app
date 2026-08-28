@@ -1,4 +1,4 @@
-import Constants from './constants.js'
+import Constants from './constants'
 
 export default class Request {
   /**

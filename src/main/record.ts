@@ -3,7 +3,8 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { ipcMain } from 'electron'
-import { Database } from './database.js'
+import { Database } from './database'
+import { log, warn } from './logger'
 
 const TIME_REGEX = /time=(\d+:\d+:\d+\.\d+)/
 
@@ -36,22 +37,22 @@ ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string,
       'flv',
       filePath,
     ])
-    console.log('[record.ts]spawn ffmpeg start', filePath)
+    log('[record.ts]spawn ffmpeg start', filePath)
     ffmpeg.stderr.on('data', (chunk) => {
       const msg = chunk.toString()
       const match = msg.match(TIME_REGEX)
       if (match && match[1]) {
-        console.log('[record.ts]spawn ffmpeg progress', match[1])
+        log('[record.ts]spawn ffmpeg progress', match[1])
         event.sender.send('recordTaskProgress', liveId, match[1])
       }
       else {
-        console.log('[record.ts]ffmpeg stderr(no match):', msg.trim())
+        log('[record.ts]ffmpeg stderr(no match):', msg.trim())
       }
     })
     // Handle process close; treat SIGINT (code null, signal 'SIGINT') as normal stop
     ffmpeg.on('close', (code, signal) => {
       if (code === 0 || signal === 'SIGINT') {
-        console.log('[record.ts]spawn ffmpeg end', liveId, filePath)
+        log('[record.ts]spawn ffmpeg end', liveId, filePath)
         event.sender.send('recordTaskEnd', liveId, filePath)
         resolve(filePath)
       }
@@ -61,11 +62,19 @@ ipcMain.handle('recordTaskStart', async (event: IpcMainInvokeEvent, url: string,
         reject(new Error(errMsg))
       }
     })
-    // 可选：支持外部 stop
+    // 支持外部 stop：向 ffmpeg stdin 写 'q' 优雅退出
+    // 注意：Windows 上 kill('SIGINT') 实际是强杀进程，FLV 尾部元数据（时长/onMetaData）来不及写入，
+    // 会导致录制文件时长显示错误或拖动异常；写 'q' 让 ffmpeg 自己收尾后再退出
     ipcMain.once(`recordTaskStop:${liveId}`, () => {
-      if (!ffmpeg.killed) {
-        ffmpeg.kill('SIGINT')
-        console.log('[record.ts]record task stopped by user', liveId)
+      if (!ffmpeg.killed && ffmpeg.exitCode === null) {
+        try {
+          ffmpeg.stdin.write('q')
+          log('[record.ts]record task stopped by user (graceful)', liveId)
+        }
+        catch (e) {
+          warn('[record.ts]graceful stop failed, fallback to kill', e)
+          ffmpeg.kill('SIGINT')
+        }
       }
     })
   })

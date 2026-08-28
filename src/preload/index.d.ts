@@ -1,11 +1,21 @@
-import type { electronAPI } from '@electron-toolkit/preload'
-
 // 网络请求参数类型
 export interface NetRequestOptions {
   url: string
   method: string
   headers?: Record<string, string>
   body?: any
+}
+
+// 最小化 electronAPI 类型（替代 @electron-toolkit/preload）
+export interface electronAPI {
+  process: {
+    platform: string
+    versions: {
+      electron: string
+      chrome: string
+      node: string
+    }
+  }
 }
 
 // 主 API 类型定义
@@ -42,16 +52,16 @@ export interface mainAPI {
 
   // 下载
   downloadTaskStart: (url: string, filename: string, liveId: string) => Promise<any>
-  downloadTaskProgress: (callback: (liveId: string, time: string) => void) => void
-  downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
-  downloadTaskError: (callback: (liveId: string, error: any) => void) => void
+  downloadTaskProgress: (callback: (liveId: string, time: string) => void) => () => void
+  downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => () => void
+  downloadTaskError: (callback: (liveId: string, error: any) => void) => () => void
   downloadTaskStop: (liveId: string) => void
   getPlatform: () => string
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => Promise<any>
-  recordTaskProgress: (callback: (liveId: string, time: string) => void) => void
-  recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => void
-  recordTaskError: (callback: (liveId: string, error: any) => void) => void
+  recordTaskProgress: (callback: (liveId: string, time: string) => void) => () => void
+  recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => () => void
+  recordTaskError: (callback: (liveId: string, error: any) => void) => () => void
   recordTaskStop: (liveId: string) => void
 
   // 休眠

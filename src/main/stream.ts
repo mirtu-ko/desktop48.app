@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { app, ipcMain } from 'electron'
-import { Database } from './database.js'
-import { serverPort } from './http-server.js'
+import { Database } from './database'
+import { serverPort } from './http-server'
+import { closeLog, error, log } from './logger'
 
 // 直播播放只在这里维护“会话”和“活跃转流进程”的状态。
 // IPC 负责注册直播地址，HTTP 端点真正触发 FFmpeg 拉流并输出 HTTP-FLV。
@@ -70,19 +71,19 @@ function stopProcess(process: ReturnType<typeof spawn>) {
     }
   }
   catch (err) {
-    console.error('[stream.ts] 发送 FFmpeg 退出指令失败:', err)
+    error('[stream.ts] 发送 FFmpeg 退出指令失败:', err)
   }
 
   try {
     process.kill('SIGTERM')
   }
   catch (err) {
-    console.error('[stream.ts] 发送 FFmpeg 终止信号失败:', err)
+    error('[stream.ts] 发送 FFmpeg 终止信号失败:', err)
     try {
       process.kill('SIGKILL')
     }
     catch (killErr) {
-      console.error('[stream.ts] 强制结束 FFmpeg 失败:', killErr)
+      error('[stream.ts] 强制结束 FFmpeg 失败:', killErr)
     }
   }
 }
@@ -133,16 +134,16 @@ export function createFlvStreamProcess(liveId: string) {
   registerActiveProcess(sessionId, ffmpeg)
 
   ffmpeg.stderr.on('data', (data) => {
-    console.log(`[stream.ts] ffmpeg stderr (${liveId}): ${data}`)
+    log(`[stream.ts] ffmpeg stderr (${liveId}): ${data}`)
   })
 
   ffmpeg.on('error', (err) => {
-    console.error(`[stream.ts] ffmpeg error (${liveId}):`, err)
+    error(`[stream.ts] ffmpeg error (${liveId}):`, err)
   })
 
   ffmpeg.on('close', (code, signal) => {
     unregisterActiveProcess(sessionId, ffmpeg)
-    console.log(`[stream.ts] ffmpeg closed (${liveId}), code=${code}, signal=${signal}`)
+    log(`[stream.ts] ffmpeg closed (${liveId}), code=${code}, signal=${signal}`)
   })
 
   return ffmpeg
@@ -178,7 +179,7 @@ ipcMain.handle('stopLiveStream', async (_event, liveId: string) => {
   const hadSession = streamSessions.delete(sessionId)
   stopActiveProcesses(sessionId)
   if (hadSession)
-    console.log(`[stream.ts] 已移除直播会话: ${liveId}`)
+    log(`[stream.ts] 已移除直播会话: ${liveId}`)
 })
 
 app.on('before-quit', () => {
@@ -188,14 +189,7 @@ app.on('before-quit', () => {
   streamSessions.clear()
   activeStreamProcesses.clear()
 
-  const logPath = path.join(app.getPath('userData'), 'main.log')
-  if (fs.existsSync(logPath)) {
-    try {
-      fs.unlinkSync(logPath)
-      console.log('[stream.ts] 已清理日志文件', logPath)
-    }
-    catch (err) {
-      console.error('[stream.ts] 清理日志文件失败:', err)
-    }
-  }
+  // 注意：这里不再删除日志文件——崩溃排查完全依赖 main.log。
+  // 清理完子进程后最后刷盘，保证退出过程的日志也落盘。
+  closeLog()
 })

@@ -14,8 +14,20 @@ export default class RecordTask {
 
   private _onEnd: () => void = () => {}
 
+  // 保存已注册的 IPC 监听器取消函数，任务结束时统一移除，避免监听器泄漏
+  private _unsubscribers: Array<() => void> = []
+
   public setOnEnd(cb: () => void) {
     this._onEnd = cb
+  }
+
+  /**
+   * 移除所有已注册的 IPC 监听器
+   */
+  private cleanupListeners() {
+    for (const unsubscribe of this._unsubscribers)
+      unsubscribe()
+    this._unsubscribers = []
   }
 
   public constructor(url: string, filename: string, liveId: string) {
@@ -73,29 +85,31 @@ export default class RecordTask {
       // 调用主进程IPC开始录制
       window.mainAPI.recordTaskStart?.(this._url, this._filename, this._liveId)
       // 监听录制进度
-      window.mainAPI.recordTaskProgress?.((liveId: string, time: string) => {
+      this._unsubscribers.push(window.mainAPI.recordTaskProgress?.((liveId: string, time: string) => {
         if (liveId === this._liveId) {
           console.log('[record-task.ts] record task progress:', liveId, time)
         }
-      })
+      }))
       // 监听录制完成
-      window.mainAPI.recordTaskEnd?.((liveId: string, _filePath: string) => {
+      this._unsubscribers.push(window.mainAPI.recordTaskEnd?.((liveId: string, _filePath: string) => {
         if (liveId === this._liveId) {
           this._filePath = _filePath
           this._status = Constants.RecordStatus.Finish
+          this.cleanupListeners()
           if (typeof this._onEnd === 'function') {
             this._onEnd()
           }
           console.info('[record-task.ts] record task end:', liveId)
         }
-      })
+      }))
       // 监听录制错误
-      window.mainAPI.recordTaskError?.((liveId: string, error: any) => {
+      this._unsubscribers.push(window.mainAPI.recordTaskError?.((liveId: string, error: any) => {
         if (liveId === this._liveId) {
           this._status = Constants.RecordStatus.Finish
+          this.cleanupListeners()
           console.error('[record-task.ts] record error', error)
         }
-      })
+      }))
     })
   }
 
@@ -120,6 +134,7 @@ export default class RecordTask {
     }
     finally {
       this._status = Constants.RecordStatus.Finish
+      this.cleanupListeners()
       console.info('record task stop')
     }
   }

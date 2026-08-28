@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
+import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
 import LiveItem from '../components/LiveItem.vue'
 import LivePlayer from '../components/LivePlayer.vue'
+
+const route = useRoute()
+const router = useRouter()
 
 const liveList = ref<any[]>([])
 const liveNext = ref('0')
@@ -29,7 +34,7 @@ async function getLiveList() {
   // console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
   try {
-    updateHiddenMemberIds()
+    await updateHiddenMemberIds()
     const content = await Apis.instance().lives(liveNext.value)
     // console.log('获取到的直播列表:', content)
     if (noMore.value) {
@@ -45,14 +50,17 @@ async function getLiveList() {
       noMore.value = true
     }
     liveNext.value = content.next
-    for (const item of content.liveList) {
-      if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
-        continue
+
+    // 先过滤掉被屏蔽的成员，再并行补全成员信息，避免逐条串行 await 拖慢列表加载
+    const visibleItems = content.liveList.filter(
+      (item: any) => !hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
+    )
+    await Promise.all(visibleItems.map(async (item: any) => {
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.isReview = true
       item.date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyy-MM-dd hh:mm:ss')
-      // 异步补全成员信息
+      // 并行补全成员信息
       try {
         item.member = await window.mainAPI.getMember(item.userInfo.userId)
       }
@@ -60,8 +68,8 @@ async function getLiveList() {
         item.member = null
         console.error('获取成员信息失败:', e)
       }
-      liveList.value.push(item)
-    }
+    }))
+    liveList.value.push(...visibleItems)
     loading.value = false
   }
   catch (error) {
@@ -86,11 +94,6 @@ onMounted(() => {
 watch(liveTabs, (newTabs) => {
   localStorage.setItem('liveTabs', JSON.stringify(newTabs))
 }, { deep: true })
-
-// 在组件卸载时清理数据
-onUnmounted(() => {
-  localStorage.removeItem('liveTabs')
-})
 
 function onTabRemove(targetName: string) {
   activeName.value = 'Home'
@@ -125,9 +128,66 @@ function refresh() {
   getLiveList()
 }
 
+/** 其他页面（如演出页）请求在本页打开一个开放公演播放 tab */
+function openLiveTab(payload: any) {
+  const exists = liveTabs.value.some((tab: any) => tab.liveId === payload.liveId)
+  if (exists) {
+    const tab = liveTabs.value.find((tab: any) => tab.liveId === payload.liveId)
+    if (tab) {
+      activeName.value = tab.name
+    }
+    return
+  }
+
+  const liveTab = {
+    label: payload.title,
+    title: payload.title,
+    liveId: payload.liveId,
+    name: `${payload.liveId}_${Math.random().toString(36).substring(2)}`,
+    liveType: 1,
+    liveMode: 0,
+    startTime: payload.startTime,
+    source: 'open',
+    avatar: payload.avatar || '',
+  }
+  liveTabs.value.push(liveTab)
+  activeName.value = liveTab.name
+}
+
+/** 从路由 query 读取演出页跳转参数并打开播放 tab（冷启动兜底），打开后立即清掉参数，防止刷新后重复打开 */
+function openLiveFromQuery() {
+  const liveId = route.query.openLiveId as string
+  if (!liveId) {
+    return
+  }
+  openLiveTab({
+    liveId,
+    title: (route.query.openTitle as string) || '开放公演',
+    startTime: Number.parseInt(route.query.openStartTime as string) || Date.now(),
+    avatar: (route.query.openAvatar as string) || '',
+  })
+  router.replace({ query: {} })
+}
+
+let openLiveTabHandler: any
+
 // onMounted
 onMounted(async () => {
-  updateHiddenMemberIds()
+  openLiveTabHandler = (payload: any) => openLiveTab(payload)
+  EventBus.on('open-live-tab', openLiveTabHandler)
+  await updateHiddenMemberIds()
+  getLiveList()
+  openLiveFromQuery()
+})
+
+// 已挂载时（keep-alive 复用），演出页再次跳转也能打开
+watch(() => route.query.openLiveId, () => {
+  openLiveFromQuery()
+})
+
+onUnmounted(() => {
+  EventBus.off('open-live-tab', openLiveTabHandler)
+  localStorage.removeItem('liveTabs')
 })
 
 async function onInfiniteScroll() {
@@ -139,10 +199,6 @@ async function onInfiniteScroll() {
   }
   await getLiveList()
 }
-
-onMounted(() => {
-  getLiveList()
-})
 </script>
 
 <template>
@@ -194,6 +250,8 @@ onMounted(() => {
           :start-time="tab.startTime"
           :live-type="tab.liveType"
           :live-mode="tab.liveMode"
+          :source="tab.source || 'user'"
+          :avatar-url="tab.avatar || ''"
           @close="onTabRemove(tab.name)"
         />
       </el-tab-pane>

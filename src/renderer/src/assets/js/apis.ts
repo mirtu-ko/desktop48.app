@@ -1,6 +1,29 @@
-import { ref } from 'vue'
-import ApiUrls from './api-urls.js'
-import Request from './request.js'
+import ApiUrls from './api-urls'
+import Request from './request'
+
+/** 开放公演关联的队伍信息 */
+export interface OpenLiveTeam {
+  teamId: number
+  groupId: number
+  teamName: string
+  /** 队伍 logo 路径（可能是相对路径，需 sourceUrl 归一化） */
+  teamLogo: string
+  teamColor?: string
+}
+
+/** 开放公演条目（getOpenLiveList 接口） */
+export interface OpenLive {
+  liveId: string
+  title: string
+  subTitle: string
+  coverPath: string
+  /** 1=未开始 2=进行中 4=已结束 */
+  status: number
+  /** 开演时间（毫秒时间戳） */
+  stime: string
+  /** 关联队伍，可能为空数组 */
+  teamList?: OpenLiveTeam[]
+}
 
 export default class Apis {
   public static instance() {
@@ -8,10 +31,6 @@ export default class Apis {
   }
 
   private static apis: Apis = new Apis()
-
-  private static readonly SHOWS_REGEX = /<li class="starts">\s*<div class="startimg">\s*<img src="([^"]+)"[^>]*>\s*<span class="starttime">(\d+)日&nbsp;(\d+:\d+)<\/span>\s*<\/div>\s*<p>([^<]+)<\/p>/g
-
-  private static readonly WATCH_CONTENT_REGEX = /<div class="watchcontent">[\s\S]*?<div class="v-img"><a[^>]*?href="[^"]*?\/id\/(\d+)"[^>]*><img src="([^"]+)"[^>]*><\/a><\/div>[\s\S]*?<h2>([^<]+)<\/h2>[\s\S]*?<p>&nbsp;&nbsp;([^<]+)<\/p>[\s\S]*?<input[^>]*?id="start_time_\d+"[^>]*?value="(\d+)"[^>]*>[\s\S]*?<input[^>]*?id="end_time_\d+"[^>]*?value="(\d+)"[^>]*>/g
 
   /**
    * 同步成员信息
@@ -95,6 +114,18 @@ export default class Apis {
   }
 
   /**
+   * 开放公演详情
+   * @param liveId 开放公演的 snowflake liveId（来自 getOpenLiveList）
+   * @returns content，其中 roomId 是 live.48.cn 体系里的数字 id
+   */
+  public openLive(liveId: string): Promise<any> {
+    const data = {
+      liveId,
+    }
+    return this.request(ApiUrls.OPEN_LIVE_URL, data, {})
+  }
+
+  /**
    * 下载弹幕
    * @param barrageUrl 弹幕地址
    */
@@ -134,120 +165,19 @@ export default class Apis {
   }
 
   /**
-   * 获取公演信息
+   * 开放公演列表
+   * @param groupId 团体 id：10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT，0=全部
+   * @param next 翻页游标，首页传 '0'
+   * @param record true=可回放的已结束公演，false=排期/进行中
    */
-  public shows(key): Promise<any> {
-    console.log('[apis.ts]开始获取公演信息')
-    const url = ref('')
-    if (key === '1') {
-      url.value = ApiUrls.SHOW_LIST_URL
+  public openLives(groupId: number = 0, next: string = '0', record: boolean = false) {
+    const data = {
+      groupId,
+      next,
+      debug: false,
+      record,
     }
-    else if (key === '2') {
-      url.value = ApiUrls.BEJ_SHOW_LIST_URL
-    }
-    else if (key === '3') {
-      url.value = ApiUrls.GNZ_SHOW_LIST_URL
-    }
-    else if (key === '5') {
-      url.value = ApiUrls.CKG_SHOW_LIST_URL
-    }
-    else if (key === '6') {
-      url.value = ApiUrls.CGT_SHOW_LIST_URL
-    }
-    else {
-      console.error('[apis.ts]未知的 key', key)
-      return Promise.reject(new Error(`[apis.ts]未知的 key ${key}`))
-    }
-
-    return new Promise((resolve, reject) => {
-      Request.get(url.value)
-        .then((html) => {
-          // 使用正则表达式解析HTML内容
-          const shows = this.parseShowsHtml(html)
-          const watchContent = this.parseWatchContent(html)
-          console.log('[apis.ts]parseShowsHtml', shows)
-          console.log('[apis.ts]parseWatchContent', watchContent)
-          resolve({
-            shows,
-            watchContent,
-          })
-        })
-        .catch((error) => {
-          reject(error)
-        })
-    })
-  }
-
-  private parseShowsHtml(html: string): Array<{
-    id: number
-    title: string
-    date: string
-    time: string
-    image: string
-  }> {
-    const shows: Array<{
-      id: number
-      title: string
-      date: string
-      time: string
-      image: string
-    }> = []
-
-    // 使用正则表达式匹配演出信息
-    const regex = Apis.SHOWS_REGEX
-    regex.lastIndex = 0 // 重置正则表达式的状态
-    let match: RegExpExecArray | null
-
-    // eslint-disable-next-line no-cond-assign
-    while ((match = regex.exec(html)) !== null) {
-      shows.push({
-        id: shows.length + 1,
-        image: match[1],
-        date: match[2],
-        time: match[3],
-        title: match[4].trim(),
-      })
-    }
-    return shows
-  }
-
-  private parseWatchContent(html: string): Array<{
-    id: number
-    title: string
-    image: string
-    description: string
-    startTime: number
-    endTime: number
-    status: string
-  }> {
-    const watchContents: Array<{
-      id: number
-      title: string
-      image: string
-      description: string
-      startTime: number
-      endTime: number
-      status: string
-    }> = []
-
-    // 使用正则表达式匹配watchcontent信息
-    const regex = Apis.WATCH_CONTENT_REGEX
-    regex.lastIndex = 0 // 重置正则表达式的状态
-
-    let match: RegExpExecArray | null
-    // eslint-disable-next-line no-cond-assign
-    while ((match = regex.exec(html)) !== null) {
-      watchContents.push({
-        id: Number.parseInt(match[1]),
-        image: match[2],
-        title: match[3].trim(),
-        description: match[4].trim(),
-        startTime: Number.parseInt(match[5]),
-        endTime: Number.parseInt(match[6]),
-        status: 'upcoming', // 可以根据时间判断状态
-      })
-    }
-
-    return watchContents
+    console.log('[apis.ts]openLives', data)
+    return this.request(ApiUrls.OPEN_LIVE_LIST_URL, data, {})
   }
 }

@@ -3,7 +3,8 @@ import { dirname, join } from 'node:path'
 import { app, ipcMain } from 'electron'
 import { LowSync } from 'lowdb'
 import { JSONFileSync } from 'lowdb/node'
-import data from './data.js'
+import data from './data'
+import { log } from './logger'
 
 interface Team {
   label: string
@@ -137,19 +138,19 @@ class Database {
     this.memberTeamUpdate()
     this.lowdb.write()
     // 调试打印数据库路径
-    console.log('[database.ts]数据库路径', this.dbPath)
+    log('[database.ts]数据库路径', this.dbPath)
   }
 
   public saveMemberData(content: any) {
     // 写入 starInfo 数据
-    console.log('[database.ts] save-member-data 开始写入:', content.starInfo?.length, content.teamInfo?.length, content.groupInfo?.length)
+    log('[database.ts] save-member-data 开始写入:', content.starInfo?.length, content.teamInfo?.length, content.groupInfo?.length)
     if (content.starInfo)
       this.db.starInfo = content.starInfo
     if (content.teamInfo)
       this.db.teamInfo = content.teamInfo
     if (content.groupInfo)
       this.db.groupInfo = content.groupInfo
-    console.log('[database.ts] save-member-data 写入成功:', {
+    log('[database.ts] save-member-data 写入成功:', {
       starInfo: this.db.starInfo?.length,
       teamInfo: this.db.teamInfo?.length,
       groupInfo: this.db.groupInfo?.length,
@@ -173,12 +174,12 @@ class Database {
   }
 
   public getTeamOptions() {
-    // teamInfo 根据groupid 获取groupname，拼接到teamName
-    this.teamsDB.forEach((team: any) => {
-      const group = this.db.groupInfo.find((g: any) => Number(g.groupId) === Number(team.groupId))
-      team.teamName = `${group?.groupName || ''}-${team.teamName || ''}`
+    // 拼接 groupName-teamName 作为 label，不修改原始数据，避免重复调用导致名字叠加
+    return (this.teamsDB || []).map((t: any) => {
+      const group = this.db.groupInfo.find((g: any) => Number(g.groupId) === Number(t.groupId))
+      const label = `${group?.groupName || ''}-${t.teamName || ''}`
+      return { label, value: t.teamId }
     })
-    return (this.teamsDB || []).map((t: any) => ({ label: t.teamName, value: t.teamId }))
   }
 
   public getGroupOptions() {
