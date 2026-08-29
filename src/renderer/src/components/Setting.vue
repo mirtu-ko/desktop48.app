@@ -41,7 +41,7 @@ async function setDownloadDirectory() {
 }
 
 async function openDownloadDirectory() {
-  window.mainAPI.showItemInFolder(downloadDirectory.value)
+  window.mainAPI.openPath(downloadDirectory.value)
 }
 
 // ffmpeg目录
@@ -81,7 +81,7 @@ function confirmFfmpegDir() {
 }
 
 async function openFfmpegDirectory() {
-  window.mainAPI.showItemInFolder(ffmpegDirectory.value)
+  window.mainAPI.openPath(ffmpegDirectory.value)
 }
 
 // User-Agent

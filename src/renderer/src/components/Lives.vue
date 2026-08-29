@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
@@ -19,6 +19,9 @@ const noMore = ref(false)
 const liveScrollRef = ref<any>(null)
 const scrollDistance = 10
 
+// 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
+let listRequestId = 0
+
 const disabled = computed(() => loading.value || noMore.value)
 
 // 更新隐藏的成员ID
@@ -31,21 +34,17 @@ async function updateHiddenMemberIds() {
 
 // 加载更多
 async function getLiveList() {
+  const requestId = ++listRequestId
   // console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
   try {
     await updateHiddenMemberIds()
-    const content = await Apis.instance().lives(liveNext.value)
-    // console.log('获取到的直播列表:', content)
-    if (noMore.value) {
-      ElMessage({
-        message: '加载完毕，没有更多直播了',
-        type: 'info',
-      })
-      noMore.value = true
-      loading.value = false
+    if (requestId !== listRequestId)
       return
-    }
+    const content = await Apis.instance().lives(liveNext.value)
+    if (requestId !== listRequestId)
+      return
+    // console.log('获取到的直播列表:', content)
     if (content.next === '0') {
       noMore.value = true
     }
@@ -69,10 +68,14 @@ async function getLiveList() {
         console.error('获取成员信息失败:', e)
       }
     }))
+    if (requestId !== listRequestId)
+      return
     liveList.value.push(...visibleItems)
     loading.value = false
   }
   catch (error) {
+    if (requestId !== listRequestId)
+      return
     console.info(error)
     loading.value = false
   }
@@ -82,11 +85,15 @@ async function getLiveList() {
 const activeName = ref('Home')
 const liveTabs = ref<any[]>([])
 
-// 从 localStorage 恢复标签页
+// 从 localStorage 恢复标签页与激活页
 onMounted(() => {
   const savedTabs = localStorage.getItem('liveTabs')
   if (savedTabs) {
     liveTabs.value = JSON.parse(savedTabs)
+    const savedActive = localStorage.getItem('liveActiveName')
+    if (savedActive && liveTabs.value.some((tab: any) => tab.name === savedActive)) {
+      activeName.value = savedActive
+    }
   }
 })
 
@@ -95,17 +102,29 @@ watch(liveTabs, (newTabs) => {
   localStorage.setItem('liveTabs', JSON.stringify(newTabs))
 }, { deep: true })
 
+// 监听激活页变化并保存到 localStorage
+watch(activeName, (name) => {
+  localStorage.setItem('liveActiveName', name)
+})
+
 function onTabRemove(targetName: string) {
-  activeName.value = 'Home'
+  const wasActive = activeName.value === targetName
   liveTabs.value = liveTabs.value.filter((tab: any) => tab.name != targetName)
-  refresh()
+  // 仅当关闭的是当前激活的 tab 时才切回直播列表
+  if (wasActive) {
+    activeName.value = 'Home'
+  }
 }
 
 // 修改播放方法
 function play(item: any) {
   const exists = liveTabs.value.some((tab: any) => tab.liveId === item.liveId)
-  if (exists)
+  if (exists) {
+    const tab = liveTabs.value.find((tab: any) => tab.liveId === item.liveId)
+    if (tab)
+      activeName.value = tab.name
     return
+  }
 
   const liveTab = {
     label: `${item.userInfo.nickname}的直播间`,
@@ -175,7 +194,7 @@ let openLiveTabHandler: any
 onMounted(async () => {
   openLiveTabHandler = (payload: any) => openLiveTab(payload)
   EventBus.on('open-live-tab', openLiveTabHandler)
-  await updateHiddenMemberIds()
+  // getLiveList 内部已调用 updateHiddenMemberIds，无需在此重复调用
   getLiveList()
   openLiveFromQuery()
 })
@@ -187,7 +206,6 @@ watch(() => route.query.openLiveId, () => {
 
 onUnmounted(() => {
   EventBus.off('open-live-tab', openLiveTabHandler)
-  localStorage.removeItem('liveTabs')
 })
 
 async function onInfiniteScroll() {
@@ -207,14 +225,15 @@ async function onInfiniteScroll() {
       <el-tab-pane label="直播列表" name="Home">
         <el-container>
           <el-header class="header-box">
-            <el-button type="primary" @click="refresh">
+            <span v-if="liveList.length > 0" class="live-count">已加载 {{ liveList.length }} 个直播</span>
+            <el-button type="primary" :icon="Refresh" :loading="loading" @click="refresh">
               刷新
             </el-button>
           </el-header>
           <div v-loading="loading" class="live-main">
             <!-- 无直播时显示 -->
-            <div v-if="!loading && liveList.length === 0" class="live-info">
-              当前没有直播
+            <div v-if="!loading && liveList.length === 0" class="live-empty">
+              <el-empty description="当前没有直播" />
             </div>
 
             <!-- 有直播时显示 -->
@@ -228,8 +247,11 @@ async function onInfiniteScroll() {
             >
               <div class="live-list">
                 <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">
-                  <LiveItem :item="item" class="live-card" />
+                  <LiveItem :item="item" />
                 </div>
+              </div>
+              <div v-if="noMore" class="list-end">
+                没有更多直播了
               </div>
             </el-scrollbar>
           </div>
@@ -245,6 +267,7 @@ async function onInfiniteScroll() {
         closable
       >
         <LivePlayer
+          :active="activeName === tab.name"
           :live-title="tab.title"
           :live-id="tab.liveId"
           :start-time="tab.startTime"
@@ -268,18 +291,30 @@ async function onInfiniteScroll() {
   overflow: hidden;
 }
 
+.header-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.live-count {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
 .live-main {
-  height: calc(100%);
+  height: calc(100% - 60px);
   overflow: hidden;
 }
 
 .scrollbar-wrapper {
-  height: calc(100% - 60px);
+  height: 100%;
   overflow-x: hidden !important;
 }
-.live-info {
-  height: calc(100% - 150px);
-  overflow: hidden;
+
+.live-empty {
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -287,20 +322,20 @@ async function onInfiniteScroll() {
 
 .live-list {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 0.3fr));
-}
-
-:deep(.el-card__body) {
-  padding: 6px !important;
-}
-
-:deep(.el-card__header) {
-  padding: 8px !important;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* 留出卡片悬停上浮与阴影的空间 */
+  padding: 12px 16px 8px;
 }
 
 .live-item {
-  overflow: hidden;
-  background: #fff;
+  min-width: 0;
+}
+
+.list-end {
+  padding: 16px 0 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 </style>

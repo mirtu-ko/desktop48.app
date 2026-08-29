@@ -7,6 +7,7 @@ import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker,
 
 import icon from '../../resources/icon.png?asset'
 import { Database } from './database'
+import { stopAllFfmpegTasks } from './ffmpeg-task'
 import { getLogPathForDisplay, log } from './logger'
 import './download' // 下载功能主进程注册
 import './record' // 录制功能主进程注册
@@ -44,7 +45,7 @@ function isAllowedHost(url: string): boolean {
   }
 }
 
-ipcMain.handle('show-item-in-folder', async (_event: IpcMainInvokeEvent, filePath: string) => {
+ipcMain.handle('open-path', async (_event: IpcMainInvokeEvent, filePath: string) => {
   // 校验路径：允许系统标准用户目录 + 用户配置的下载目录/ffmpeg目录
   const allowedRoots = [
     app.getPath('desktop'),
@@ -64,7 +65,7 @@ ipcMain.handle('show-item-in-folder', async (_event: IpcMainInvokeEvent, filePat
   if (!allowedRoots.some(root => resolved.startsWith(path.resolve(root)))) {
     throw new Error(`路径不在允许范围内: ${filePath}`)
   }
-  shell.showItemInFolder(filePath)
+  shell.openPath(filePath)
 })
 
 ipcMain.handle('select-directory', async () => {
@@ -191,6 +192,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   // 直播流等子进程资源在 stream.ts 的 before-quit 里统一清理
+  // 对仍在运行的所有 ffmpeg 任务写 'q' 优雅收尾，避免退出后残留孤儿进程
+  stopAllFfmpegTasks()
 })
 
 // 在此文件中，您可以包含应用主进程的其他特定代码，

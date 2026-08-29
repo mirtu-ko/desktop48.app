@@ -40,7 +40,7 @@ export interface mainAPI {
   setConfig: (key: string, value: any) => Promise<any>
 
   // 文件夹目录
-  showItemInFolder: (filePath: string) => Promise<any>
+  openPath: (filePath: string) => Promise<any>
   checkFfmpegBinaries: (dir: string) => Promise<any>
   getDesktopPath: () => Promise<any>
   selectDirectory: () => Promise<any>
@@ -56,6 +56,8 @@ export interface mainAPI {
   downloadTaskEnd: (callback: (liveId: string, filePath: string) => void) => () => void
   downloadTaskError: (callback: (liveId: string, error: any) => void) => () => void
   downloadTaskStop: (liveId: string) => void
+  downloadTaskList: () => Promise<any[]>
+  downloadTaskRemove: (liveId: string) => Promise<void>
   getPlatform: () => string
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => Promise<any>
@@ -63,6 +65,8 @@ export interface mainAPI {
   recordTaskEnd: (callback: (liveId: string, filePath: string) => void) => () => void
   recordTaskError: (callback: (liveId: string, error: any) => void) => () => void
   recordTaskStop: (liveId: string) => void
+  recordTaskList: () => Promise<any[]>
+  recordTaskRemove: (liveId: string) => Promise<void>
 
   // 休眠
   preventSleep: () => Promise<any>

@@ -35,7 +35,7 @@ const api = {
   createLiveStream: (rtmpUrl: string, liveId: string) => ipcRenderer.invoke('createLiveStream', rtmpUrl, liveId),
   stopLiveStream: (liveId: string) => ipcRenderer.invoke('stopLiveStream', liveId),
   // 文件夹目录
-  showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
+  openPath: (filePath: string) => ipcRenderer.invoke('open-path', filePath),
   getDesktopPath: () => ipcRenderer.invoke('get-desktop-path'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('check-ffmpeg-binaries', dir),
@@ -59,6 +59,8 @@ const api = {
     return () => ipcRenderer.removeListener('downloadTaskError', listener)
   },
   downloadTaskStop: (liveId: string) => ipcRenderer.send(`downloadTaskStop:${liveId}`),
+  downloadTaskList: () => ipcRenderer.invoke('downloadTaskList'),
+  downloadTaskRemove: (liveId: string) => ipcRenderer.invoke('downloadTaskRemove', liveId),
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('recordTaskStart', url, filename, liveId),
   recordTaskProgress: (callback: (_liveId: string, _time: string) => void) => {
@@ -77,6 +79,8 @@ const api = {
     return () => ipcRenderer.removeListener('recordTaskError', listener)
   },
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
+  recordTaskList: () => ipcRenderer.invoke('recordTaskList'),
+  recordTaskRemove: (liveId: string) => ipcRenderer.invoke('recordTaskRemove', liveId),
   // 阻止系统休眠
   preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
   // 允许系统休眠

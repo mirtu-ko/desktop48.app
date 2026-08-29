@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DownloadTaskPayload } from '../assets/js/task-payload'
+import type { TaskPayload } from '../assets/js/task-payload'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { cloneDeep } from 'lodash'
@@ -450,8 +450,7 @@ async function checkDownloadDirectory(): Promise<boolean> {
 
 function getReviewDownloadFilename() {
   const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  const extension = playStreamPath.value.endsWith('.m3u8') ? 'mp4' : 'mp4'
-  return `${realName.value}${date}.${extension}`
+  return `${realName.value}${date}.mp4`
 }
 
 async function download() {
@@ -460,7 +459,7 @@ async function download() {
     return
 
   const filename = getReviewDownloadFilename()
-  const downloadTask: DownloadTaskPayload = {
+  const downloadTask: TaskPayload = {
     url: playStreamPath.value,
     filename,
     liveId: props.liveId,
