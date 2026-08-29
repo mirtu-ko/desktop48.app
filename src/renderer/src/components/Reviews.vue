@@ -127,9 +127,12 @@ async function getReviewList() {
 
 // 点击回放
 function onReviewClick(item: any) {
-  const exists = reviewTabs.value.some((tab: any) => tab.liveId === item.liveId)
-  if (exists)
+  // 该回放已经打开过就直接切到对应标签页，不再重复创建
+  const openedTab = reviewTabs.value.find((tab: any) => tab.liveId === item.liveId)
+  if (openedTab) {
+    activeName.value = openedTab.name
     return
+  }
   const liveTab = {
     label: `${item.userInfo.nickname}的直播间`,
     title: item.title,
@@ -271,7 +274,10 @@ onMounted(() => {
         :name="reviewTab.name"
         @close="onTabRemove(reviewTab.name)"
       >
-        <ReviewPlayer :live-id="reviewTab.liveId" :start-time="reviewTab.startTime" :live-title="reviewTab.title" />
+        <ReviewPlayer
+          :live-id="reviewTab.liveId" :start-time="reviewTab.startTime" :live-title="reviewTab.title"
+          :active="activeName === reviewTab.name"
+        />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -284,6 +290,18 @@ onMounted(() => {
 .review-container {
   height: 100%;
   overflow: hidden;
+}
+
+/* el-tabs 内部的内容容器默认是 auto 高度，会断开高度链，
+   导致标签页里的播放器拿不到可用高度 */
+:deep(.el-tabs) {
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
 }
 
 .header-box {
