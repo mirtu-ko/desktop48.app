@@ -70,7 +70,9 @@ async function getLiveList() {
     }))
     if (requestId !== listRequestId)
       return
-    liveList.value.push(...visibleItems)
+    // 兜底去重，避免接口分页边界返回重复项导致列表出现重复卡片
+    const existedIds = new Set(liveList.value.map((item: any) => item.liveId))
+    liveList.value.push(...visibleItems.filter((item: any) => !existedIds.has(item.liveId)))
     loading.value = false
   }
   catch (error) {
@@ -209,6 +211,10 @@ onUnmounted(() => {
 })
 
 async function onInfiniteScroll() {
+  // el-scrollbar 的 end-reached 不受 infinite-scroll-disabled 约束，需手动拦截，
+  // 否则加载中或已无更多数据时会用重置后的 next 重复请求第一页
+  if (disabled.value)
+    return
   const wrap: HTMLElement | undefined = liveScrollRef.value?.wrapRef
   if (wrap) {
     const nearBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - scrollDistance - 1
