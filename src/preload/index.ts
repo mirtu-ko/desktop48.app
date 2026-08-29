@@ -35,7 +35,7 @@ const api = {
   createLiveStream: (rtmpUrl: string, liveId: string) => ipcRenderer.invoke('createLiveStream', rtmpUrl, liveId),
   stopLiveStream: (liveId: string) => ipcRenderer.invoke('stopLiveStream', liveId),
   // 文件夹目录
-  showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
+  openPath: (filePath: string) => ipcRenderer.invoke('open-path', filePath),
   getDesktopPath: () => ipcRenderer.invoke('get-desktop-path'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('check-ffmpeg-binaries', dir),

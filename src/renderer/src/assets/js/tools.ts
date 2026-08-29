@@ -78,7 +78,7 @@ class Tools {
   public static streamPathHandle(streamPath: string, timestamp: number) {
     const date = new Date(timestamp)
     const liveDate = `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`
-    // window.mainAPI?.showItemInFolder?.(this.getFilePath())
+    // window.mainAPI?.openPath?.(this.getFilePath())
     return streamPath.replace(Tools.STREAM_PATH_REGEX, (pathPrefix, protocol, host) => {
       if (host.toLowerCase() !== YI_ZHI_BO_HOST) {
         return pathPrefix

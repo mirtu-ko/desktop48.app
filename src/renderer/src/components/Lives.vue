@@ -82,11 +82,15 @@ async function getLiveList() {
 const activeName = ref('Home')
 const liveTabs = ref<any[]>([])
 
-// 从 localStorage 恢复标签页
+// 从 localStorage 恢复标签页与激活页
 onMounted(() => {
   const savedTabs = localStorage.getItem('liveTabs')
   if (savedTabs) {
     liveTabs.value = JSON.parse(savedTabs)
+    const savedActive = localStorage.getItem('liveActiveName')
+    if (savedActive && liveTabs.value.some((tab: any) => tab.name === savedActive)) {
+      activeName.value = savedActive
+    }
   }
 })
 
@@ -95,10 +99,18 @@ watch(liveTabs, (newTabs) => {
   localStorage.setItem('liveTabs', JSON.stringify(newTabs))
 }, { deep: true })
 
+// 监听激活页变化并保存到 localStorage
+watch(activeName, (name) => {
+  localStorage.setItem('liveActiveName', name)
+})
+
 function onTabRemove(targetName: string) {
-  activeName.value = 'Home'
+  const wasActive = activeName.value === targetName
   liveTabs.value = liveTabs.value.filter((tab: any) => tab.name != targetName)
-  refresh()
+  // 仅当关闭的是当前激活的 tab 时才切回直播列表
+  if (wasActive) {
+    activeName.value = 'Home'
+  }
 }
 
 // 修改播放方法
@@ -175,7 +187,7 @@ let openLiveTabHandler: any
 onMounted(async () => {
   openLiveTabHandler = (payload: any) => openLiveTab(payload)
   EventBus.on('open-live-tab', openLiveTabHandler)
-  await updateHiddenMemberIds()
+  // getLiveList 内部已调用 updateHiddenMemberIds，无需在此重复调用
   getLiveList()
   openLiveFromQuery()
 })
@@ -187,7 +199,6 @@ watch(() => route.query.openLiveId, () => {
 
 onUnmounted(() => {
   EventBus.off('open-live-tab', openLiveTabHandler)
-  localStorage.removeItem('liveTabs')
 })
 
 async function onInfiniteScroll() {

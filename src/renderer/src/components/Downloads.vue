@@ -35,7 +35,7 @@ function stopDownloadTask(task: DownloadTaskRow) {
   removeDownloadTask(task)
 }
 
-function handleDownloadTask(taskData: DownloadTaskPayload) {
+async function handleDownloadTask(taskData: DownloadTaskPayload) {
   console.log('[Downloads.vue]taskData', taskData)
   const liveId = taskData.liveId
   const exists = findDownloadTaskByLiveId(liveId)
@@ -49,16 +49,22 @@ function handleDownloadTask(taskData: DownloadTaskPayload) {
 
   const rawTask = new DownloadTask(taskData.url, taskData.filename, liveId)
   const downloadTask = reactive(rawTask)
-  downloadTasks.value.push(downloadTask)
-  downloadTask.start(() => {
-    ElMessage({
-      message: '下载开始',
-      type: 'info',
+  try {
+    await downloadTask.start(() => {
+      ElMessage({
+        message: '下载开始',
+        type: 'info',
+      })
     })
-  })
+    downloadTasks.value.push(downloadTask)
+  }
+  catch (error) {
+    console.error('[Downloads.vue] download task start failed', error)
+    ElMessage({ message: String(error), type: 'error' })
+  }
 }
 
-function handleRecordTask(taskData: RecordTaskPayload) {
+async function handleRecordTask(taskData: RecordTaskPayload) {
   console.log('[Downloads.vue]record-task', taskData)
   const liveId = taskData.liveId
   const exists = findRecordTaskByLiveId(liveId)
@@ -71,25 +77,37 @@ function handleRecordTask(taskData: RecordTaskPayload) {
     if (exists.isFinish()) {
       exists.setUrl(taskData.url)
       exists.setFilename(taskData.filename)
-      exists.start(() => {
-        ElMessage({
-          message: '录制已重新开始，原任务将被覆盖',
-          type: 'info',
+      try {
+        await exists.start(() => {
+          ElMessage({
+            message: '录制已重新开始，原任务将被覆盖',
+            type: 'info',
+          })
         })
-      })
+      }
+      catch (error) {
+        console.error('[Downloads.vue] record task restart failed', error)
+        ElMessage({ message: String(error), type: 'error' })
+      }
     }
     return
   }
 
   const rawTask = new RecordTask(taskData.url, taskData.filename, liveId)
   const recordTask = reactive(rawTask)
-  recordTasks.value.push(recordTask)
-  recordTask.start(() => {
-    ElMessage({
-      message: '录制开始',
-      type: 'info',
+  try {
+    await recordTask.start(() => {
+      ElMessage({
+        message: '录制开始',
+        type: 'info',
+      })
     })
-  })
+    recordTasks.value.push(recordTask)
+  }
+  catch (error) {
+    console.error('[Downloads.vue] record task start failed', error)
+    ElMessage({ message: String(error), type: 'error' })
+  }
 }
 
 onMounted(() => {

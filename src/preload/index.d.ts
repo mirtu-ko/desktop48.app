@@ -40,7 +40,7 @@ export interface mainAPI {
   setConfig: (key: string, value: any) => Promise<any>
 
   // 文件夹目录
-  showItemInFolder: (filePath: string) => Promise<any>
+  openPath: (filePath: string) => Promise<any>
   checkFfmpegBinaries: (dir: string) => Promise<any>
   getDesktopPath: () => Promise<any>
   selectDirectory: () => Promise<any>

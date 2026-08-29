@@ -44,7 +44,7 @@ function isAllowedHost(url: string): boolean {
   }
 }
 
-ipcMain.handle('show-item-in-folder', async (_event: IpcMainInvokeEvent, filePath: string) => {
+ipcMain.handle('open-path', async (_event: IpcMainInvokeEvent, filePath: string) => {
   // 校验路径：允许系统标准用户目录 + 用户配置的下载目录/ffmpeg目录
   const allowedRoots = [
     app.getPath('desktop'),
@@ -64,7 +64,7 @@ ipcMain.handle('show-item-in-folder', async (_event: IpcMainInvokeEvent, filePat
   if (!allowedRoots.some(root => resolved.startsWith(path.resolve(root)))) {
     throw new Error(`路径不在允许范围内: ${filePath}`)
   }
-  shell.showItemInFolder(filePath)
+  shell.openPath(filePath)
 })
 
 ipcMain.handle('select-directory', async () => {

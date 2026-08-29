@@ -72,26 +72,21 @@ export default class RecordTask {
     return this._filePath
   }
 
-  public start(startListener: () => void) {
-    this.init().then(async () => {
-      if (!this._saveDirectory) {
-        console.error('save directory is empty')
-        return
-      }
-      this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
-      this._status = Constants.RecordStatus.Recording
-      startListener()
-      console.info('[record-task.ts] record task start:', this._url, this._filename, this._liveId)
-      // 调用主进程IPC开始录制
-      window.mainAPI.recordTaskStart?.(this._url, this._filename, this._liveId)
-      // 监听录制进度
-      this._unsubscribers.push(window.mainAPI.recordTaskProgress?.((liveId: string, time: string) => {
+  public async start(startListener: () => void): Promise<void> {
+    await this.init()
+    if (!this._saveDirectory)
+      throw new Error('下载目录为空')
+
+    this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
+
+    // 先注册监听器，避免 ffmpeg 启动后立即发送的事件丢失。
+    this._unsubscribers.push(window.mainAPI.recordTaskProgress?.((liveId: string, time: string) => {
         if (liveId === this._liveId) {
           console.log('[record-task.ts] record task progress:', liveId, time)
         }
       }))
-      // 监听录制完成
-      this._unsubscribers.push(window.mainAPI.recordTaskEnd?.((liveId: string, _filePath: string) => {
+    // 监听录制完成
+    this._unsubscribers.push(window.mainAPI.recordTaskEnd?.((liveId: string, _filePath: string) => {
         if (liveId === this._liveId) {
           this._filePath = _filePath
           this._status = Constants.RecordStatus.Finish
@@ -102,15 +97,26 @@ export default class RecordTask {
           console.info('[record-task.ts] record task end:', liveId)
         }
       }))
-      // 监听录制错误
-      this._unsubscribers.push(window.mainAPI.recordTaskError?.((liveId: string, error: any) => {
+    // 监听录制错误
+    this._unsubscribers.push(window.mainAPI.recordTaskError?.((liveId: string, error: any) => {
         if (liveId === this._liveId) {
           this._status = Constants.RecordStatus.Finish
           this.cleanupListeners()
           console.error('[record-task.ts] record error', error)
         }
-      }))
-    })
+    }))
+
+    try {
+      console.info('[record-task.ts] record task start:', this._url, this._filename, this._liveId)
+      await window.mainAPI.recordTaskStart?.(this._url, this._filename, this._liveId)
+      this._status = Constants.RecordStatus.Recording
+      startListener()
+    }
+    catch (error) {
+      this.cleanupListeners()
+      console.error('[record-task.ts] record task start failed', error)
+      throw error
+    }
   }
 
   public isRecording() {
@@ -142,7 +148,7 @@ export default class RecordTask {
   public openSaveDirectory() {
     this.init().then(() => {
       console.info('record task open save directory', this._saveDirectory)
-      window.mainAPI?.showItemInFolder?.(this._saveDirectory)
+      window.mainAPI?.openPath?.(this._saveDirectory)
     })
   }
 }

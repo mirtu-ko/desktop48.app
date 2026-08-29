@@ -63,26 +63,22 @@ export default class DownloadTask {
     this._onEnd = value
   }
 
-  public start(startListener: () => void) {
-    this.init().then(async () => {
-      // compute full file path early for display during download
-      if (!this._saveDirectory) {
-        console.error('saveDirectory is not initialized')
-        return
-      }
-      this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
-      this._status = Constants.DownloadStatus.Downloading
-      startListener()
-      console.info('[download-task.ts] download task start:', this._url, this._filename, this._liveId)
-      window.mainAPI.downloadTaskStart(this._url, this._filename, this._liveId)
-      // 监听下载进度
-      this._unsubscribers.push(window.mainAPI.downloadTaskProgress((liveId: string, time: string) => {
+  public async start(startListener: () => void): Promise<void> {
+    await this.init()
+    // compute full file path early for display during download
+    if (!this._saveDirectory)
+      throw new Error('保存目录为空')
+
+    this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
+
+    // 先注册监听器，避免 ffmpeg 启动后立即发送的事件丢失。
+    this._unsubscribers.push(window.mainAPI.downloadTaskProgress((liveId: string, time: string) => {
         if (liveId === this._liveId) {
           console.log('[download-task.ts] download task progress:', liveId, time)
         }
       }))
-      // 监听下载完成
-      this._unsubscribers.push(window.mainAPI.downloadTaskEnd((liveId: string, _filePath: string) => {
+    // 监听下载完成
+    this._unsubscribers.push(window.mainAPI.downloadTaskEnd((liveId: string, _filePath: string) => {
         if (liveId === this._liveId) {
           this._filePath = _filePath
           this._status = Constants.DownloadStatus.Finish
@@ -90,14 +86,26 @@ export default class DownloadTask {
           this._onEnd()
         }
       }))
-      // 监听下载错误
-      this._unsubscribers.push(window.mainAPI.downloadTaskError((liveId: string, error: any) => {
+    // 监听下载错误
+    this._unsubscribers.push(window.mainAPI.downloadTaskError((liveId: string, error: any) => {
         if (liveId === this._liveId) {
           console.error('[download-task] download error', error)
+          this._status = Constants.DownloadStatus.Finish
           this.cleanupListeners()
         }
       }))
-    })
+
+    try {
+      console.info('[download-task.ts] download task start:', this._url, this._filename, this._liveId)
+      await window.mainAPI.downloadTaskStart(this._url, this._filename, this._liveId)
+      this._status = Constants.DownloadStatus.Downloading
+      startListener()
+    }
+    catch (error) {
+      this.cleanupListeners()
+      console.error('[download-task.ts] download task start failed', error)
+      throw error
+    }
   }
 
   public isDownloading() {
@@ -125,6 +133,6 @@ export default class DownloadTask {
       console.error('saveDirectory is not initialized')
       return
     }
-    window.mainAPI.showItemInFolder(this._saveDirectory)
+    window.mainAPI.openPath(this._saveDirectory)
   }
 }

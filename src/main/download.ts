@@ -24,72 +24,76 @@ ipcMain.handle('downloadTaskStart', async (event: IpcMainInvokeEvent, url: strin
   if (!fs.existsSync(ffmpegPath))
     throw new Error('ffmpeg 二进制文件不存在')
   const filePath = path.join(saveDir, filename)
-  return new Promise<string>((resolve, reject) => {
-    // spawn ffmpeg to download and merge ts segments
-    // -bsf:a aac_adtstoasc: HLS TS 里的 AAC 是 ADTS 格式，MP4 容器需要 ASC 格式，必须转封装
-    // -movflags +faststart: 正常结束时把 moov atom 移到文件头，播放器可立即打开
-    const ffmpeg = spawn(ffmpegPath, [
-      '-hide_banner',
-      '-loglevel',
-      'info',
-      '-y',
-      '-i',
-      url,
-      '-c',
-      'copy',
-      '-bsf:a',
-      'aac_adtstoasc',
-      '-movflags',
-      '+faststart',
-      filePath,
-    ])
-    log('[download.ts]spawn ffmpeg start', filePath)
-    // 解析 stderr 中的进度信息，推送给渲染进程
-    ffmpeg.stderr.on('data', (chunk) => {
-      const msg = chunk.toString()
-      const match = msg.match(TIME_REGEX)
-      if (match && match[1]) {
-        log('[download.ts]spawn ffmpeg progress', match[1])
-        event.sender.send('downloadTaskProgress', liveId, match[1])
-      }
-      else {
-        // 可选：输出未匹配行便于调试
-        log('[download.ts]ffmpeg stderr(no match):', msg.trim())
-      }
+  // spawn ffmpeg to download and merge ts segments
+  // -bsf:a aac_adtstoasc: HLS TS 里的 AAC 是 ADTS 格式，MP4 容器需要 ASC 格式，必须转封装
+  // -movflags +faststart: 正常结束时把 moov atom 移到文件头，播放器可立即打开
+  const ffmpeg = spawn(ffmpegPath, [
+    '-hide_banner',
+    '-loglevel',
+    'info',
+    '-y',
+    '-i',
+    url,
+    '-c',
+    'copy',
+    '-bsf:a',
+    'aac_adtstoasc',
+    '-movflags',
+    '+faststart',
+    filePath,
+  ])
+  log('[download.ts]spawn ffmpeg start', filePath)
+  // 解析 stderr 中的进度信息，推送给渲染进程
+  ffmpeg.stderr.on('data', (chunk) => {
+    const msg = chunk.toString()
+    const match = msg.match(TIME_REGEX)
+    if (match && match[1]) {
+      log('[download.ts]spawn ffmpeg progress', match[1])
+      event.sender.send('downloadTaskProgress', liveId, match[1])
+    }
+    else {
+      // 可选：输出未匹配行便于调试
+      log('[download.ts]ffmpeg stderr(no match):', msg.trim())
+    }
+  })
+  const startPromise = new Promise<string>((resolve, reject) => {
+    ffmpeg.once('spawn', () => {
+      resolve(filePath)
     })
-    // Handle close event; treat SIGINT as normal completion
-    ffmpeg.on('close', (code, signal) => {
-      if (code === 0 || signal === 'SIGINT') {
-        log('[download.ts]spawn ffmpeg end', liveId, filePath)
-        event.sender.send('downloadTaskEnd', liveId, filePath)
-        resolve(filePath)
-      }
-      else {
-        const errMsg = `[download.ts]ffmpeg exited with code ${code}`
-        event.sender.send('downloadTaskError', liveId, errMsg)
-        reject(new Error(errMsg))
-      }
-    })
-    ffmpeg.on('error', (err) => {
+    ffmpeg.once('error', (err) => {
       error('[download.ts]spawn ffmpeg error', err)
       const errMsg = `[download.ts]ffmpeg error: ${err.message}`
       event.sender.send('downloadTaskError', liveId, errMsg)
       reject(new Error(errMsg))
     })
-    // 支持外部 stop：向 ffmpeg stdin 写 'q' 优雅退出
-    // 注意：Windows 上 kill('SIGINT') 实际是强杀进程，ffmpeg 来不及写 MP4 文件尾（moov atom），
-    // 文件会损坏打不开；写 'q' 让 ffmpeg 自己收尾后再退出
-    ipcMain.once(`downloadTaskStop:${liveId}`, () => {
-      if (!ffmpeg.killed && ffmpeg.exitCode === null) {
-        try {
-          ffmpeg.stdin.write('q')
-          log('[download.ts]download task stopped by user (graceful)', liveId)
-        }
-        catch (e) {
-          warn('[download.ts]graceful stop failed, fallback to kill', e)
-          ffmpeg.kill('SIGINT')
-        }
-      }
-    })
   })
+  // Handle close event; treat SIGINT as normal completion
+  ffmpeg.on('close', (code, signal) => {
+    if (code === 0 || signal === 'SIGINT') {
+      log('[download.ts]spawn ffmpeg end', liveId, filePath)
+      event.sender.send('downloadTaskEnd', liveId, filePath)
+    }
+    else {
+      const errMsg = `[download.ts]ffmpeg exited with code ${code}`
+      event.sender.send('downloadTaskError', liveId, errMsg)
+    }
+  })
+  // 支持外部 stop：向 ffmpeg stdin 写 'q' 优雅退出
+  // 注意：Windows 上 kill('SIGINT') 实际是强杀进程，ffmpeg 来不及写 MP4 文件尾（moov atom），
+  // 文件会损坏打不开；写 'q' 让 ffmpeg 自己收尾后再退出
+  ipcMain.once(`downloadTaskStop:${liveId}`, () => {
+    if (!ffmpeg.killed && ffmpeg.exitCode === null) {
+      try {
+        ffmpeg.stdin.write('q')
+        log('[download.ts]download task stopped by user (graceful)', liveId)
+      }
+      catch (e) {
+        warn('[download.ts]graceful stop failed, fallback to kill', e)
+        ffmpeg.kill('SIGINT')
+      }
+    }
+  })
+
+  // IPC 调用只表示 ffmpeg 已成功启动；下载结束由 downloadTaskEnd/downloadTaskError 通知。
+  return startPromise
 })
