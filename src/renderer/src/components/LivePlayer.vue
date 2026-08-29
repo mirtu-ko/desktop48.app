@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RecordTaskPayload } from '../assets/js/task-payload'
+import type { TaskPayload } from '../assets/js/task-payload'
 import { Loading, Refresh, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
@@ -404,7 +404,7 @@ async function record() {
   fetchLiveDetail().then(async (detail) => {
     const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
     const filename = `${realName.value} ${date}.flv`
-    const recordTask: RecordTaskPayload = {
+    const recordTask: TaskPayload = {
       url: detail.playStreamPath,
       filename,
       liveId: props.liveId,

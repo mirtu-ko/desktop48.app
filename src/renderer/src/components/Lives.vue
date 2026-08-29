@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -218,14 +219,15 @@ async function onInfiniteScroll() {
       <el-tab-pane label="直播列表" name="Home">
         <el-container>
           <el-header class="header-box">
-            <el-button type="primary" @click="refresh">
+            <span v-if="liveList.length > 0" class="live-count">已加载 {{ liveList.length }} 个直播</span>
+            <el-button type="primary" :icon="Refresh" :loading="loading" @click="refresh">
               刷新
             </el-button>
           </el-header>
           <div v-loading="loading" class="live-main">
             <!-- 无直播时显示 -->
-            <div v-if="!loading && liveList.length === 0" class="live-info">
-              当前没有直播
+            <div v-if="!loading && liveList.length === 0" class="live-empty">
+              <el-empty description="当前没有直播" />
             </div>
 
             <!-- 有直播时显示 -->
@@ -239,8 +241,11 @@ async function onInfiniteScroll() {
             >
               <div class="live-list">
                 <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">
-                  <LiveItem :item="item" class="live-card" />
+                  <LiveItem :item="item" />
                 </div>
+              </div>
+              <div v-if="noMore" class="list-end">
+                没有更多直播了
               </div>
             </el-scrollbar>
           </div>
@@ -279,18 +284,30 @@ async function onInfiniteScroll() {
   overflow: hidden;
 }
 
+.header-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.live-count {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
 .live-main {
-  height: calc(100%);
+  height: calc(100% - 60px);
   overflow: hidden;
 }
 
 .scrollbar-wrapper {
-  height: calc(100% - 60px);
+  height: 100%;
   overflow-x: hidden !important;
 }
-.live-info {
-  height: calc(100% - 150px);
-  overflow: hidden;
+
+.live-empty {
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -298,20 +315,20 @@ async function onInfiniteScroll() {
 
 .live-list {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 0.3fr));
-}
-
-:deep(.el-card__body) {
-  padding: 6px !important;
-}
-
-:deep(.el-card__header) {
-  padding: 8px !important;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* 留出卡片悬停上浮与阴影的空间 */
+  padding: 12px 16px 8px;
 }
 
 .live-item {
-  overflow: hidden;
-  background: #fff;
+  min-width: 0;
+}
+
+.list-end {
+  padding: 16px 0 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 </style>

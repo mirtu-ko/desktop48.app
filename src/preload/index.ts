@@ -59,6 +59,8 @@ const api = {
     return () => ipcRenderer.removeListener('downloadTaskError', listener)
   },
   downloadTaskStop: (liveId: string) => ipcRenderer.send(`downloadTaskStop:${liveId}`),
+  downloadTaskList: () => ipcRenderer.invoke('downloadTaskList'),
+  downloadTaskRemove: (liveId: string) => ipcRenderer.invoke('downloadTaskRemove', liveId),
   // 录制
   recordTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('recordTaskStart', url, filename, liveId),
   recordTaskProgress: (callback: (_liveId: string, _time: string) => void) => {
@@ -77,6 +79,8 @@ const api = {
     return () => ipcRenderer.removeListener('recordTaskError', listener)
   },
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
+  recordTaskList: () => ipcRenderer.invoke('recordTaskList'),
+  recordTaskRemove: (liveId: string) => ipcRenderer.invoke('recordTaskRemove', liveId),
   // 阻止系统休眠
   preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
   // 允许系统休眠

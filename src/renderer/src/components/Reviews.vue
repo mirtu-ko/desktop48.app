@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref, watch } from 'vue'
 import Apis from '../assets/js/apis'
@@ -234,7 +235,7 @@ onMounted(() => {
                 placeholder="请选择分团" clearable filterable :options="groupOptions"
               />
             </div>
-            <el-button style="margin-left: 8px;" type="primary" @click="refresh">
+            <el-button style="margin-left: 8px;" :icon="Refresh" type="primary" @click="refresh">
               刷新
             </el-button>
           </el-header>
@@ -300,12 +301,15 @@ onMounted(() => {
 
 .review-list {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 0.3fr));
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* 留出卡片悬停上浮与阴影的空间 */
+  padding: 12px 16px 8px;
 }
 
 .review-item {
   cursor: pointer;
+  min-width: 0;
 }
 
 .loading-more-tip {
@@ -313,14 +317,6 @@ onMounted(() => {
   color: #888;
   padding: 12px 0 16px 0;
   font-size: 14px;
-}
-
-:deep(.el-card__body) {
-  padding: 6px !important;
-}
-
-:deep(.el-card__header) {
-  padding: 8px !important;
 }
 
 html,

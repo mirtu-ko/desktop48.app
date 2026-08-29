@@ -78,7 +78,7 @@ onUnmounted(() => {
           回放
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.Shows">
-          演出
+          公演
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.DOWNLOADS">
           下载

@@ -55,20 +55,11 @@ export default class Constants {
   }
 
   /**
-   * 下载状态
+   * 任务状态（下载/录制共用）
    */
-  public static readonly DownloadStatus = {
+  public static readonly TaskStatus = {
     Prepared: 0,
-    Downloading: 1,
-    Finish: 2,
-  }
-
-  /**
-   * 录制状态
-   */
-  public static readonly RecordStatus = {
-    Prepared: 0,
-    Recording: 1,
+    Running: 1,
     Finish: 2,
   }
 
