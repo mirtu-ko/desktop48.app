@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Refresh } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
@@ -20,6 +19,9 @@ const noMore = ref(false)
 const liveScrollRef = ref<any>(null)
 const scrollDistance = 10
 
+// 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
+let listRequestId = 0
+
 const disabled = computed(() => loading.value || noMore.value)
 
 // 更新隐藏的成员ID
@@ -32,21 +34,17 @@ async function updateHiddenMemberIds() {
 
 // 加载更多
 async function getLiveList() {
+  const requestId = ++listRequestId
   // console.log('[Lives.vue] getLiveList 方法开始执行')
   loading.value = true
   try {
     await updateHiddenMemberIds()
-    const content = await Apis.instance().lives(liveNext.value)
-    // console.log('获取到的直播列表:', content)
-    if (noMore.value) {
-      ElMessage({
-        message: '加载完毕，没有更多直播了',
-        type: 'info',
-      })
-      noMore.value = true
-      loading.value = false
+    if (requestId !== listRequestId)
       return
-    }
+    const content = await Apis.instance().lives(liveNext.value)
+    if (requestId !== listRequestId)
+      return
+    // console.log('获取到的直播列表:', content)
     if (content.next === '0') {
       noMore.value = true
     }
@@ -70,10 +68,14 @@ async function getLiveList() {
         console.error('获取成员信息失败:', e)
       }
     }))
+    if (requestId !== listRequestId)
+      return
     liveList.value.push(...visibleItems)
     loading.value = false
   }
   catch (error) {
+    if (requestId !== listRequestId)
+      return
     console.info(error)
     loading.value = false
   }
@@ -117,8 +119,12 @@ function onTabRemove(targetName: string) {
 // 修改播放方法
 function play(item: any) {
   const exists = liveTabs.value.some((tab: any) => tab.liveId === item.liveId)
-  if (exists)
+  if (exists) {
+    const tab = liveTabs.value.find((tab: any) => tab.liveId === item.liveId)
+    if (tab)
+      activeName.value = tab.name
     return
+  }
 
   const liveTab = {
     label: `${item.userInfo.nickname}的直播间`,
@@ -261,6 +267,7 @@ async function onInfiniteScroll() {
         closable
       >
         <LivePlayer
+          :active="activeName === tab.name"
           :live-title="tab.title"
           :live-id="tab.liveId"
           :start-time="tab.startTime"

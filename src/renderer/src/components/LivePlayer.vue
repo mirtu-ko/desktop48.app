@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../assets/js/task-payload'
-import { Loading, Refresh, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
+import { Refresh, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -32,6 +32,8 @@ const props = defineProps({
   source: { type: String, default: 'user' },
   /** open 模式下的顶部头像（队伍 logo，完整 URL） */
   avatarUrl: { type: String, default: '' },
+  /** 当前 tab 是否为激活页，false 时后台暂停（停播放器/定时器、释放防休眠，保留本地流便于快速恢复） */
+  active: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['close'])
@@ -46,6 +48,8 @@ const videoBoxRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const retryCount = ref(0)
 const maxRetries = 3
+// 切走后台后保留本地流的时间上限（毫秒），超过则销毁，避免长期占用拉流资源
+const BACKGROUND_STREAM_TTL = 60_000
 const isManuallyUnmounted = ref(false)
 const streamRestartToken = ref(0)
 const isRecoveringStream = ref(false)
@@ -125,7 +129,9 @@ const onlineNumTimer = ref<ReturnType<typeof setInterval> | null>(null)
 let activeStreamRequestId = 0
 let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
 let elapsedTimer: ReturnType<typeof setInterval> | null = null
+let backgroundDestroyTimer: ReturnType<typeof setTimeout> | null = null
 let playerWatchStopHandle: (() => void) | null = null
+let activeWatchStopHandle: (() => void) | null = null
 let resizeObserver: ResizeObserver | null = null
 let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
 
@@ -166,7 +172,7 @@ async function getOne() {
   isRecoveringStream.value = false
   try {
     const data = await fetchLiveDetail()
-    if (isManuallyUnmounted.value)
+    if (isManuallyUnmounted.value || !props.active)
       return
     console.log('获取到的直播信息:', data)
     applyLiveDetail(data)
@@ -282,6 +288,13 @@ function resetMediaElement() {
   mediaElement.oncanplay = null
 }
 
+function pauseMediaElement() {
+  const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
+  if (!mediaElement)
+    return
+  mediaElement.pause()
+}
+
 async function stopCurrentLiveStream() {
   const currentStreamId = streamId.value
   if (!currentStreamId)
@@ -328,7 +341,7 @@ async function restartLiveStream(rtmpUrl: string) {
 
 // 网络抖动、链接过期等都走这里的统一重试节奏，避免并发重连。
 function scheduleStreamRetry() {
-  if (isManuallyUnmounted.value || isRecoveringStream.value)
+  if (isManuallyUnmounted.value || !props.active || isRecoveringStream.value)
     return
 
   if (retryCount.value < maxRetries) {
@@ -365,6 +378,8 @@ function scheduleStreamRetry() {
         console.error('停止直播流失败:', err)
       })
     }
+    // 重试耗尽视为直播结束，直接关闭当前 tab
+    emit('close')
   }
 }
 
@@ -419,11 +434,154 @@ async function record() {
   })
 }
 
-startOnlineNumTimer()
+// 基于本地 HTTP-FLV 地址创建并挂载 mpegts 播放器
+function setupPlayer(path: string) {
+  const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
+  if (!mediaElement || !path)
+    return
 
-onMounted(async () => {
-  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
+  // 播放地址变化时，销毁旧实例并按最新本地 FLV 地址重新挂载。
+  destroyLivePlayer()
+
+  if (!mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
+    loading.value = false
+    ElMessage.error('当前环境不支持 HTTP-FLV 直播播放')
+    return
+  }
+
+  const player = mpegts.createPlayer({
+    type: 'flv',
+    isLive: true,
+    cors: true,
+    withCredentials: false,
+    url: path,
+  }, {
+    enableWorker: true,
+    enableStashBuffer: false,
+    isLive: true,
+    lazyLoad: false,
+    liveBufferLatencyChasing: true,
+    liveBufferLatencyMaxLatency: 1.5,
+    liveBufferLatencyMinRemain: 0.3,
+    liveSync: true,
+    liveSyncMaxLatency: 1.2,
+    liveSyncTargetLatency: 0.6,
+    liveSyncPlaybackRate: 1.2,
+  })
+
+  livePlayer = player
+  player.attachMediaElement(mediaElement)
+  player.load()
+  void Promise.resolve(player.play()).catch((error) => {
+    console.error('[LivePlayer.vue] 自动播放失败:', error)
+  })
+
+  mediaElement.oncanplay = () => {
+    loading.value = false
+    isRecoveringStream.value = false
+    if (!isRadio.value) {
+      updateVideoDimensions()
+    }
+  }
+
+  if (!isRadio.value)
+    mediaElement.onloadedmetadata = () => updateVideoDimensions()
+
+  mediaElement.onerror = () => {
+    handleStreamError('native media error')
+  }
+
+  player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+    if (isManuallyUnmounted.value) {
+      player.destroy()
+      if (livePlayer === player)
+        livePlayer = null
+      return
+    }
+
+    console.error('[LivePlayer.vue] HTTP-FLV 错误:', errorType, errorDetail, errorInfo)
+    if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
+      loading.value = true
+      scheduleStreamRetry()
+      return
+    }
+
+    handleStreamError(`${errorType}:${errorDetail}`)
+  })
+}
+
+// 后台暂停：销毁播放器、停定时器、释放防休眠；但保留本地流进程与其地址，
+// 恢复时可跳过重新拉源、直接重建播放器，实现秒切。
+function pauseLive() {
+  if (isManuallyUnmounted.value)
+    return
+  clearStreamRetryTimer()
+  // 保留播放器与本地流，仅暂停底层媒体，切回时直接续播、不重建缓冲
+  if (livePlayer)
+    livePlayer.pause()
+  pauseMediaElement()
+  stopOnlineNumTimer()
+  stopElapsedTimer()
+  if (powerSaveBlockerId.value !== null) {
+    window.mainAPI.allowSleep(powerSaveBlockerId.value)
+    powerSaveBlockerId.value = null
+  }
+  // 后台停留超过阈值则销毁本地流，避免长期占用拉流资源
+  startBackgroundDestroyTimer()
+}
+
+function clearBackgroundDestroyTimer() {
+  if (backgroundDestroyTimer) {
+    clearTimeout(backgroundDestroyTimer)
+    backgroundDestroyTimer = null
+  }
+}
+
+// 后台停留过久，销毁本地流并清空缓存地址；恢复时会走全量重新拉流。
+// 若在定时器已触发、清理尚未完成时用户切回，则取消清理以保持流畅。
+async function clearBackgroundStream() {
+  clearBackgroundDestroyTimer()
+  if (props.active || isManuallyUnmounted.value)
+    return
+  destroyLivePlayer()
+  resetMediaElement()
+  await stopCurrentLiveStream()
+  playStreamPath.value = ''
+  isRecoveringStream.value = false
+}
+
+function startBackgroundDestroyTimer() {
+  clearBackgroundDestroyTimer()
+  backgroundDestroyTimer = setTimeout(async () => {
+    backgroundDestroyTimer = null
+    await clearBackgroundStream()
+  }, BACKGROUND_STREAM_TTL)
+}
+
+async function resumeLive() {
+  if (isManuallyUnmounted.value)
+    return
+  clearBackgroundDestroyTimer()
+  if (powerSaveBlockerId.value === null)
+    powerSaveBlockerId.value = await window.mainAPI.preventSleep()
   startElapsedTimer()
+  startOnlineNumTimer()
+  // 播放器仍在则直接续播（期间未销毁本地流），否则按缓存地址重建或全量拉流
+  if (livePlayer) {
+    void Promise.resolve(livePlayer.play()).catch((error) => {
+      console.error('[LivePlayer.vue] 恢复播放失败:', error)
+    })
+  }
+  else if (playStreamPath.value) {
+    setupPlayer(playStreamPath.value)
+  }
+  else {
+    await getOne()
+  }
+}
+
+onMounted(() => {
+  console.log('[LivePlayer.vue] onMounted', props)
 
   if (!isRadio.value && videoBoxRef.value) {
     boxDimensions.value = {
@@ -445,88 +603,32 @@ onMounted(async () => {
 
   if (nativeVideo.value)
     nativeVideo.value.addEventListener('resize', handleNativeVideoResize)
-})
 
-onMounted(() => {
-  console.log('[LivePlayer.vue] onMounted', props)
-  getOne()
   playerWatchStopHandle = watch(
     () => playStreamPath.value,
     (newPath) => {
-      const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
-      if (!mediaElement || !newPath)
+      // 暂停状态下不建播放器（resume 时会自行重建）
+      if (isManuallyUnmounted.value || !props.active)
         return
-
-      // 播放地址变化时，销毁旧实例并按最新本地 FLV 地址重新挂载。
-      destroyLivePlayer()
-
-      if (!mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
-        loading.value = false
-        ElMessage.error('当前环境不支持 HTTP-FLV 直播播放')
-        return
-      }
-
-      const player = mpegts.createPlayer({
-        type: 'flv',
-        isLive: true,
-        cors: true,
-        withCredentials: false,
-        url: newPath,
-      }, {
-        enableWorker: true,
-        enableStashBuffer: false,
-        isLive: true,
-        lazyLoad: false,
-        liveBufferLatencyChasing: true,
-        liveBufferLatencyMaxLatency: 1.5,
-        liveBufferLatencyMinRemain: 0.3,
-        liveSync: true,
-        liveSyncMaxLatency: 1.2,
-        liveSyncTargetLatency: 0.6,
-        liveSyncPlaybackRate: 1.2,
-      })
-
-      livePlayer = player
-      player.attachMediaElement(mediaElement)
-      player.load()
-      void Promise.resolve(player.play()).catch((error) => {
-        console.error('[LivePlayer.vue] 自动播放失败:', error)
-      })
-
-      mediaElement.oncanplay = () => {
-        loading.value = false
-        isRecoveringStream.value = false
-        if (!isRadio.value) {
-          updateVideoDimensions()
-        }
-      }
-
-      if (!isRadio.value)
-        mediaElement.onloadedmetadata = () => updateVideoDimensions()
-
-      mediaElement.onerror = () => {
-        handleStreamError('native media error')
-      }
-
-      player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
-        if (isManuallyUnmounted.value) {
-          player.destroy()
-          if (livePlayer === player)
-            livePlayer = null
-          return
-        }
-
-        console.error('[LivePlayer.vue] HTTP-FLV 错误:', errorType, errorDetail, errorInfo)
-        if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
-          loading.value = true
-          scheduleStreamRetry()
-          return
-        }
-
-        handleStreamError(`${errorType}:${errorDetail}`)
-      })
+      setupPlayer(newPath)
     },
     { immediate: true },
+  )
+
+  // 初始即激活则启动会话，否则保持后台暂停
+  if (props.active)
+    resumeLive()
+
+  activeWatchStopHandle = watch(
+    () => props.active,
+    (active) => {
+      if (isManuallyUnmounted.value)
+        return
+      if (active)
+        resumeLive()
+      else
+        pauseLive()
+    },
   )
 })
 
@@ -535,9 +637,14 @@ onUnmounted(() => {
   activeStreamRequestId++
   clearStreamRetryTimer()
   stopElapsedTimer()
+  clearBackgroundDestroyTimer()
   if (playerWatchStopHandle) {
     playerWatchStopHandle()
     playerWatchStopHandle = null
+  }
+  if (activeWatchStopHandle) {
+    activeWatchStopHandle()
+    activeWatchStopHandle = null
   }
   destroyLivePlayer()
   resetMediaElement()
@@ -601,6 +708,7 @@ onUnmounted(() => {
         controls
         autoplay
         class="audio-player"
+        :class="{ 'media-hidden': loading }"
       />
     </div>
     <div v-else class="video-wrapper" :style="videoWrapperStyle">
@@ -609,15 +717,24 @@ onUnmounted(() => {
         controls
         autoplay
         class="video-player"
+        :class="{ 'media-hidden': loading }"
         :style="videoStyle"
         :poster="coverImage"
       />
     </div>
     <div v-if="loading" class="loading-container">
-      <el-icon color="#FFFFFF" class="is-loading" size="24px">
-        <Loading />
-      </el-icon>
-      <span class="loading-text">正在加载直播...</span>
+      <div v-if="coverImage" class="loading-bg" :style="{ backgroundImage: `url(${coverImage})` }" />
+      <div class="loading-spinner" aria-hidden="true">
+        <div class="ring ring--outer" />
+        <div class="ring ring--inner" />
+      </div>
+      <div class="loading-text">
+        <span class="loading-text__label">正在加载直播</span>
+        <span class="loading-text__dots"><span>.</span><span>.</span><span>.</span></span>
+      </div>
+      <div class="loading-hint">
+        连接直播源中，请稍候
+      </div>
     </div>
     <div class="tag-container">
       <el-tag v-if="liveType === 1 && liveMode === 0">
@@ -648,6 +765,11 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   min-height: 200px;
+}
+
+/* 加载期间隐藏媒体元素本体，避免浏览器原生 buffering 转圈与自定义 overlay 叠加 */
+.video-box .media-hidden {
+  opacity: 0;
 }
 
 .video-box-background {
@@ -702,14 +824,99 @@ onUnmounted(() => {
 
 .loading-container {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 20px;
   z-index: 10;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 用封面图作加载背景，0.1 透明度淡显，不遮挡居中内容 */
+.loading-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.1;
+  z-index: 0;
+}
+
+.loading-spinner,
+.loading-text,
+.loading-hint {
+  position: relative;
+  z-index: 1;
+}
+
+.loading-spinner {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner .ring {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.ring--outer {
+  inset: 0;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  border-top-color: #409eff;
+  box-shadow: 0 0 18px rgba(64, 158, 255, 0.35);
+  animation: spin 1.1s linear infinite;
+}
+
+.ring--inner {
+  inset: 11px;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-bottom-color: #a0b8ff;
+  animation: spin 0.8s linear infinite reverse;
+}
+
+.loading-text {
+  display: flex;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.94);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+.loading-text__dots {
+  display: inline-flex;
+  margin-left: 2px;
+  overflow: hidden;
+}
+
+.loading-text__dots span {
+  animation: dot-bounce 1.2s ease-in-out infinite;
+  color: #409eff;
+  font-weight: 700;
+}
+
+.loading-text__dots span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.loading-text__dots span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.loading-hint {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .tag-container {
@@ -782,17 +989,21 @@ onUnmounted(() => {
   }
 }
 
-.loading-text {
-  color: #fff;
-  font-size: 14px;
-}
-
-@keyframes rotating {
-  from {
-    transform: rotate(0deg);
-  }
+@keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes dot-bounce {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
   }
 }
 </style>

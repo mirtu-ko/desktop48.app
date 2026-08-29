@@ -9,3 +9,4 @@ build/icons
 .DS_Store
 .eslintcache
 *.log*
+.trae/rules/git-commit-message.md
