@@ -950,7 +950,7 @@ onUnmounted(() => {
   width: 360px;
   flex-shrink: 0;
   min-height: 0;
-  background: #fafbfc;
+  background: var(--el-bg-color-page);
 }
 
 .video-box-inner {

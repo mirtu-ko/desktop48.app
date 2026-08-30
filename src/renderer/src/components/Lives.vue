@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
+import useLoadMore from '../assets/js/use-load-more'
 import LiveItem from '../components/LiveItem.vue'
 import LivePlayer from '../components/LivePlayer.vue'
 
@@ -16,13 +17,19 @@ const liveNext = ref('0')
 const loading = ref(false)
 const noMore = ref(false)
 
-const liveScrollRef = ref<any>(null)
-const scrollDistance = 10
-
 // 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
 let listRequestId = 0
 
 const disabled = computed(() => loading.value || noMore.value)
+
+const liveScrollRef = ref<any>(null)
+
+// 统一的触底加载：直播/回放/公演三页共用同一套交互逻辑
+const { onInfiniteScroll } = useLoadMore({
+  load: getLiveList,
+  disabled,
+  scrollbarRef: liveScrollRef,
+})
 
 // 更新隐藏的成员ID
 const hiddenMemberIds = ref<number[]>([])
@@ -208,20 +215,6 @@ watch(() => route.query.openLiveId, () => {
 onUnmounted(() => {
   EventBus.off('open-live-tab', openLiveTabHandler)
 })
-
-async function onInfiniteScroll() {
-  // el-scrollbar 的 end-reached 不受 infinite-scroll-disabled 约束，需手动拦截，
-  // 否则加载中或已无更多数据时会用重置后的 next 重复请求第一页
-  if (disabled.value)
-    return
-  const wrap: HTMLElement | undefined = liveScrollRef.value?.wrapRef
-  if (wrap) {
-    const nearBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - scrollDistance - 1
-    if (!nearBottom)
-      return
-  }
-  await getLiveList()
-}
 </script>
 
 <template>
@@ -245,9 +238,8 @@ async function onInfiniteScroll() {
             <el-scrollbar
               v-if="liveList.length > 0"
               ref="liveScrollRef"
-              :infinite-scroll-disabled="disabled"
               class="scrollbar-wrapper"
-              :distance="scrollDistance"
+              :distance="10"
               @end-reached="onInfiniteScroll"
             >
               <div class="live-list">
@@ -340,12 +332,5 @@ async function onInfiniteScroll() {
 
 .live-item {
   min-width: 0;
-}
-
-.list-end {
-  padding: 16px 0 24px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
 }
 </style>

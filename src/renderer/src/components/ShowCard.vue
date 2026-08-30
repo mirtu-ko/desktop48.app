@@ -75,10 +75,10 @@ function formatTime(stime: string): string {
   justify-content: center;
   padding: 12px 16px;
   text-align: center;
-  color: #8a8a8a;
+  color: var(--el-text-color-secondary);
   font-size: 15px;
   line-height: 1.4;
-  background: linear-gradient(135deg, #f2f2f6 0%, #e4e6ec 100%);
+  background: linear-gradient(135deg, var(--el-fill-color-light) 0%, var(--el-fill-color) 100%);
   overflow: hidden;
   word-break: break-all;
 }
@@ -107,7 +107,7 @@ function formatTime(stime: string): string {
 .show-info h3 {
   margin: 10px 0 4px;
   font-size: 16px;
-  color: #333;
+  color: var(--el-text-color-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

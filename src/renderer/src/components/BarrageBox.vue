@@ -82,8 +82,8 @@ const emptyText = computed(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #fff;
-  border-left: 1px solid #ebeef5;
+  background: var(--el-bg-color);
+  border-left: 1px solid var(--el-border-color-lighter);
 }
 
 .panel-header {
@@ -92,7 +92,7 @@ const emptyText = computed(() => {
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .header-line {
@@ -103,17 +103,17 @@ const emptyText = computed(() => {
 
 .meta {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .meta-time {
   margin-left: auto;
-  color: #19be6b;
+  color: var(--el-color-success);
 }
 
 .search-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 /* min-height: 0 是必需的，否则 flex 子项会被内容撑开导致外层出现滚动条 */

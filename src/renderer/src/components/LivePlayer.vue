@@ -868,15 +868,15 @@ onUnmounted(() => {
 .ring--outer {
   inset: 0;
   border: 3px solid rgba(255, 255, 255, 0.14);
-  border-top-color: #409eff;
-  box-shadow: 0 0 18px rgba(64, 158, 255, 0.35);
+  border-top-color: var(--brand-primary);
+  box-shadow: 0 0 18px rgba(108, 92, 231, 0.35);
   animation: spin 1.1s linear infinite;
 }
 
 .ring--inner {
   inset: 11px;
   border: 3px solid rgba(255, 255, 255, 0.12);
-  border-bottom-color: #a0b8ff;
+  border-bottom-color: var(--brand-primary-light);
   animation: spin 0.8s linear infinite reverse;
 }
 
@@ -898,7 +898,7 @@ onUnmounted(() => {
 
 .loading-text__dots span {
   animation: dot-bounce 1.2s ease-in-out infinite;
-  color: #409eff;
+  color: var(--brand-primary-light);
   font-weight: 700;
 }
 

@@ -1,3 +1,27 @@
+/* ============ 精致浅色主题 ============ */
+:root {
+  /* 品牌色 */
+  --brand-primary: #6c5ce7;
+  --brand-primary-light: #8f7dfa;
+  --brand-secondary: #ff8ab0;
+
+  /* Element Plus 主题色覆写（浅色） */
+  --el-color-primary: #6c5ce7;
+  --el-color-primary-light-3: #9990ef;
+  --el-color-primary-light-5: #b6b0f4;
+  --el-color-primary-light-7: #d3d0f9;
+  --el-color-primary-light-8: #e1dffb;
+  --el-color-primary-light-9: #f0effd;
+  --el-color-primary-dark-2: #5449cd;
+
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 20px;
+
+  --el-bg-color-page: #f6f7fb;
+  --el-card-border-radius: 12px;
+}
+
 html,
 body,
 #app,
@@ -6,6 +30,55 @@ body,
   margin: 0;
   height: 100%;
   overflow: hidden;
+  background: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
+  font-family: 'PingFang SC', 'Helvetica Neue', Helvetica, 'Microsoft YaHei', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 主内容区：柔和渐变底 + 角落淡彩光晕 */
+.el-main {
+  background:
+    radial-gradient(1100px 480px at 90% -8%, rgba(108, 92, 231, 0.05), transparent 60%),
+    radial-gradient(900px 420px at -8% 108%, rgba(255, 138, 176, 0.04), transparent 55%), var(--el-bg-color-page);
+}
+
+/* 顶栏：透明底 + 细分隔线，与渐变背景融合 */
+.el-header {
+  background: transparent;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+/* 分区标题 */
+.el-divider__text {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background-color: var(--el-bg-color-page);
+}
+
+/* 精致滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(31, 35, 70, 0.18);
+  border-radius: 8px;
+
+  &:hover {
+    background: rgba(31, 35, 70, 0.32);
+  }
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 列表触底提示（直播/回放/公演三页统一） */
+.list-end {
+  padding: 16px 0 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 
 .team-badge {

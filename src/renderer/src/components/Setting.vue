@@ -98,12 +98,12 @@ async function setUserAgent() {
   >
     <div class="setting-root">
       <el-divider content-position="left">
-        更新成员信息
+        更新成员数据库
       </el-divider>
 
       <el-card style="text-align: left;" shadow="hover">
         <el-button type="primary" :loading="isUpdating" @click="updateInfo">
-          更新成员信息
+          更新成员数据库
         </el-button>
       </el-card>
 

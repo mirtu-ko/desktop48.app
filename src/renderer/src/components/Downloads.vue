@@ -113,8 +113,8 @@ onMounted(() => {
 })
 
 const taskGroups = computed(() => [
-  { kind: 'download' as TaskKind, title: '回放下载任务', emptyText: '未有下载任务', tasks: downloadTasks.value },
-  { kind: 'record' as TaskKind, title: '直播录制任务', emptyText: '未有录制任务', tasks: recordTasks.value },
+  { kind: 'download' as TaskKind, title: '回放下载任务', emptyText: '无下载任务', tasks: downloadTasks.value },
+  { kind: 'record' as TaskKind, title: '直播录制任务', emptyText: '无录制任务', tasks: recordTasks.value },
 ])
 
 // 在 setup 阶段就订阅（早于 onMounted）：播放页跳转后立即 emit 事件，

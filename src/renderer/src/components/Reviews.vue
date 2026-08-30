@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Refresh } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref, watch } from 'vue'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import Tools from '../assets/js/tools'
+import useLoadMore from '../assets/js/use-load-more'
 import LiveItem from '../components/LiveItem.vue'
 import ReviewPlayer from './ReviewPlayer.vue'
 
@@ -30,8 +30,6 @@ async function updateHiddenMemberIds() {
 
 const teamOptions = ref<any[]>([])
 const groupOptions = ref<any[]>([])
-const reviewScrollRef = ref<any>(null)
-const scrollDistance = 10
 const whitespaceRegex = /\s+/g
 
 function filterMethod(node: any, keyword: string) {
@@ -63,7 +61,21 @@ onMounted(async () => {
 
 // 获取录播列表
 const disabled = computed(() => loading.value || noMore.value)
+
+const reviewScrollRef = ref<any>(null)
+
+// 统一的触底加载：直播/回放/公演三页共用同一套交互逻辑
+const { onInfiniteScroll } = useLoadMore({
+  load: getReviewList,
+  disabled,
+  scrollbarRef: reviewScrollRef,
+})
+
+// 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
+let listRequestId = 0
+
 async function getReviewList() {
+  const requestId = ++listRequestId
   const params: {
     userId: string
     teamId: string
@@ -88,45 +100,49 @@ async function getReviewList() {
     default:
       break
   }
-  params.next = reviewNext.value
   loading.value = true
-  await updateHiddenMemberIds()
-  Apis.instance().reviews(params).then(async (content: any) => {
+  try {
+    await updateHiddenMemberIds()
+    if (requestId !== listRequestId)
+      return
+    const content = await Apis.instance().reviews(params)
+    if (requestId !== listRequestId)
+      return
     if (!content || !Array.isArray(content.liveList)) {
       console.warn('liveList 不是数组或无内容', content?.liveList)
       noMore.value = true
-      loading.value = false
-      return
-    }
-    if (noMore.value) {
-      ElMessage({
-        message: '加载完毕',
-        type: 'success',
-      })
-      noMore.value = true
-      loading.value = false
       return
     }
     if (content.next == '0' || content.liveList.length === 0) {
       noMore.value = true
     }
     reviewNext.value = content.next
-    for (const item of content.liveList) {
-      if (hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)))
-        continue
+
+    // 过滤被屏蔽成员，并行补全成员信息，避免逐条串行 await 拖慢列表加载
+    const visibleItems = content.liveList.filter(
+      (item: any) => !hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
+    )
+    await Promise.all(visibleItems.map(async (item: any) => {
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
       item.member = await window.mainAPI.getMember(item.userInfo.userId)
       item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
-      reviewList.value.push(item)
-      // console.log('当前列表长度:', reviewList.value.length)
-    }
-    loading.value = false
-  }).catch((error: any) => {
+    }))
+    if (requestId !== listRequestId)
+      return
+    // 兜底去重，避免接口分页边界返回重复项导致列表出现重复卡片
+    const existedIds = new Set(reviewList.value.map((item: any) => item.liveId))
+    reviewList.value.push(...visibleItems.filter((item: any) => !existedIds.has(item.liveId)))
+  }
+  catch (error) {
+    if (requestId !== listRequestId)
+      return
     console.info(error)
     noMore.value = true
+  }
+  finally {
     loading.value = false
-  })
+  }
 }
 
 // 点击回放
@@ -160,32 +176,6 @@ watch(reviewTabs, (newTabs: any) => {
 }, {
   deep: true,
 })
-
-// 加载更多
-const isLoadingMore = ref(false)
-
-async function onInfiniteScroll() {
-  const wrap: HTMLElement | undefined = reviewScrollRef.value?.wrapRef
-  if (wrap) {
-    const nearBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - scrollDistance
-    if (!nearBottom)
-      return
-  }
-  console.log('触发加载更多', {
-    isLoadingMore: isLoadingMore.value,
-    loading: loading.value,
-    noMore: noMore.value,
-  })
-  if (isLoadingMore.value || loading.value || noMore.value)
-    return
-  isLoadingMore.value = true
-  try {
-    await getReviewList()
-  }
-  finally {
-    isLoadingMore.value = false
-  }
-}
 
 // 刷新
 function refresh() {
@@ -237,15 +227,14 @@ function refresh() {
             </el-button>
           </el-header>
 
-          <div v-if="reviewList.length === 0 && !loading" style="text-align:center; color:#999; padding:120px 0;">
+          <div v-if="reviewList.length === 0 && !loading" class="review-empty">
             暂无回放
           </div>
           <el-scrollbar
             ref="reviewScrollRef"
             v-loading="loading"
             class="scrollbar-wrapper"
-            :infinite-scroll-disabled="disabled"
-            :distance="scrollDistance"
+            :distance="10"
             @end-reached="onInfiniteScroll"
           >
             <div class="review-list">
@@ -256,8 +245,8 @@ function refresh() {
                 <LiveItem :item="item" class="live-card" />
               </div>
             </div>
-            <div v-if="isLoadingMore" class="loading-more-tip">
-              正在加载更多...
+            <div v-if="noMore" class="list-end">
+              没有更多回放了
             </div>
           </el-scrollbar>
         </div>
@@ -323,10 +312,9 @@ function refresh() {
   min-width: 0;
 }
 
-.loading-more-tip {
+.review-empty {
+  padding: 120px 0;
   text-align: center;
-  color: #888;
-  padding: 12px 0 16px 0;
-  font-size: 14px;
+  color: var(--el-text-color-placeholder);
 }
 </style>

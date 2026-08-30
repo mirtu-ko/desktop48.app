@@ -6,6 +6,7 @@ import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
+import useLoadMore from '../assets/js/use-load-more'
 import ShowCard from '../components/ShowCard.vue'
 
 const router = useRouter()
@@ -13,8 +14,21 @@ const router = useRouter()
 const showList = ref<OpenLive[]>([])
 const next = ref('0')
 const loading = ref(false)
+/** 是否已无更多可加载（下一页游标为 0） */
+const noMore = ref(false)
 /** 当前团体 groupId：0=全部 10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT */
 const groupId = ref('0')
+
+const disabled = computed(() => loading.value || noMore.value)
+
+const showsScrollRef = ref<any>(null)
+
+// 统一的触底加载：直播/回放/公演三页共用同一套交互逻辑
+const { onInfiniteScroll } = useLoadMore({
+  load: () => fetchShows(true),
+  disabled,
+  scrollbarRef: showsScrollRef,
+})
 
 /** 加载失败的封面 liveId（空 URL 或 404 都走占位图） */
 const brokenImages = ref(new Set<string>())
@@ -52,6 +66,9 @@ async function fetchShows(append = false) {
       showList.value = list
     }
     next.value = content.next || '0'
+    // getOpenLiveList 的 next 是"最后一场开演时间"游标：有数据时永远是时间戳，
+    // 只有拉回空列表（或返回 '0'）才算没有更多，不能只靠 next === '0' 判断
+    noMore.value = list.length === 0 || content.next === '0'
     console.log('获取演出信息成功:', showList.value)
   }
   catch (error) {
@@ -62,18 +79,19 @@ async function fetchShows(append = false) {
   }
 }
 
-async function loadMore() {
-  await fetchShows(true)
-}
-
 onMounted(async () => {
   await fetchShows()
+  // 首屏数据太少（不足一屏）时不会触发 end-reached，主动补拉下一页直到填满或无更多
+  await onInfiniteScroll()
 })
 
-/** 切换团体：重置翻页游标后重新拉取 */
+/** 切换团体：重置翻页游标后重新拉取，并回到列表顶部 */
 watch(groupId, async () => {
   next.value = '0'
+  noMore.value = false
   await fetchShows()
+  showsScrollRef.value?.setScrollTop?.(0)
+  await onInfiniteScroll()
 })
 
 /** 分组：当日开演 → “即将开始”，其余 → “最近公演” */
@@ -122,48 +140,53 @@ function openLiveStream(show: OpenLive) {
       <el-tab-pane label="CKG48" name="13" />
       <el-tab-pane label="CGT48" name="14" />
     </el-tabs>
-    <el-scrollbar wrap-class="scrollbar-wrapper">
-      <div class="shows-container">
-        <template v-if="todayShows.length">
-          <h2>即将开始</h2>
-          <div class="shows-list">
-            <div
-              v-for="show in todayShows"
-              :key="show.liveId"
-              class="show-item"
-              :class="{ clickable: show.status === 2 }"
-              @click="openLiveStream(show)"
-            >
-              <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+    <div class="shows-main">
+      <el-scrollbar
+        ref="showsScrollRef"
+        class="scrollbar-wrapper"
+        :distance="10"
+        @end-reached="onInfiniteScroll"
+      >
+        <div class="shows-container">
+          <template v-if="todayShows.length">
+            <h2>即将开始</h2>
+            <div class="shows-list">
+              <div
+                v-for="show in todayShows"
+                :key="show.liveId"
+                class="show-item"
+                :class="{ clickable: show.status === 2 }"
+                @click="openLiveStream(show)"
+              >
+                <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+              </div>
             </div>
-          </div>
-        </template>
+          </template>
 
-        <template v-if="recentShows.length">
-          <h2>最近公演</h2>
-          <div class="shows-list">
-            <div
-              v-for="show in recentShows"
-              :key="show.liveId"
-              class="show-item"
-              :class="{ clickable: show.status === 2 }"
-              @click="openLiveStream(show)"
-            >
-              <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+          <template v-if="recentShows.length">
+            <h2>最近公演</h2>
+            <div class="shows-list">
+              <div
+                v-for="show in recentShows"
+                :key="show.liveId"
+                class="show-item"
+                :class="{ clickable: show.status === 2 }"
+                @click="openLiveStream(show)"
+              >
+                <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+              </div>
             </div>
-          </div>
-        </template>
+          </template>
 
-        <div v-if="!showList.length && !loading">
-          <p>暂无演出信息</p>
+          <div v-if="!showList.length && !loading">
+            <p>暂无演出信息</p>
+          </div>
         </div>
-        <div v-if="next !== '0'" class="load-more">
-          <el-button :loading="loading" @click="loadMore">
-            加载更多
-          </el-button>
+        <div v-if="noMore" class="list-end">
+          没有更多公演了
         </div>
-      </div>
-    </el-scrollbar>
+      </el-scrollbar>
+    </div>
   </div>
 </template>
 
@@ -173,12 +196,24 @@ function openLiveStream(show: OpenLive) {
   overflow: hidden;
 }
 
+.shows-main {
+  height: calc(100% - 60px);
+  overflow: hidden;
+}
+
 .shows-container {
-  padding: 0 10px;
+  padding: 8px 10px 12px;
+
+  h2 {
+    margin: 14px 4px 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
 }
 
 .scrollbar-wrapper {
-  height: calc(100% - 60px);
+  height: 100%;
   overflow-x: hidden !important;
 }
 
@@ -189,12 +224,14 @@ function openLiveStream(show: OpenLive) {
 }
 
 .show-item {
-  border: 1px solid #eee;
-  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
   overflow: hidden;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease-in-out;
+  background: var(--el-bg-color);
+  box-shadow: var(--el-box-shadow-light);
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
 }
 
 .show-item.clickable {
@@ -202,13 +239,7 @@ function openLiveStream(show: OpenLive) {
 }
 
 .show-item.clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.load-more {
-  display: flex;
-  justify-content: center;
-  padding: 20px 0;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(31, 35, 70, 0.12);
 }
 </style>
