@@ -99,11 +99,7 @@ onUnmounted(() => {
     <div v-show="activeTab === 'live'" v-loading="loading" class="live-main">
       <!-- 无直播时显示 -->
       <div v-if="!loading && liveList.length === 0" class="live-empty">
-        <el-empty description="当前没有直播">
-          <el-button type="primary" :icon="Refresh" @click="refreshList">
-            刷新
-          </el-button>
-        </el-empty>
+        <el-empty description="当前没有直播" />
       </div>
 
       <!-- 有直播时显示 -->

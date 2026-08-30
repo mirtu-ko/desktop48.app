@@ -14,7 +14,7 @@ function onInitialized() {
 
 <template>
   <div id="app">
-    <Initialize v-if="!isInitialized" @on-initialized="onInitialized" />
+    <Initialize v-if="!isInitialized" @initialized="onInitialized" />
     <Index v-else />
     <!-- <Versions /> -->
   </div>

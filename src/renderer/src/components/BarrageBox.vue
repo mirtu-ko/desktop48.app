@@ -17,7 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ seek: [seconds: number] }>()
 
-const startDate = Tools.dateFormat(Number.parseInt(props.startTime as any), 'yyyy-MM-dd hh:mm')
+const startDate = Tools.dateFormat(props.startTime, 'yyyy-MM-dd hh:mm')
 const keyword = ref('')
 
 const statusType = computed(() => props.barrageLoaded ? 'success' : 'info')

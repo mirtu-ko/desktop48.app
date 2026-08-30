@@ -103,8 +103,8 @@ onMounted(async () => {
   await onInfiniteScroll()
 })
 
-/** 刷新：重置翻页游标后重新拉取，并回到列表顶部 */
-async function refresh() {
+/** 刷新/切换团体共用：重置翻页游标后重新拉取，并回到列表顶部 */
+async function reload() {
   next.value = '0'
   noMore.value = false
   await fetchShows()
@@ -112,14 +112,11 @@ async function refresh() {
   await onInfiniteScroll()
 }
 
-/** 切换团体：重置翻页游标后重新拉取，并回到列表顶部 */
-watch(groupId, async () => {
-  next.value = '0'
-  noMore.value = false
-  await fetchShows()
-  showsScrollRef.value?.setScrollTop?.(0)
-  await onInfiniteScroll()
-})
+/** 刷新按钮：重置分页后拉取最新列表 */
+const refresh = reload
+
+/** 切换团体：重置分页后重新拉取该团体公演 */
+watch(groupId, reload)
 
 /** 分组：当日开演 → “即将开始”，其余 → “最近公演” */
 function isToday(stime: string): boolean {

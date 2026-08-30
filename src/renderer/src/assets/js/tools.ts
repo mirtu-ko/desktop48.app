@@ -1,9 +1,16 @@
 const YI_ZHI_BO_HOST = 'alcdn.hls.xiaoka.tv'
 
 class Tools {
-  public static readonly APP_DATA_PATH: string = '' // Electron环境下需通过主进程或window.electron暴露;
-
   private static readonly STREAM_PATH_REGEX = /^(http|https):\/\/([^/]+)\/(\d+)/
+
+  /**
+   * 将相对路径 / 相对图片路径归一化为 source.48.cn 完整 URL；已是完整 URL 时原样返回
+   */
+  private static toSourceUrl(path: string): string {
+    if (path.includes('http'))
+      return path
+    return `https://source.48.cn${path}`
+  }
 
   private static readonly DATE_FORMAT_REGEXES: Record<string, RegExp> = {
     'M+': /(M+)/,
@@ -23,53 +30,37 @@ class Tools {
    * @returns {string[]} 完整的图片URL数组
    */
   public static pictureUrls(picturesStr: string) {
-    const pictures = picturesStr.split(',')
-    return pictures.map((picture) => {
-      if (picture.includes('http')) {
-        return picture
-      }
-      else {
-        return `https://source.48.cn${picture}`
-      }
-    })
+    return picturesStr.split(',').map(picture => Tools.toSourceUrl(picture))
   }
 
   public static sourceUrl(sourcePath: string) {
-    if (sourcePath.includes('http://') || sourcePath.includes('https://')) {
-      return sourcePath
-    }
-    else {
-      return `https://source.48.cn${sourcePath}`
-    }
+    return Tools.toSourceUrl(sourcePath)
   }
 
   public static timeToSecond(time: string): number {
     if (!time) {
       return 0
     }
-    const hours = time.split(':')[0]
-    const minutes = time.split(':')[1]
-    const seconds = time.split(':')[2]
+    const [hours, minutes, seconds] = time.split(':')
     return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds)
   }
 
   public static lyricsParse(lyrics: string) {
-    if (typeof lyrics === 'undefined') {
+    if (!lyrics) {
       console.error('lyrics undefined')
+      return []
     }
     const barrages: any[] = []
     const lines = lyrics.split('\n')
     lines.forEach((line: string) => {
-      if (typeof line !== 'undefined') {
-        const tmp = line.split(']')
-        if (typeof tmp !== 'undefined' && tmp.length > 1) {
-          const arr = tmp[1].split('\t')
-          barrages.push({
-            time: tmp[0].replace('[', ''),
-            username: arr[0],
-            content: arr[1],
-          })
-        }
+      const tmp = line.split(']')
+      if (tmp.length > 1) {
+        const arr = tmp[1].split('\t')
+        barrages.push({
+          time: tmp[0].replace('[', ''),
+          username: arr[0],
+          content: arr[1],
+        })
       }
     })
     return barrages

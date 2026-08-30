@@ -9,12 +9,26 @@ window.mainAPI.getMemberOptions().then((options: any[]) => {
 })
 const selectedMember = ref<any[]>([])
 
+const whitespaceRegex = /\s+/g
+
+// 成员支持拼音/首字母/缩写检索，与回放筛选保持一致
+function filterMethod(node: any, keyword: string) {
+  const label = node.text || node.label
+  const pinyin = node.data?.pinyin?.replace(whitespaceRegex, '') || ''
+  const abbr = node.data?.abbr?.replace(whitespaceRegex, '') || ''
+  const searchText = keyword.toLowerCase()
+  return (
+    (label && label.toLowerCase().includes(searchText))
+    || (pinyin && pinyin.toLowerCase().includes(searchText))
+    || (abbr && abbr.toLowerCase().includes(searchText))
+  )
+}
+
 // 屏蔽成员
 const hiddenMembers = ref<any[]>([])
 
 onMounted(async () => {
   hiddenMembers.value = await window.mainAPI.getHiddenMembers()
-  console.log('hiddenMembers', hiddenMembers.value)
 })
 
 async function clear() {
@@ -23,7 +37,6 @@ async function clear() {
 }
 
 async function addHiddenMember() {
-  console.log(selectedMember.value)
   if (typeof selectedMember.value[2] === 'undefined') {
     ElMessage({
       message: '请选中需要屏蔽的成员',
@@ -42,7 +55,6 @@ async function addHiddenMember() {
   const tempIds = hiddenMembers.value.map((m: any) => m.userId)
   tempIds.push(selectedMember.value[2])
   window.mainAPI.setHiddenMembers(tempIds)
-  console.log(tempIds)
   selectedMember.value = []
   hiddenMembers.value = await window.mainAPI.getHiddenMembers()
 }
@@ -56,8 +68,7 @@ async function removeHidMember(memberId: number) {
 <template>
   <div style="text-align: left;">
     <el-cascader
-      v-model="selectedMember" style="width: 320px;" transfer placeholder="请选择成员" clearable filterable
-      :options="members"
+      v-model="selectedMember" style="width: 320px;" transfer placeholder="请选择成员" clearable filterable :filter-method="filterMethod" :options="members"
     />
     <el-button style="margin-left: 8px;" type="primary" @click="addHiddenMember">
       屏蔽

@@ -59,8 +59,8 @@ const whitespaceRegex = /\s+/g
 
 function filterMethod(node: any, keyword: string) {
   const label = node.text || node.label
-  const pinyin = node.data?.pinyin.replace(whitespaceRegex, '') || ''
-  const abbr = node.data?.abbr.replace(whitespaceRegex, '') || ''
+  const pinyin = node.data?.pinyin?.replace(whitespaceRegex, '') || ''
+  const abbr = node.data?.abbr?.replace(whitespaceRegex, '') || ''
   const searchText = keyword.toLowerCase()
   return (
     (label && label.toLowerCase().includes(searchText))
