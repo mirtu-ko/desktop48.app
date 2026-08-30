@@ -19,9 +19,9 @@ const pathToMenu = {
 
 const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Constants.Menu.LIVES)
 
-function handleMenuSelect(index: string) {
-  activeIndex.value = index
-  router.push(index)
+function changeMenu(menu: string) {
+  activeIndex.value = menu
+  router.push(menu)
 }
 
 // 路由变化时自动同步菜单高亮
@@ -42,10 +42,7 @@ function handleBeforeUnload() {
 }
 
 onMounted(async () => {
-  changeMenuHandler = (menu: string) => {
-    activeIndex.value = menu
-    router.push(menu)
-  }
+  changeMenuHandler = changeMenu
   EventBus.on('change-selected-menu', changeMenuHandler)
   // 当数据库没有成员信息时
   if (!(await window.mainAPI.hasMembers?.())) {
@@ -69,7 +66,7 @@ onUnmounted(() => {
     <el-aside style="width: 200px;">
       <el-menu
         :default-active="activeIndex" mode="vertical" router class="side-menu" background-color="#545c64"
-        text-color="#fff" active-text-color="#ffd04b" @select="handleMenuSelect"
+        text-color="#fff" active-text-color="#ffd04b" @select="changeMenu"
       >
         <el-menu-item :index="Constants.Menu.LIVES">
           直播
@@ -108,7 +105,7 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .el-main {
-  height: calc(100%);
+  height: 100%;
 }
 
 .side-menu {

@@ -56,7 +56,6 @@ const isRecoveringStream = ref(false)
 const rotationAngle = ref(0)
 const videoWidth = ref(0)
 const videoHeight = ref(0)
-const videoWH = ref(0)
 const boxDimensions = ref({ width: 0, height: 0 })
 const coverImage = ref('')
 const onlineNum = ref(0)
@@ -112,7 +111,6 @@ const videoWrapperStyle = computed(() => {
 const videoStyle = computed(() => {
   if (isVerticalRotation.value) {
     return {
-      objectFit: 'contain' as const,
       maxWidth: '100%',
       maxHeight: '100%',
       width: 'auto',
@@ -235,7 +233,7 @@ function updateOnlineNum() {
 }
 
 function rotateLeft() {
-  rotationAngle.value = (rotationAngle.value - 90) % 360
+  rotationAngle.value = ((rotationAngle.value - 90) % 360 + 360) % 360
 }
 
 function rotateRight() {
@@ -253,7 +251,6 @@ function updateVideoDimensions() {
 
     videoWidth.value = nextVideoWidth
     videoHeight.value = nextVideoHeight
-    videoWH.value = nextVideoHeight > 0 ? nextVideoWidth / nextVideoHeight : 0
   }
 }
 

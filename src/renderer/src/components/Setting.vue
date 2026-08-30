@@ -22,10 +22,14 @@ function updateInfo() {
   })
 }
 
-// 下载目录
+// 下载目录 / ffmpeg目录 / User-Agent
 const downloadDirectory = ref('')
+const ffmpegDirectory = ref('')
+const userAgent = ref('')
 onMounted(async () => {
   downloadDirectory.value = await window.mainAPI.getConfig('downloadDirectory')
+  ffmpegDirectory.value = await window.mainAPI.getConfig('ffmpegDirectory', '')
+  userAgent.value = await window.mainAPI.getConfig('userAgent', Constants.DEFAULT_USER_AGENT)
 })
 
 async function setDownloadDirectory() {
@@ -43,12 +47,6 @@ async function setDownloadDirectory() {
 async function openDownloadDirectory() {
   window.mainAPI.openPath(downloadDirectory.value)
 }
-
-// ffmpeg目录
-const ffmpegDirectory = ref('')
-onMounted(async () => {
-  ffmpegDirectory.value = await window.mainAPI.getConfig('ffmpegDirectory', '')
-})
 
 async function setFfmpegDirectory() {
   const dir = await window.mainAPI.selectDirectory()
@@ -84,11 +82,6 @@ async function openFfmpegDirectory() {
   window.mainAPI.openPath(ffmpegDirectory.value)
 }
 
-// User-Agent
-const userAgent = ref('')
-onMounted(async () => {
-  userAgent.value = await window.mainAPI.getConfig('userAgent', Constants.DEFAULT_USER_AGENT)
-})
 async function setUserAgent() {
   await window.mainAPI.setConfig('userAgent', userAgent.value)
   ElMessage({
@@ -118,11 +111,10 @@ async function setUserAgent() {
         User-Agent设置
       </el-divider>
 
-      <el-card style="margin-top: 16px;" shadow="hover">
-        <div style="display: flex;flex-direction: row;width: 720px;">
-          <el-input v-model="userAgent" style="" type="text" placeholder="设置User-Agent" />
-
-          <el-button style="margin-left: 8px;" type="primary" @click="setUserAgent">
+      <el-card class="setting-card" shadow="hover">
+        <div class="setting-row setting-row--wide">
+          <el-input v-model="userAgent" type="text" placeholder="设置User-Agent" />
+          <el-button type="primary" @click="setUserAgent">
             设置
           </el-button>
         </div>
@@ -132,15 +124,13 @@ async function setUserAgent() {
         默认下载目录
       </el-divider>
 
-      <el-card style="margin-top: 16px;" shadow="hover">
-        <div style="display: flex;flex-direction: row; width: 640px;">
+      <el-card class="setting-card" shadow="hover">
+        <div class="setting-row setting-row--narrow">
           <el-input v-model="downloadDirectory" type="text" placeholder="下载目录" readonly @click="setDownloadDirectory" />
-
-          <el-button style="margin-left: 8px;" type="primary" @click="setDownloadDirectory">
+          <el-button type="primary" @click="setDownloadDirectory">
             选择
           </el-button>
-
-          <el-button style="margin-left: 8px;" type="success" @click="openDownloadDirectory">
+          <el-button type="success" @click="openDownloadDirectory">
             打开目录
           </el-button>
         </div>
@@ -150,15 +140,13 @@ async function setUserAgent() {
         ffmpeg目录
       </el-divider>
 
-      <el-card style="margin-top: 16px;" shadow="hover">
-        <div style="display: flex;flex-direction: row; width: 640px;">
+      <el-card class="setting-card" shadow="hover">
+        <div class="setting-row setting-row--narrow">
           <el-input v-model="ffmpegDirectory" type="text" placeholder="ffmpeg目录" readonly @click="setFfmpegDirectory" />
-
-          <el-button style="margin-left: 8px;" type="primary" @click="setFfmpegDirectory">
+          <el-button type="primary" @click="setFfmpegDirectory">
             选择
           </el-button>
-
-          <el-button style="margin-left: 8px;" type="success" @click="openFfmpegDirectory">
+          <el-button type="success" @click="openFfmpegDirectory">
             打开目录
           </el-button>
         </div>
@@ -168,7 +156,7 @@ async function setUserAgent() {
         屏蔽成员直播|回放
       </el-divider>
 
-      <el-card style="margin-top: 16px;" shadow="hover">
+      <el-card class="setting-card" shadow="hover">
         <HiddenMembers />
       </el-card>
     </div>
@@ -179,5 +167,22 @@ async function setUserAgent() {
 .scrollbar-wrapper,
 .setting-root {
   height: 100%;
+}
+
+.setting-card {
+  margin-top: 16px;
+}
+
+.setting-row {
+  display: flex;
+  gap: 8px;
+}
+
+.setting-row--wide {
+  width: 720px;
+}
+
+.setting-row--narrow {
+  width: 640px;
 }
 </style>

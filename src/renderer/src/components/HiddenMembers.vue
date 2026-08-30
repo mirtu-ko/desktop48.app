@@ -39,7 +39,7 @@ async function addHiddenMember() {
     })
     return
   }
-  const tempIds = Array.from(hiddenMembers.value.map((m: any) => m.userId))
+  const tempIds = hiddenMembers.value.map((m: any) => m.userId)
   tempIds.push(selectedMember.value[2])
   window.mainAPI.setHiddenMembers(tempIds)
   console.log(tempIds)
@@ -80,7 +80,7 @@ async function removeHidMember(memberId: number) {
   </div>
 </template>
 
-<style lang="scss">
+<style scoped lang="scss">
 .el-tag {
   margin: 4px;
   border-color: #fff !important;

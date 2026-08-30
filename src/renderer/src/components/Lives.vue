@@ -57,7 +57,6 @@ async function getLiveList() {
     await Promise.all(visibleItems.map(async (item: any) => {
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
-      item.isReview = true
       item.date = Tools.dateFormat(Number.parseInt(item.ctime), 'yyyy-MM-dd hh:mm:ss')
       // 并行补全成员信息
       try {
@@ -302,6 +301,11 @@ async function onInfiniteScroll() {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
+}
+
+/* 无数据时左侧计数被隐藏，用 margin-left:auto 把刷新按钮始终钉在右侧 */
+.header-box .el-button {
+  margin-left: auto;
 }
 
 .live-count {

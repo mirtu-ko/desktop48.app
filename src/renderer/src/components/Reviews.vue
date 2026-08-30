@@ -32,13 +32,12 @@ const teamOptions = ref<any[]>([])
 const groupOptions = ref<any[]>([])
 const reviewScrollRef = ref<any>(null)
 const scrollDistance = 10
-const pinyinRegex = /\s+/g
-const abbrRegex = /\s+/g
+const whitespaceRegex = /\s+/g
 
 function filterMethod(node: any, keyword: string) {
   const label = node.text || node.label
-  const pinyin = node.data?.pinyin.replace(pinyinRegex, '') || ''
-  const abbr = node.data?.abbr.replace(abbrRegex, '') || ''
+  const pinyin = node.data?.pinyin.replace(whitespaceRegex, '') || ''
+  const abbr = node.data?.abbr.replace(whitespaceRegex, '') || ''
   const searchText = keyword.toLowerCase()
   return (
     (label && label.toLowerCase().includes(searchText))
@@ -54,6 +53,12 @@ onMounted(async () => {
   memberOption.value = await window.mainAPI.getMemberTree()
   console.log('memberOption.value', memberOption.value)
   updateHiddenMemberIds()
+  getReviewList()
+  // 从 localStorage 中加载标签页数据
+  const savedTabs = localStorage.getItem('reviewTabs')
+  if (savedTabs) {
+    reviewTabs.value = JSON.parse(savedTabs)
+  }
 })
 
 // 获取录播列表
@@ -85,7 +90,7 @@ async function getReviewList() {
   }
   params.next = reviewNext.value
   loading.value = true
-  updateHiddenMemberIds()
+  await updateHiddenMemberIds()
   Apis.instance().reviews(params).then(async (content: any) => {
     if (!content || !Array.isArray(content.liveList)) {
       console.warn('liveList 不是数组或无内容', content?.liveList)
@@ -111,7 +116,6 @@ async function getReviewList() {
         continue
       item.cover = Tools.pictureUrls(item.coverPath)
       item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
-      item.isReview = true
       item.member = await window.mainAPI.getMember(item.userInfo.userId)
       item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
       reviewList.value.push(item)
@@ -190,16 +194,6 @@ function refresh() {
   noMore.value = false
   getReviewList()
 }
-
-// 初始化
-onMounted(() => {
-  getReviewList()
-  // 从 localStorage 中加载标签页数据
-  const savedTabs = localStorage.getItem('reviewTabs')
-  if (savedTabs) {
-    reviewTabs.value = JSON.parse(savedTabs)
-  }
-})
 </script>
 
 <template>
@@ -272,7 +266,6 @@ onMounted(() => {
       <el-tab-pane
         v-for="reviewTab in reviewTabs" :key="reviewTab.name" closable :label="reviewTab.label"
         :name="reviewTab.name"
-        @close="onTabRemove(reviewTab.name)"
       >
         <ReviewPlayer
           :live-id="reviewTab.liveId" :start-time="reviewTab.startTime" :live-title="reviewTab.title"
@@ -306,8 +299,8 @@ onMounted(() => {
 
 .header-box {
   display: flex;
-  align-items: right;
-  justify-content: right;
+  align-items: center;
+  justify-content: flex-end;
   padding: 12px;
   width: 100%;
 }
@@ -335,12 +328,5 @@ onMounted(() => {
   color: #888;
   padding: 12px 0 16px 0;
   font-size: 14px;
-}
-
-html,
-body,
-#app {
-  height: 100%;
-  overflow: hidden;
 }
 </style>

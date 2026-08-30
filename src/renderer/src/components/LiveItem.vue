@@ -186,7 +186,6 @@ const liveBadge = computed(() => {
 
     .team-badge {
       flex-shrink: 0;
-      margin-left: 0;
     }
   }
 
