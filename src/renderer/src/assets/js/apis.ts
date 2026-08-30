@@ -35,20 +35,13 @@ export default class Apis {
   /**
    * 同步成员信息
    */
-  public syncInfo(): Promise<any> {
+  public async syncInfo(): Promise<any> {
     console.log('[apis.ts]开始更新成员信息')
-    return new Promise((resolve, reject) => {
-      this.request(ApiUrls.UPDATE_INFO_URL, {}, {})
-        .then(async (content: any) => {
-          // 更新数据到数据库
-          console.log('[apis.ts]更新成员信息', content)
-          await window.mainAPI.saveMemberData(content)
-          resolve(content)
-        })
-        .catch((error) => {
-          reject(error)
-        })
-    })
+    // 更新数据到数据库
+    const content = await this.request(ApiUrls.UPDATE_INFO_URL, {}, {})
+    console.log('[apis.ts]更新成员信息', content)
+    await window.mainAPI.saveMemberData(content)
+    return content
   }
 
   /**
@@ -133,35 +126,26 @@ export default class Apis {
     return Request.get(barrageUrl)
   }
 
-  private request(url: string, data: any, headers: any): Promise<any> {
+  private async request(url: string, data: any, headers: any): Promise<any> {
     console.log('[apis.ts]request:', url, data)
-    return new Promise((resolve, reject) => {
-      Request.post(url, data, headers)
-        .then((responseBody) => {
-          // console.log('[apis.ts]response:', responseBody)
-          if (typeof responseBody === 'string') {
-            try {
-              responseBody = JSON.parse(responseBody)
-            }
-            catch (e) {
-              console.warn('[apis.ts]responseBody 不是 JSON', responseBody, e)
-              reject(new Error(`[apis.ts]接口返回非JSON：${responseBody}`))
-              return
-            }
-          }
-          if (responseBody && responseBody.success) {
-            resolve(responseBody.content)
-          }
-          else {
-            reject(responseBody && responseBody.message ? responseBody.message : '接口无 success 字段')
-            console.log('[apis.ts]reject', responseBody && responseBody.message ? responseBody.message : '接口无 success 字段')
-          }
-        })
-        .catch((error) => {
-          console.error(error)
-          throw new Error(`[apis.ts]request error ${error}`)
-        })
-    })
+    let responseBody = await Request.post(url, data, headers)
+    if (typeof responseBody === 'string') {
+      try {
+        responseBody = JSON.parse(responseBody)
+      }
+      catch (e) {
+        console.warn('[apis.ts]responseBody 不是 JSON', responseBody, e)
+        throw new Error(`[apis.ts]接口返回非JSON：${responseBody}`)
+      }
+    }
+    if (responseBody && responseBody.success) {
+      return responseBody.content
+    }
+    else {
+      const message = responseBody && responseBody.message ? responseBody.message : '接口无 success 字段'
+      console.log('[apis.ts]reject', message)
+      throw new Error(message)
+    }
   }
 
   /**

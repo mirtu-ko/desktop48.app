@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { Download, Microphone, Setting, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
+import FloatPlayerHost from './FloatPlayerHost.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,7 +13,6 @@ const route = useRoute()
 // 路由 path 与菜单 index 的映射
 const pathToMenu = {
   '/lives': Constants.Menu.LIVES,
-  '/reviews': Constants.Menu.REVIEWS,
   '/shows': Constants.Menu.Shows,
   '/downloads': Constants.Menu.DOWNLOADS,
   '/setting': Constants.Menu.SETTING,
@@ -19,9 +20,9 @@ const pathToMenu = {
 
 const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Constants.Menu.LIVES)
 
-function handleMenuSelect(index: string) {
-  activeIndex.value = index
-  router.push(index)
+function changeMenu(menu: string) {
+  activeIndex.value = menu
+  router.push(menu)
 }
 
 // 路由变化时自动同步菜单高亮
@@ -34,18 +35,8 @@ watch(
 
 let changeMenuHandler: any
 
-// 用原生 beforeunload 在页面卸载前同步清理 localStorage，
-// 避免依赖主进程发消息+强制销毁窗口的脆弱时序（localStorage 是同步 API）
-function handleBeforeUnload() {
-  localStorage.removeItem('liveTabs')
-  localStorage.removeItem('reviewTabs')
-}
-
 onMounted(async () => {
-  changeMenuHandler = (menu: string) => {
-    activeIndex.value = menu
-    router.push(menu)
-  }
+  changeMenuHandler = changeMenu
   EventBus.on('change-selected-menu', changeMenuHandler)
   // 当数据库没有成员信息时
   if (!(await window.mainAPI.hasMembers?.())) {
@@ -53,38 +44,48 @@ onMounted(async () => {
     await Apis.instance().syncInfo()
     console.log('[Index.vue]数据库没有成员信息, 同步完成')
   }
-
-  // 页面卸载前清理缓存（窗口关闭/刷新都会触发）
-  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 onUnmounted(() => {
   EventBus.off('change-selected-menu', changeMenuHandler)
-  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 
 <template>
   <el-container>
-    <el-aside style="width: 200px;">
+    <el-aside class="app-aside" width="220px">
+      <div class="app-brand">
+        <div class="app-logo">
+          48
+        </div>
+        <div class="brand-text">
+          <div class="app-title">
+            Desktop48
+          </div>
+          <div class="app-sub">
+            SNH48 直播助手
+          </div>
+        </div>
+      </div>
       <el-menu
-        :default-active="activeIndex" mode="vertical" router class="side-menu" background-color="#545c64"
-        text-color="#fff" active-text-color="#ffd04b" @select="handleMenuSelect"
+        :default-active="activeIndex" mode="vertical" router class="side-menu"
+        @select="changeMenu"
       >
         <el-menu-item :index="Constants.Menu.LIVES">
-          直播
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.REVIEWS">
-          回放
+          <el-icon><VideoCamera /></el-icon>
+          <span>直播</span>
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.Shows">
-          公演
+          <el-icon><Microphone /></el-icon>
+          <span>公演</span>
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.DOWNLOADS">
-          下载
+          <el-icon><Download /></el-icon>
+          <span>下载</span>
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.SETTING">
-          设置
+          <el-icon><Setting /></el-icon>
+          <span>设置</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -103,24 +104,98 @@ onUnmounted(() => {
         </keep-alive>
       </router-view>
     </el-main>
+
+    <!-- 全局画中画迷你窗：跨页面持续播放 -->
+    <FloatPlayerHost />
   </el-container>
 </template>
 
 <style scoped lang="scss">
 .el-main {
-  height: calc(100%);
+  height: 100%;
+}
+
+.app-aside {
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color-lighter);
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 16px;
+
+  .app-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+  }
+
+  .brand-text {
+    min-width: 0;
+  }
+
+  .app-title {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--el-text-color-primary);
+  }
+
+  .app-sub {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--el-text-color-secondary);
+  }
 }
 
 .side-menu {
-  height: 100%;
-}
-.side-menu:not(.el-menu--collapse) {
-  min-height: 100%;
-}
+  flex: 1;
+  padding: 6px 0 12px;
+  height: auto;
+  border-right: none;
+  background: transparent;
 
-:deep(.el-menu--vertical) {
-  .el-menu-item {
-    justify-content: center;
+  :deep(.el-menu-item) {
+    height: 44px;
+    margin: 4px 12px;
+    padding: 0 14px !important;
+    border-radius: 10px;
+    color: var(--el-text-color-regular);
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.2s ease;
+
+    .el-icon {
+      margin-right: 8px;
+      font-size: 18px;
+    }
+
+    &:hover {
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
+    }
+
+    &.is-active {
+      background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-light));
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 6px 16px rgba(108, 92, 231, 0.28);
+    }
   }
 }
 </style>

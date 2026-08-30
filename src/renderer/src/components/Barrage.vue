@@ -165,7 +165,7 @@ function resumeFollowing() {
   cursor: pointer;
 
   &:hover {
-    background: #eef4ff;
+    background: var(--el-color-primary-light-9);
   }
 
   .barrage-username {
@@ -174,12 +174,12 @@ function resumeFollowing() {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #18c8cc;
+    color: var(--el-color-primary);
   }
 
   .barrage-time {
     flex-shrink: 0;
-    color: #bfbfbf;
+    color: var(--el-text-color-placeholder);
     font-variant-numeric: tabular-nums;
   }
 
@@ -199,7 +199,7 @@ function resumeFollowing() {
 .barrage-empty {
   padding: 24px 0;
   text-align: center;
-  color: #aaa;
+  color: var(--el-text-color-placeholder);
   font-size: 12px;
 }
 

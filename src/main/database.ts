@@ -11,16 +11,6 @@ interface Team {
   value: string
 }
 
-interface TeamWithMembers {
-  teamName: string
-  members: any[]
-}
-
-interface GroupWithTeams {
-  groupName: string
-  teams: Map<string, TeamWithMembers>
-}
-
 interface MemberTree {
   groupName: string
   teams: Team[]
@@ -41,46 +31,61 @@ class Database {
   public memberTree: MemberTree[] = []
 
   private buildMemberTree() {
-    // 用 groupName/teamName 字符串分组，保持结构不变
-    const groupMap = new Map<string, GroupWithTeams>()
+    // 用 groupName/teamName 字符串分组，保持树状层级；同时记录 groupId / teamId 供回放筛选使用
+    const groupMap = new Map<string, { groupId: number, groupName: string, teams: Map<string, { teamId: number, teamName: string, members: any[] }> }>()
     for (const member of this.db.starInfo || []) {
       const groupName = member.groupName || '未分组'
       const teamName = member.teamName || '未分队'
       if (!groupMap.has(groupName)) {
-        groupMap.set(groupName, {
-          groupName,
-          teams: new Map<string, TeamWithMembers>(),
-        })
+        groupMap.set(groupName, { groupId: member.groupId, groupName, teams: new Map() })
       }
       const group = groupMap.get(groupName)!
+      group.groupId ??= member.groupId
       if (!group.teams.has(teamName)) {
-        group.teams.set(teamName, {
-          teamName,
-          members: [],
-        })
+        group.teams.set(teamName, { teamId: member.teamId, teamName, members: [] })
       }
-      group.teams.get(teamName)!.members.push(member)
+      const team = group.teams.get(teamName)!
+      team.teamId ??= member.teamId
+      team.members.push(member)
     }
-    // 转换为数组结构，直接存到 this.db.memberTree
-    this.memberTree = Array.from(groupMap.values()).map((group: GroupWithTeams) => ({
-      groupName: group.groupName,
-      teams: Array.from(group.teams.values()).map((team: TeamWithMembers) => ({
-        teamName: team.teamName,
-        label: team.teamName,
-        value: team.teamName,
-      })),
-      label: group.groupName,
-      value: group.groupName,
-      children: Array.from(group.teams.values()).map((team: TeamWithMembers) => ({
-        label: team.teamName,
-        value: team.teamName,
-        children: team.members.map((member: any) => ({
-          label: member.realName,
-          value: member.userId,
-          ...member,
-        })),
-      })),
-    }))
+
+    // 排序权重：按 groupSort / teamSort；查不到的排到末尾
+    const groupSortOf = (groupId: number) => {
+      const g = this.db.groupInfo?.find((i: any) => Number(i.groupId) === Number(groupId))
+      return g?.groupSort ?? Number.MAX_SAFE_INTEGER
+    }
+    const teamSortOf = (groupId: number, teamId: number) => {
+      const t = this.db.teamInfo?.find(
+        (i: any) => Number(i.groupId) === Number(groupId) && Number(i.teamId) === Number(teamId),
+      )
+      return t?.teamSort ?? Number.MAX_SAFE_INTEGER
+    }
+
+    // 转换为数组结构，直接存到 this.db.memberTree；group/team/member 的 value 用 id 字符串，便于回放按维度筛选
+    this.memberTree = [...groupMap.values()]
+      .sort((a, b) => groupSortOf(a.groupId) - groupSortOf(b.groupId))
+      .map((group) => {
+        const teamNodes = [...group.teams.values()]
+          .sort((a, b) => teamSortOf(group.groupId, a.teamId) - teamSortOf(group.groupId, b.teamId))
+          .map(team => ({
+            teamName: team.teamName,
+            label: team.teamName,
+            value: String(team.teamId),
+            children: team.members.map((member: any) => ({
+              label: member.realName,
+              value: String(member.userId),
+              ...member,
+            })),
+          }))
+        return {
+          groupName: group.groupName,
+          groupId: group.groupId,
+          label: group.groupName,
+          value: String(group.groupId),
+          teams: teamNodes.map(({ teamName, label, value }: any) => ({ teamName, label, value })),
+          children: teamNodes,
+        }
+      })
     this.db.memberTree = this.memberTree
   }
 

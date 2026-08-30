@@ -17,7 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ seek: [seconds: number] }>()
 
-const startDate = Tools.dateFormat(Number.parseInt(props.startTime as any), 'yyyy-MM-dd hh:mm')
+const startDate = Tools.dateFormat(props.startTime, 'yyyy-MM-dd hh:mm')
 const keyword = ref('')
 
 const statusType = computed(() => props.barrageLoaded ? 'success' : 'info')
@@ -53,13 +53,17 @@ const emptyText = computed(() => {
         <span class="meta">观看人数：{{ number }}</span>
         <span class="meta meta-time">{{ startDate }}</span>
       </div>
-      <el-input
-        v-model="keyword"
-        :prefix-icon="Search"
-        size="small"
-        clearable
-        placeholder="搜索弹幕内容或用户名"
-      />
+      <div class="search-row">
+        <el-input
+          v-model="keyword"
+          :prefix-icon="Search"
+          size="small"
+          clearable
+          placeholder="搜索弹幕内容或用户名"
+        />
+        <!-- 弹幕设置等操作按钮，由父级注入到搜索框后面 -->
+        <slot name="actions" />
+      </div>
       <div v-if="trimmedKeyword" class="search-tip">
         命中 {{ displayItems.length }} 条，点击可跳转
       </div>
@@ -82,8 +86,8 @@ const emptyText = computed(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #fff;
-  border-left: 1px solid #ebeef5;
+  background: var(--el-bg-color);
+  border-left: 1px solid var(--el-border-color-lighter);
 }
 
 .panel-header {
@@ -92,7 +96,7 @@ const emptyText = computed(() => {
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .header-line {
@@ -103,17 +107,27 @@ const emptyText = computed(() => {
 
 .meta {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .meta-time {
   margin-left: auto;
-  color: #19be6b;
+  color: var(--el-color-success);
 }
 
 .search-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .el-input {
+    flex: 1;
+  }
 }
 
 /* min-height: 0 是必需的，否则 flex 子项会被内容撑开导致外层出现滚动条 */

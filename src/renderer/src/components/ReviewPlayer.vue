@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../assets/js/task-payload'
 import type { BarrageListItem } from './Barrage.vue'
-import { Loading } from '@element-plus/icons-vue'
+import { ChatDotRound, Download, Loading, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
@@ -16,9 +16,11 @@ const props = defineProps({
   liveTitle: { type: String, required: true },
   liveId: { type: String, required: true },
   startTime: { type: Number, required: true },
-  // 是否处于前台标签页。标签页切走后 DOM 仍然存在，需要靠这个标记暂停播放
-  active: { type: Boolean, default: true },
+  // 迷你窗紧凑模式：隐藏弹幕侧栏与对应头部按钮，适配画中画小窗口
+  compact: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['avatar', 'orientation'])
 
 const playStreamPath = ref('')
 const isRadio = ref(false)
@@ -38,8 +40,6 @@ const lastPlaybackError = ref('')
 const mediaLoading = ref(true)
 const mediaBuffering = ref(false)
 const sidebarVisible = ref(true)
-// 仅记录“被切到后台而暂停”的情形，用户自己按下的暂停不该在切回时被强行播放
-let pausedByInactive = false
 
 // 弹幕唯一数据源：解析时就把 [hh:mm:ss] 转成秒并排序，
 // 之后所有消费方（右侧列表 / 视频叠加层）都只持有指向它的游标，不再复制数组。
@@ -348,11 +348,6 @@ function stopDanmakuAnimation() {
 // =========== 视频弹幕叠加层结束 ===========
 
 function attemptAutoplay(mediaElement: HTMLMediaElement) {
-  // 后台标签页不自动播放，标记成“因切走而暂停”，切回前台时再补播
-  if (!props.active) {
-    pausedByInactive = true
-    return
-  }
   void Promise.resolve(mediaElement.play()).catch((error) => {
     console.error('[ReviewPlayer.vue] 自动播放失败:', error)
   })
@@ -420,6 +415,13 @@ function bindMediaEvents(mediaElement: HTMLMediaElement) {
   mediaElement.onloadedmetadata = async () => {
     lastPlaybackError.value = ''
     mediaLoading.value = false
+    // 回放无旋转按钮，直接按源宽高比上报横竖屏
+    if (!isRadio.value) {
+      const w = nativeVideo.value?.videoWidth || 0
+      const h = nativeVideo.value?.videoHeight || 0
+      if (w && h)
+        emit('orientation', w > h)
+    }
     await ensureBarragesLoaded()
     attemptAutoplay(mediaElement)
   }
@@ -519,6 +521,7 @@ async function getOne() {
     number.value = data.onlineNum
     realName.value = data.user.userName
     userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
+    emit('avatar', userAvatar.value)
     carousels.value = isRadio.value && data.carousels?.carousels?.length
       ? data.carousels.carousels.map((carousel: string) => Tools.sourceUrl(carousel))
       : []
@@ -543,18 +546,6 @@ async function getOne() {
   }
 }
 
-function play() {
-  const mediaElement = getActiveMediaElement()
-  if (mediaElement) {
-    void mediaElement.play()
-  }
-  else {
-    console.warn('active media element is null')
-  }
-}
-
-defineExpose({ play, download })
-
 // seek 由 onseeking 处理，这里只负责按进度投放弹幕
 function onTimeUpdate(newTime: number) {
   currentTime.value = newTime
@@ -569,21 +560,6 @@ function seekTo(seconds: number) {
     return
   mediaElement.currentTime = Math.max(0, seconds)
   void mediaElement.play()
-}
-
-async function copyStreamPath() {
-  if (!playStreamPath.value) {
-    ElMessage({ message: '播放地址还未就绪', type: 'warning' })
-    return
-  }
-  try {
-    await navigator.clipboard.writeText(playStreamPath.value)
-    ElMessage({ message: '播放地址已复制', type: 'success' })
-  }
-  catch (error) {
-    console.error('[ReviewPlayer.vue] 复制播放地址失败:', error)
-    ElMessage({ message: '复制失败，请手动选取地址', type: 'error' })
-  }
 }
 
 function togglePlay() {
@@ -722,32 +698,10 @@ watch(
   { flush: 'post' },
 )
 
-// 标签页切换：切走时暂停并记账，切回时只恢复那些因切走而暂停的播放
-watch(
-  () => props.active,
-  (isActive) => {
-    const mediaElement = getActiveMediaElement()
-    if (!mediaElement)
-      return
-    if (isActive) {
-      rootRef.value?.focus()
-      if (pausedByInactive) {
-        pausedByInactive = false
-        void mediaElement.play().catch(() => {})
-      }
-    }
-    else if (!mediaElement.paused) {
-      pausedByInactive = true
-      mediaElement.pause()
-    }
-  },
-)
-
 onMounted(async () => {
   loadDanmakuSettings()
   startDanmakuAnimation()
-  if (props.active)
-    rootRef.value?.focus()
+  rootRef.value?.focus()
   await getOne()
 })
 
@@ -760,59 +714,6 @@ onUnmounted(() => {
 
 <template>
   <div ref="rootRef" class="review-player" tabindex="-1" @keydown="onKeydown">
-    <el-header class="header-box">
-      <img :src="userAvatar" alt="avatar" class="header-avatar">
-      <span class="header-title" :title="liveTitle">{{ liveTitle }}</span>
-      <el-tooltip :content="playStreamPath || '播放地址加载中'" placement="bottom">
-        <el-button @click="copyStreamPath">
-          复制地址
-        </el-button>
-      </el-tooltip>
-      <el-popover trigger="click" placement="bottom-end" :width="260">
-        <template #reference>
-          <el-button>弹幕设置</el-button>
-        </template>
-        <div class="danmaku-settings">
-          <div class="setting-row">
-            <span>显示弹幕</span>
-            <el-switch :model-value="settings.enabled" @change="toggleDanmaku" />
-          </div>
-          <div class="setting-row column">
-            <span>不透明度</span>
-            <el-slider v-model="settings.opacity" :min="0.2" :max="1" :step="0.1" @change="saveDanmakuSettings" />
-          </div>
-          <div class="setting-row column">
-            <span>字号</span>
-            <el-slider v-model="settings.fontSize" :min="14" :max="40" :step="2" @change="saveDanmakuSettings" />
-          </div>
-          <div class="setting-row column">
-            <span>速度</span>
-            <el-slider v-model="settings.speed" :min="80" :max="400" :step="20" @change="saveDanmakuSettings" />
-          </div>
-          <div class="setting-row column">
-            <span>显示区域</span>
-            <el-radio-group v-model="settings.area" size="small" @change="saveDanmakuSettings">
-              <el-radio-button :value="0.25">
-                顶部
-              </el-radio-button>
-              <el-radio-button :value="0.5">
-                半屏
-              </el-radio-button>
-              <el-radio-button :value="1">
-                全屏
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-        </div>
-      </el-popover>
-      <el-button @click="sidebarVisible = !sidebarVisible">
-        {{ sidebarVisible ? '隐藏弹幕列表' : '显示弹幕列表' }}
-      </el-button>
-      <el-button type="success" @click="download">
-        下载
-      </el-button>
-    </el-header>
-
     <div class="review-content">
       <div class="video-box">
         <div ref="videoBoxRef" class="video-box-inner">
@@ -873,18 +774,37 @@ onUnmounted(() => {
               <el-button size="small" type="primary" @click="retryPlayback">
                 重试
               </el-button>
-              <el-button size="small" @click="copyStreamPath">
-                复制地址
-              </el-button>
               <el-button size="small" type="success" @click="download">
                 去下载
               </el-button>
             </div>
           </div>
+
+          <div class="player-actions">
+            <el-button circle class="action-btn action-download" title="下载" @click="download">
+              <el-icon>
+                <Download />
+              </el-icon>
+            </el-button>
+          </div>
+
+          <!-- 视频窗口右边缘：hover 时才浮出的弹幕列表显隐竖条（B站式边缘吸附） -->
+          <div v-if="!compact" class="sidebar-toggle">
+            <div
+              class="sidebar-toggle-tab"
+              :title="sidebarVisible ? '隐藏弹幕列表' : '显示弹幕列表'"
+              @click="sidebarVisible = !sidebarVisible"
+            >
+              <el-icon class="toggle-icon">
+                <ChatDotRound />
+              </el-icon>
+              <span class="toggle-label">{{ sidebarVisible ? '收起' : '弹幕' }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div v-show="sidebarVisible" class="barrage-box">
+      <div v-show="sidebarVisible && !compact" class="barrage-box">
         <BarrageBox
           :number="number"
           :start-time="startTime"
@@ -892,7 +812,51 @@ onUnmounted(() => {
           :items="barrageListItems"
           :all-items="barrageEntries"
           @seek="seekTo"
-        />
+        >
+          <template #actions>
+            <el-popover trigger="click" placement="bottom-end" :width="260">
+              <template #reference>
+                <el-button circle class="side-setting-btn" title="弹幕设置">
+                  <el-icon>
+                    <Setting />
+                  </el-icon>
+                </el-button>
+              </template>
+              <div class="danmaku-settings">
+                <div class="setting-row">
+                  <span>显示弹幕</span>
+                  <el-switch :model-value="settings.enabled" @change="toggleDanmaku" />
+                </div>
+                <div class="setting-row column">
+                  <span>不透明度</span>
+                  <el-slider v-model="settings.opacity" :min="0.2" :max="1" :step="0.1" @change="saveDanmakuSettings" />
+                </div>
+                <div class="setting-row column">
+                  <span>字号</span>
+                  <el-slider v-model="settings.fontSize" :min="14" :max="40" :step="2" @change="saveDanmakuSettings" />
+                </div>
+                <div class="setting-row column">
+                  <span>速度</span>
+                  <el-slider v-model="settings.speed" :min="80" :max="400" :step="20" @change="saveDanmakuSettings" />
+                </div>
+                <div class="setting-row column">
+                  <span>显示区域</span>
+                  <el-radio-group v-model="settings.area" size="small" @change="saveDanmakuSettings">
+                    <el-radio-button :value="0.25">
+                      顶部
+                    </el-radio-button>
+                    <el-radio-button :value="0.5">
+                      半屏
+                    </el-radio-button>
+                    <el-radio-button :value="1">
+                      全屏
+                    </el-radio-button>
+                  </el-radio-group>
+                </div>
+              </div>
+            </el-popover>
+          </template>
+        </BarrageBox>
       </div>
     </div>
   </div>
@@ -907,27 +871,116 @@ onUnmounted(() => {
   outline: none;
 }
 
-.header-box {
+/* 悬浮功能按钮：横排置于右上角（与直播播放器一致），避开顶部弹幕与底部原生控件 */
+.player-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  flex-shrink: 0;
+  gap: 6px;
+  z-index: 30;
 }
 
-.header-avatar {
+/* 统一按钮尺寸并水平居中，保证整列右缘对齐（下载按钮固定在底部） */
+.action-btn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  padding: 0;
+  /* 覆盖 Element Plus 的 .el-button + .el-button { margin-left: 12px }（同级选择器且其样式表后加载） */
+  margin-left: 0 !important;
   flex-shrink: 0;
+  --el-button-bg-color: rgba(15, 17, 26, 0.55);
+  --el-button-border-color: rgba(255, 255, 255, 0.16);
+  --el-button-hover-bg-color: rgba(30, 33, 50, 0.8);
+  --el-button-hover-border-color: rgba(255, 255, 255, 0.3);
+  --el-button-text-color: #fff;
+  --el-button-hover-text-color: #fff;
+  backdrop-filter: blur(8px);
+
+  &.is-active {
+    --el-button-bg-color: rgba(108, 92, 231, 0.85);
+    --el-button-border-color: rgba(108, 92, 231, 0.9);
+  }
 }
 
-.header-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.action-download {
+  --el-button-text-color: #7dd8a4;
+  --el-button-hover-text-color: #4fd187;
+}
+
+/* 视频窗口右边缘的弹幕显隐竖条触发区：平时不可见，hover 到右缘才滑出 */
+.sidebar-toggle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 72px;
+  box-sizing: border-box;
+  padding-top: 96px;
+  padding-bottom: 96px;
+  z-index: 30;
+}
+
+/* B站式边缘吸附竖条：贴在右缘，仅左侧圆角，hover 时从边缘滑出 */
+.sidebar-toggle-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 26px;
+  height: 76px;
+  box-sizing: border-box;
+  padding: 8px 2px;
+  border-radius: 10px 0 0 10px;
+  background: rgba(108, 92, 231, 0.75);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(6px);
+  border-left: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateX(12px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sidebar-toggle:hover .sidebar-toggle-tab {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar-toggle-tab:hover {
+  background: rgba(108, 92, 231, 0.75);
+}
+
+.toggle-icon {
+  font-size: 16px;
+}
+
+.toggle-label {
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  font-weight: 500;
+}
+
+/* 弹幕列表面板搜索框右侧的设置按钮：小而圆，与右栏配色一致 */
+.side-setting-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-left: 0 !important;
+  color: var(--el-text-color-secondary);
 }
 
 /* 视频占主区域，弹幕列表定宽侧栏；min-height/min-width 为 0 让高度链正确收缩 */
@@ -950,7 +1003,7 @@ onUnmounted(() => {
   width: 360px;
   flex-shrink: 0;
   min-height: 0;
-  background: #fafbfc;
+  background: var(--el-bg-color-page);
 }
 
 .video-box-inner {

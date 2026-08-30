@@ -113,8 +113,8 @@ onMounted(() => {
 })
 
 const taskGroups = computed(() => [
-  { kind: 'download' as TaskKind, title: '回放下载任务', emptyText: '未有下载任务', tasks: downloadTasks.value },
-  { kind: 'record' as TaskKind, title: '直播录制任务', emptyText: '未有录制任务', tasks: recordTasks.value },
+  { kind: 'download' as TaskKind, title: '回放下载任务', emptyText: '无下载任务', tasks: downloadTasks.value },
+  { kind: 'record' as TaskKind, title: '直播录制任务', emptyText: '无录制任务', tasks: recordTasks.value },
 ])
 
 // 在 setup 阶段就订阅（早于 onMounted）：播放页跳转后立即 emit 事件，
@@ -133,63 +133,82 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div>
-    <template v-for="group in taskGroups" :key="group.kind">
-      <el-divider content-position="left" class="task-divider">
-        {{ group.title }}
-      </el-divider>
+  <el-scrollbar
+    class="scrollbar-wrapper"
+    wrap-class="scrollbar-wrapper"
+  >
+    <div class="downloads-root">
+      <template v-for="group in taskGroups" :key="group.kind">
+        <el-divider content-position="left" class="section-divider">
+          {{ group.title }}
+        </el-divider>
 
-      <el-card v-if="group.tasks.length === 0" shadow="never">
-        <div class="task-empty">
-          {{ group.emptyText }}
-        </div>
-      </el-card>
-
-      <template v-else>
-        <el-card
-          v-for="task in group.tasks" :key="task.getLiveId()" class="task-card"
-          shadow="hover"
-        >
-          <div class="task-info">
-            <div class="task-main">
-              <el-tag v-if="task.isRunning()" type="primary" size="small" round class="task-tag">
-                <el-icon class="is-loading">
-                  <Loading />
-                </el-icon>
-                <span>运行中</span>
-              </el-tag>
-              <el-tag v-else type="success" size="small" round class="task-tag">
-                <el-icon><Check /></el-icon>
-                <span>已完成</span>
-              </el-tag>
-              <span class="task-path" :title="task.getFilePath()">{{ task.getFilePath() }}</span>
-            </div>
-            <div class="task-actions">
-              <el-button v-if="task.isRunning()" type="danger" size="small" @click="task.stop()">
-                结束
-              </el-button>
-              <template v-else>
-                <el-button type="success" size="small" @click="task.openSaveDirectory()">
-                  打开文件夹
-                </el-button>
-                <el-button size="small" @click="removeTask(task, group.kind)">
-                  移除
-                </el-button>
-              </template>
-            </div>
+        <el-card v-if="group.tasks.length === 0" class="glass-card glass-card--empty" shadow="never">
+          <div class="task-empty">
+            {{ group.emptyText }}
           </div>
         </el-card>
+
+        <template v-else>
+          <el-card
+            v-for="task in group.tasks" :key="task.getLiveId()" class="glass-card task-card"
+            shadow="hover"
+          >
+            <div class="task-info">
+              <div class="task-main">
+                <el-tag v-if="task.isRunning()" type="primary" size="small" round class="task-tag">
+                  <el-icon class="is-loading">
+                    <Loading />
+                  </el-icon>
+                  <span>运行中</span>
+                </el-tag>
+                <el-tag v-else type="success" size="small" round class="task-tag">
+                  <el-icon><Check /></el-icon>
+                  <span>已完成</span>
+                </el-tag>
+                <span class="task-path" :title="task.getFilePath()">{{ task.getFilePath() }}</span>
+              </div>
+              <div class="task-actions">
+                <el-button v-if="task.isRunning()" type="danger" size="small" @click="task.stop()">
+                  结束
+                </el-button>
+                <template v-else>
+                  <el-button type="success" size="small" @click="task.openSaveDirectory()">
+                    打开文件夹
+                  </el-button>
+                  <el-button size="small" @click="removeTask(task, group.kind)">
+                    移除
+                  </el-button>
+                </template>
+              </div>
+            </div>
+          </el-card>
+        </template>
       </template>
-    </template>
-  </div>
+    </div>
+  </el-scrollbar>
 </template>
 
 <style scoped lang="scss">
-.task-divider {
-  margin: 16px 0 12px;
+.scrollbar-wrapper {
+  height: 100%;
+}
 
-  &:first-child {
-    margin-top: 0;
+.downloads-root {
+  padding: 16px 20px 28px;
+}
+
+/* 分区标题与下方卡片统一间距（与设置页一致） */
+:deep(.section-divider) {
+  --el-divider-margin: 4px 0 16px;
+}
+
+/* 全新风格卡片：基础样式见全局 .glass-card，仅保留空态与任务卡片特有样式 */
+.glass-card--empty {
+  opacity: 0.85;
+
+  :deep(.el-card__body) {
+    padding: 16px 20px;
   }
 }
 
@@ -202,7 +221,7 @@ onUnmounted(() => {
 }
 
 .task-empty {
-  padding: 8px 0;
+  padding: 4px 0;
   text-align: center;
   font-size: 13px;
   color: var(--el-text-color-placeholder);
