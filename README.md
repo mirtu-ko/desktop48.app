@@ -29,6 +29,10 @@ $ npm run build:mac
 $ npm run build:linux
 ```
 
+## 预览
+
+![Desktop48 截图](resources/screenshot.png)
+
 ## macOS 常见问题
 
 ### 打开提示"已损坏，无法打开"
