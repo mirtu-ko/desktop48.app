@@ -546,18 +546,6 @@ async function getOne() {
   }
 }
 
-function play() {
-  const mediaElement = getActiveMediaElement()
-  if (mediaElement) {
-    void mediaElement.play()
-  }
-  else {
-    console.warn('active media element is null')
-  }
-}
-
-defineExpose({ play, download })
-
 // seek 由 onseeking 处理，这里只负责按进度投放弹幕
 function onTimeUpdate(newTime: number) {
   currentTime.value = newTime
@@ -930,8 +918,11 @@ onUnmounted(() => {
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 10px 0;
+  justify-content: flex-end;
+  width: 72px;
+  box-sizing: border-box;
+  padding-top: 96px;
+  padding-bottom: 96px;
   z-index: 30;
 }
 
@@ -947,14 +938,14 @@ onUnmounted(() => {
   box-sizing: border-box;
   padding: 8px 2px;
   border-radius: 10px 0 0 10px;
-  background: rgba(15, 17, 26, 0.62);
+  background: rgba(108, 92, 231, 0.75);
   color: #fff;
   font-size: 11px;
   line-height: 1.2;
   cursor: pointer;
   user-select: none;
   backdrop-filter: blur(6px);
-  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 1px solid rgba(255, 255, 255, 0.32);
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
   opacity: 0;
   transform: translateX(12px);

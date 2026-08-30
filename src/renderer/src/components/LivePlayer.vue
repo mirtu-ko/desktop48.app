@@ -851,13 +851,6 @@ onUnmounted(() => {
   display: none !important;
 }
 
-/* 电台（音频）模式：直播无进度概念，隐藏进度条与时间文本，已播时长由 LIVE 徽标展示 */
-/* .audio-player::-webkit-media-controls-timeline,
-.audio-player::-webkit-media-controls-current-time-display,
-.audio-player::-webkit-media-controls-time-remaining-display {
-  display: none !important;
-} */
-
 .live-status {
   position: absolute;
   top: 12px;
