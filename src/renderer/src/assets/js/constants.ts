@@ -25,7 +25,6 @@ export default class Constants {
    */
   public static readonly Menu: any = {
     LIVES: 'lives',
-    REVIEWS: 'reviews',
     SETTING: 'setting',
     DOWNLOADS: 'downloads',
     Shows: 'shows',

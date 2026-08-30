@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Download, Film, Setting, Tickets, VideoCamera } from '@element-plus/icons-vue'
+import { Download, Microphone, Setting, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
+import FloatPlayerHost from './FloatPlayerHost.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,7 +13,6 @@ const route = useRoute()
 // 路由 path 与菜单 index 的映射
 const pathToMenu = {
   '/lives': Constants.Menu.LIVES,
-  '/reviews': Constants.Menu.REVIEWS,
   '/shows': Constants.Menu.Shows,
   '/downloads': Constants.Menu.DOWNLOADS,
   '/setting': Constants.Menu.SETTING,
@@ -35,13 +35,6 @@ watch(
 
 let changeMenuHandler: any
 
-// 用原生 beforeunload 在页面卸载前同步清理 localStorage，
-// 避免依赖主进程发消息+强制销毁窗口的脆弱时序（localStorage 是同步 API）
-function handleBeforeUnload() {
-  localStorage.removeItem('liveTabs')
-  localStorage.removeItem('reviewTabs')
-}
-
 onMounted(async () => {
   changeMenuHandler = changeMenu
   EventBus.on('change-selected-menu', changeMenuHandler)
@@ -51,14 +44,10 @@ onMounted(async () => {
     await Apis.instance().syncInfo()
     console.log('[Index.vue]数据库没有成员信息, 同步完成')
   }
-
-  // 页面卸载前清理缓存（窗口关闭/刷新都会触发）
-  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 onUnmounted(() => {
   EventBus.off('change-selected-menu', changeMenuHandler)
-  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 
@@ -86,12 +75,8 @@ onUnmounted(() => {
           <el-icon><VideoCamera /></el-icon>
           <span>直播</span>
         </el-menu-item>
-        <el-menu-item :index="Constants.Menu.REVIEWS">
-          <el-icon><Film /></el-icon>
-          <span>回放</span>
-        </el-menu-item>
         <el-menu-item :index="Constants.Menu.Shows">
-          <el-icon><Tickets /></el-icon>
+          <el-icon><Microphone /></el-icon>
           <span>公演</span>
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.DOWNLOADS">
@@ -119,6 +104,9 @@ onUnmounted(() => {
         </keep-alive>
       </router-view>
     </el-main>
+
+    <!-- 全局画中画迷你窗：跨页面持续播放 -->
+    <FloatPlayerHost />
   </el-container>
 </template>
 

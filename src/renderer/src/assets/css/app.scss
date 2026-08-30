@@ -36,11 +36,13 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
-/* 主内容区：柔和渐变底 + 角落淡彩光晕 */
+/* 主内容区：柔和渐变底 + 角落淡彩光晕
+ * padding 覆盖 Element Plus 默认的 20px，收窄整体四周留白，让三色列表页更紧凑 */
 .el-main {
   background:
     radial-gradient(1100px 480px at 90% -8%, rgba(108, 92, 231, 0.05), transparent 60%),
     radial-gradient(900px 420px at -8% 108%, rgba(255, 138, 176, 0.04), transparent 55%), var(--el-bg-color-page);
+  padding: 10px 12px 12px;
 }
 
 /* 顶栏：透明底 + 细分隔线，与渐变背景融合 */
@@ -79,6 +81,30 @@ body,
   text-align: center;
   font-size: 12px;
   color: var(--el-text-color-placeholder);
+}
+
+/* 磨砂玻璃浮层面板（右下操作条 / 左上 tab 栏共用的表层） */
+.frosted-surface {
+  background: color-mix(in srgb, var(--el-bg-color) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
+  box-shadow: 0 12px 32px -12px rgba(31, 35, 70, 0.3);
+}
+
+/* 磨砂玻璃卡片（设置 / 下载等页面的内容卡片统一外观） */
+.glass-card {
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
+  background: color-mix(in srgb, var(--el-bg-color) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 8px 24px -12px rgba(31, 35, 70, 0.22);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px -14px rgba(31, 35, 70, 0.28);
+  }
 }
 
 .team-badge {

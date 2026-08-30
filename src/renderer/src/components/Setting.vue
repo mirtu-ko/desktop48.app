@@ -93,26 +93,26 @@ async function setUserAgent() {
 
 <template>
   <el-scrollbar
-    style="height: 100%"
+    class="scrollbar-wrapper"
     wrap-class="scrollbar-wrapper"
   >
     <div class="setting-root">
-      <el-divider content-position="left">
+      <el-divider content-position="left" class="section-divider">
         更新成员数据库
       </el-divider>
 
-      <el-card style="text-align: left;" shadow="hover">
+      <el-card class="glass-card" shadow="hover">
         <el-button type="primary" :loading="isUpdating" @click="updateInfo">
           更新成员数据库
         </el-button>
       </el-card>
 
-      <el-divider content-position="left">
+      <el-divider content-position="left" class="section-divider">
         User-Agent设置
       </el-divider>
 
-      <el-card class="setting-card" shadow="hover">
-        <div class="setting-row setting-row--wide">
+      <el-card class="glass-card" shadow="hover">
+        <div class="setting-row">
           <el-input v-model="userAgent" type="text" placeholder="设置User-Agent" />
           <el-button type="primary" @click="setUserAgent">
             设置
@@ -120,12 +120,12 @@ async function setUserAgent() {
         </div>
       </el-card>
 
-      <el-divider content-position="left">
+      <el-divider content-position="left" class="section-divider">
         默认下载目录
       </el-divider>
 
-      <el-card class="setting-card" shadow="hover">
-        <div class="setting-row setting-row--narrow">
+      <el-card class="glass-card" shadow="hover">
+        <div class="setting-row">
           <el-input v-model="downloadDirectory" type="text" placeholder="下载目录" readonly @click="setDownloadDirectory" />
           <el-button type="primary" @click="setDownloadDirectory">
             选择
@@ -136,12 +136,12 @@ async function setUserAgent() {
         </div>
       </el-card>
 
-      <el-divider content-position="left">
+      <el-divider content-position="left" class="section-divider">
         ffmpeg目录
       </el-divider>
 
-      <el-card class="setting-card" shadow="hover">
-        <div class="setting-row setting-row--narrow">
+      <el-card class="glass-card" shadow="hover">
+        <div class="setting-row">
           <el-input v-model="ffmpegDirectory" type="text" placeholder="ffmpeg目录" readonly @click="setFfmpegDirectory" />
           <el-button type="primary" @click="setFfmpegDirectory">
             选择
@@ -152,37 +152,61 @@ async function setUserAgent() {
         </div>
       </el-card>
 
-      <el-divider content-position="left">
+      <el-divider content-position="left" class="section-divider">
         屏蔽成员直播|回放
       </el-divider>
 
-      <el-card class="setting-card" shadow="hover">
+      <el-card class="glass-card" shadow="hover">
         <HiddenMembers />
       </el-card>
     </div>
   </el-scrollbar>
 </template>
 
-<style scoped>
-.scrollbar-wrapper,
-.setting-root {
+<style scoped lang="scss">
+.scrollbar-wrapper {
   height: 100%;
 }
 
-.setting-card {
-  margin-top: 16px;
+.setting-root {
+  padding: 16px 20px 28px;
+}
+
+/* 分区标题与下方卡片统一间距 */
+:deep(.section-divider) {
+  --el-divider-margin: 4px 0 16px;
+}
+
+/* 全新风格卡片：磨砂玻璃 + 柔和边框 + 轻投影（基础样式见全局 .glass-card） */
+.glass-card {
+  :deep(.el-card__body) {
+    padding: 18px 20px;
+  }
+}
+
+/* 品牌主按钮统一为渐变风格 */
+:deep(.glass-card .el-button--primary) {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
+  border: none;
+  box-shadow: 0 6px 16px -4px rgba(108, 92, 231, 0.5);
+
+  &:hover {
+    background: linear-gradient(135deg, var(--brand-primary-light), var(--brand-secondary));
+  }
 }
 
 .setting-row {
   display: flex;
-  gap: 8px;
-}
+  align-items: center;
+  gap: 10px;
+  max-width: 640px;
 
-.setting-row--wide {
-  width: 720px;
-}
+  .el-input {
+    flex: 1;
+  }
 
-.setting-row--narrow {
-  width: 640px;
+  .el-button {
+    flex-shrink: 0;
+  }
 }
 </style>

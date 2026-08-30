@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import type { OpenLive } from '../assets/js/apis'
+import { Refresh } from '@element-plus/icons-vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
+import useFloatPlayers from '../assets/js/use-float-players'
 import useLoadMore from '../assets/js/use-load-more'
+import FloatingDock from '../components/FloatingDock.vue'
+import FloatingTabBar from '../components/FloatingTabBar.vue'
 import ShowCard from '../components/ShowCard.vue'
 
 const router = useRouter()
+
+// 画中画迷你窗：与直播/回放页共用全局播放挂载点
+const { openLive } = useFloatPlayers()
 
 const showList = ref<OpenLive[]>([])
 const next = ref('0')
@@ -18,6 +25,17 @@ const loading = ref(false)
 const noMore = ref(false)
 /** 当前团体 groupId：0=全部 10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT */
 const groupId = ref('0')
+
+/** 团体切换 tab 选项（左上角浮动磨砂玻璃切换器）
+ *  active 主题色：SNH=浅蓝 BEJ=粉红 GNZ=黄绿 CKG=琥珀，无主题色时回退品牌渐变 */
+const groupTabs = [
+  { label: '全部', key: '0', color: '' },
+  { label: 'SNH48', key: '10', color: '#8FD3F6' },
+  { label: 'BEJ48', key: '11', color: '#FE2472' },
+  { label: 'GNZ48', key: '12', color: '#ABCA14' },
+  { label: 'CKG48', key: '13', color: '#FFBA07' },
+  { label: 'CGT48', key: '14', color: '#D21217' },
+]
 
 const disabled = computed(() => loading.value || noMore.value)
 
@@ -85,6 +103,15 @@ onMounted(async () => {
   await onInfiniteScroll()
 })
 
+/** 刷新：重置翻页游标后重新拉取，并回到列表顶部 */
+async function refresh() {
+  next.value = '0'
+  noMore.value = false
+  await fetchShows()
+  showsScrollRef.value?.setScrollTop?.(0)
+  await onInfiniteScroll()
+}
+
 /** 切换团体：重置翻页游标后重新拉取，并回到列表顶部 */
 watch(groupId, async () => {
   next.value = '0'
@@ -106,40 +133,30 @@ function isToday(stime: string): boolean {
 const todayShows = computed(() => showList.value.filter(show => isToday(show.stime)))
 const recentShows = computed(() => showList.value.filter(show => !isToday(show.stime)))
 
-/** 进行中的公演：双通道打开直播 tab——事件给已挂载的 Lives（即时、可重复点同一场），query 兜底冷启动 */
+/** 进行中的公演：以画中画迷你窗直接打开直播，无需再经顶部 tab 中转 */
 function openLiveStream(show: OpenLive) {
   if (show.status !== 2) {
     return
   }
-  EventBus.emit('open-live-tab', {
+  openLive({
     liveId: show.liveId,
+    nickname: show.teamList?.[0]?.teamName || '',
     title: show.subTitle || show.title,
     startTime: Number.parseInt(show.stime),
     avatar: show.teamList?.[0]?.teamLogo || '',
+    source: 'open',
+    liveType: 1,
+    liveMode: 0,
   })
   EventBus.emit('change-selected-menu', Constants.Menu.LIVES)
-  router.push({
-    path: '/lives',
-    query: {
-      openLiveId: show.liveId,
-      openTitle: show.subTitle || show.title,
-      openStartTime: String(Number.parseInt(show.stime)),
-      openAvatar: show.teamList?.[0]?.teamLogo || '',
-    },
-  })
+  router.push('/lives')
 }
 </script>
 
 <template>
   <div v-loading="loading" class="container">
-    <el-tabs v-model="groupId">
-      <el-tab-pane label="全部" name="0" />
-      <el-tab-pane label="SNH48" name="10" />
-      <el-tab-pane label="BEJ48" name="11" />
-      <el-tab-pane label="GNZ48" name="12" />
-      <el-tab-pane label="CKG48" name="13" />
-      <el-tab-pane label="CGT48" name="14" />
-    </el-tabs>
+    <!-- 左上角浮动团体切换：不占行，内容滚过时呈现磨砂玻璃 -->
+    <FloatingTabBar :tabs="groupTabs" :active="groupId" @change="groupId = $event" />
     <div class="shows-main">
       <el-scrollbar
         ref="showsScrollRef"
@@ -178,31 +195,48 @@ function openLiveStream(show: OpenLive) {
             </div>
           </template>
 
-          <div v-if="!showList.length && !loading">
-            <p>暂无演出信息</p>
-          </div>
+          <el-empty
+            v-if="!showList.length && !loading"
+            class="shows-empty"
+            :image-size="120"
+            description="暂无演出信息，换个团体看看吧"
+          />
         </div>
         <div v-if="noMore" class="list-end">
           没有更多公演了
         </div>
       </el-scrollbar>
     </div>
+    <!-- 右下角浮动操作条：磨砂玻璃 dock 衬托刷新按钮，空数据时也可用 -->
+    <FloatingDock>
+      <el-button
+        circle
+        type="primary"
+        :icon="Refresh"
+        :loading="loading"
+        title="刷新"
+        @click="refresh"
+      />
+    </FloatingDock>
   </div>
 </template>
 
 <style scoped>
 .container {
+  position: relative;
   height: 100%;
   overflow: hidden;
 }
 
 .shows-main {
-  height: calc(100% - 60px);
+  position: relative;
+  height: 100%;
   overflow: hidden;
 }
 
 .shows-container {
-  padding: 8px 10px 12px;
+  /* 顶部留出左上角浮动切换器的空间，避免遮挡内容 */
+  padding: 72px 10px 12px;
 
   h2 {
     margin: 14px 4px 12px;
@@ -210,6 +244,11 @@ function openLiveStream(show: OpenLive) {
     font-weight: 600;
     color: var(--el-text-color-primary);
   }
+}
+
+/* 给列表底部留出右下角浮动刷新按钮的空间 */
+:deep(.el-scrollbar__view) {
+  padding-bottom: 88px;
 }
 
 .scrollbar-wrapper {
@@ -241,5 +280,14 @@ function openLiveStream(show: OpenLive) {
 .show-item.clickable:hover {
   transform: translateY(-3px);
   box-shadow: 0 10px 24px rgba(31, 35, 70, 0.12);
+}
+
+/* 空态：竖直居中，视觉上与浮动切换器保持对称 */
+.shows-empty {
+  padding: 80px 0 0;
+}
+
+.shows-empty :deep(.el-empty__description p) {
+  color: var(--el-text-color-secondary);
 }
 </style>

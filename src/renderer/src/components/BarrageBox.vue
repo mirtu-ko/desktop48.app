@@ -53,13 +53,17 @@ const emptyText = computed(() => {
         <span class="meta">观看人数：{{ number }}</span>
         <span class="meta meta-time">{{ startDate }}</span>
       </div>
-      <el-input
-        v-model="keyword"
-        :prefix-icon="Search"
-        size="small"
-        clearable
-        placeholder="搜索弹幕内容或用户名"
-      />
+      <div class="search-row">
+        <el-input
+          v-model="keyword"
+          :prefix-icon="Search"
+          size="small"
+          clearable
+          placeholder="搜索弹幕内容或用户名"
+        />
+        <!-- 弹幕设置等操作按钮，由父级注入到搜索框后面 -->
+        <slot name="actions" />
+      </div>
       <div v-if="trimmedKeyword" class="search-tip">
         命中 {{ displayItems.length }} 条，点击可跳转
       </div>
@@ -114,6 +118,16 @@ const emptyText = computed(() => {
 .search-tip {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .el-input {
+    flex: 1;
+  }
 }
 
 /* min-height: 0 是必需的，否则 flex 子项会被内容撑开导致外层出现滚动条 */
