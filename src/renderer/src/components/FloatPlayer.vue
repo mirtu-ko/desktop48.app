@@ -17,12 +17,12 @@ const emit = defineEmits(['close'])
 // 每个尺寸都按视频宽高比区分横竖屏：直播横屏自动套用更宽的窗口，避免窄竖窗塞横画面的尴尬。
 // 回放的放大态带右侧弹幕侧栏，无论横竖屏都保持横屏布局。
 const MINI_SIZE = {
-  live: { portrait: { w: 360, h: 540 }, landscape: { w: 640, h: 360 } },
-  review: { portrait: { w: 360, h: 540 }, landscape: { w: 640, h: 360 } },
+  live: { portrait: { w: 320, h: 540 }, landscape: { w: 640, h: 360 } },
+  review: { portrait: { w: 320, h: 540 }, landscape: { w: 640, h: 360 } },
 }
 const EXPAND_SIZE = {
-  live: { portrait: { w: 600, h: 800 }, landscape: { w: 900, h: 506 } },
-  review: { portrait: { w: 1080, h: 720 }, landscape: { w: 1080, h: 720 } },
+  live: { portrait: { w: 600, h: 820 }, landscape: { w: 1080, h: 720 } },
+  review: { portrait: { w: 1080, h: 720 }, landscape: { w: 1280, h: 800 } },
 }
 const PILL_SIZE = { w: 280, h: 40 }
 

@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import Index from './components/Index.vue'
 import Initialize from './components/Initialize.vue'
-// import Versions from './components/Versions.vue'
 
 const isInitialized = ref(false)
 
@@ -16,6 +15,5 @@ function onInitialized() {
   <div id="app">
     <Initialize v-if="!isInitialized" @initialized="onInitialized" />
     <Index v-else />
-    <!-- <Versions /> -->
   </div>
 </template>
