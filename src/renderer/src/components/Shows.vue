@@ -16,13 +16,18 @@ import ShowCard from '../components/ShowCard.vue'
 const router = useRouter()
 
 // 画中画迷你窗：与直播/回放页共用全局播放挂载点
-const { openLive } = useFloatPlayers()
+const { openLive, openReview } = useFloatPlayers()
 
 const showList = ref<OpenLive[]>([])
 const next = ref('0')
 const loading = ref(false)
 /** 是否已无更多可加载（下一页游标为 0） */
 const noMore = ref(false)
+/** 历史公演（已结束可回放）：独立列表与翻页游标 */
+const historyList = ref<OpenLive[]>([])
+const historyNext = ref('0')
+const historyLoading = ref(false)
+const historyNoMore = ref(false)
 /** 当前团体 groupId：0=全部 10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT */
 const groupId = ref('0')
 
@@ -37,13 +42,16 @@ const groupTabs = [
   { label: 'CGT48', key: '14', color: '#D21217' },
 ]
 
-const disabled = computed(() => loading.value || noMore.value)
+/** 触底加载禁用态：任一列表加载中、或两份列表都无更多时禁用 */
+const disabled = computed(() =>
+  loading.value || historyLoading.value || (noMore.value && historyNoMore.value))
 
 const showsScrollRef = ref<any>(null)
 
 // 统一的触底加载：直播/回放/公演三页共用同一套交互逻辑
+// 最近的公演翻完后接着翻历史公演；historyNext 为 '0' 时拉首页（整体替换），否则追加
 const { onInfiniteScroll } = useLoadMore({
-  load: () => fetchShows(true),
+  load: () => (noMore.value ? fetchHistoryShows(historyNext.value !== '0') : fetchShows(true)),
   disabled,
   scrollbarRef: showsScrollRef,
 })
@@ -59,6 +67,20 @@ function isBroken(show: OpenLive): boolean {
   return !show.coverPath || brokenImages.value.has(show.liveId)
 }
 
+/** coverPath / teamLogo 可能是相对路径（如 /mediasource/...），统一补全为 source.48.cn 完整 URL */
+function normalizeShowCovers(list: OpenLive[]) {
+  list.forEach((item) => {
+    if (item.coverPath) {
+      item.coverPath = Tools.sourceUrl(item.coverPath)
+    }
+    item.teamList?.forEach((team) => {
+      if (team.teamLogo) {
+        team.teamLogo = Tools.sourceUrl(team.teamLogo)
+      }
+    })
+  })
+}
+
 /** 获取开放公演列表（排期/进行中），按开演时间升序 */
 async function fetchShows(append = false) {
   loading.value = true
@@ -66,17 +88,7 @@ async function fetchShows(append = false) {
     const content = await Apis.instance().openLives(Number.parseInt(groupId.value), next.value, false)
     const list: OpenLive[] = [...(content.liveList || [])]
       .sort((a, b) => Number.parseInt(a.stime) - Number.parseInt(b.stime))
-    // coverPath / teamLogo 可能是相对路径（如 /mediasource/...），统一补全为 source.48.cn 完整 URL
-    list.forEach((item) => {
-      if (item.coverPath) {
-        item.coverPath = Tools.sourceUrl(item.coverPath)
-      }
-      item.teamList?.forEach((team) => {
-        if (team.teamLogo) {
-          team.teamLogo = Tools.sourceUrl(team.teamLogo)
-        }
-      })
-    })
+    normalizeShowCovers(list)
     if (append) {
       showList.value.push(...list)
     }
@@ -97,6 +109,32 @@ async function fetchShows(append = false) {
   }
 }
 
+/** 获取历史公演列表（record=true，已结束可回放），按开演时间降序（新→旧） */
+async function fetchHistoryShows(append = false) {
+  historyLoading.value = true
+  try {
+    const content = await Apis.instance().openLives(Number.parseInt(groupId.value), historyNext.value, true)
+    const list: OpenLive[] = [...(content.liveList || [])]
+      .sort((a, b) => Number.parseInt(b.stime) - Number.parseInt(a.stime))
+    normalizeShowCovers(list)
+    if (append) {
+      historyList.value.push(...list)
+    }
+    else {
+      historyList.value = list
+    }
+    historyNext.value = content.next || '0'
+    // 与排期列表同理：next 为最后一场开演时间游标，拉回空列表才算没有更多
+    historyNoMore.value = list.length === 0 || content.next === '0'
+  }
+  catch (error) {
+    console.error('获取历史公演失败:', error)
+  }
+  finally {
+    historyLoading.value = false
+  }
+}
+
 onMounted(async () => {
   await fetchShows()
   // 首屏数据太少（不足一屏）时不会触发 end-reached，主动补拉下一页直到填满或无更多
@@ -107,6 +145,9 @@ onMounted(async () => {
 async function reload() {
   next.value = '0'
   noMore.value = false
+  historyList.value = []
+  historyNext.value = '0'
+  historyNoMore.value = false
   await fetchShows()
   showsScrollRef.value?.setScrollTop?.(0)
   await onInfiniteScroll()
@@ -148,10 +189,24 @@ function openLiveStream(show: OpenLive) {
   EventBus.emit('change-selected-menu', Constants.Menu.LIVES)
   router.push('/lives')
 }
+
+/** 历史公演（已结束）：以画中画回放迷你窗打开 VOD 流，停留当前页继续浏览 */
+function openHistoryStream(show: OpenLive) {
+  openReview({
+    liveId: show.liveId,
+    nickname: '',
+    title: show.subTitle || show.title,
+    startTime: Number.parseInt(show.stime),
+    avatar: show.teamList?.[0]?.teamLogo || '',
+    source: 'open',
+    liveType: 1,
+    liveMode: 0,
+  })
+}
 </script>
 
 <template>
-  <div v-loading="loading" class="container">
+  <div v-loading="loading || historyLoading" class="container">
     <!-- 左上角浮动团体切换：不占行，内容滚过时呈现磨砂玻璃 -->
     <FloatingTabBar :tabs="groupTabs" :active="groupId" @change="groupId = $event" />
     <div class="shows-main">
@@ -192,14 +247,28 @@ function openLiveStream(show: OpenLive) {
             </div>
           </template>
 
+          <template v-if="historyList.length">
+            <h2>历史公演</h2>
+            <div class="shows-list">
+              <div
+                v-for="show in historyList"
+                :key="show.liveId"
+                class="show-item clickable"
+                @click="openHistoryStream(show)"
+              >
+                <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+              </div>
+            </div>
+          </template>
+
           <el-empty
-            v-if="!showList.length && !loading"
+            v-if="!showList.length && !historyList.length && !loading && !historyLoading"
             class="shows-empty"
             :image-size="120"
             description="暂无演出信息，换个团体看看吧"
           />
         </div>
-        <div v-if="noMore" class="list-end">
+        <div v-if="noMore && historyNoMore" class="list-end">
           没有更多公演了
         </div>
       </el-scrollbar>
@@ -210,7 +279,7 @@ function openLiveStream(show: OpenLive) {
         circle
         type="primary"
         :icon="Refresh"
-        :loading="loading"
+        :loading="loading || historyLoading"
         title="刷新"
         @click="refresh"
       />

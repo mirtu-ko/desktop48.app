@@ -256,6 +256,8 @@ onUnmounted(() => {
         :live-title="item.payload.title"
         :live-id="item.payload.liveId"
         :start-time="item.payload.startTime"
+        :source="item.payload.source || 'user'"
+        :avatar-url="item.payload.avatar || ''"
         :compact="!expanded"
         @avatar="onAvatar"
         @orientation="onOrientation"
@@ -319,7 +321,7 @@ onUnmounted(() => {
   height: 22px;
   border-radius: 50%;
   flex-shrink: 0;
-  object-fit: cover;
+  object-fit: contain;
   border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
 }
 

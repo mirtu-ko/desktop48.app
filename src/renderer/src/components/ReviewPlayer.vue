@@ -16,6 +16,10 @@ const props = defineProps({
   liveTitle: { type: String, required: true },
   liveId: { type: String, required: true },
   startTime: { type: Number, required: true },
+  // 数据源：user=用户直播回放(getLiveOne)，open=开放公演回放(getOpenLiveOne)
+  source: { type: String, default: 'user' },
+  // open 模式下的顶部头像（队伍 logo，完整 URL）
+  avatarUrl: { type: String, default: '' },
   // 迷你窗紧凑模式：隐藏弹幕侧栏与对应头部按钮，适配画中画小窗口
   compact: { type: Boolean, default: false },
 })
@@ -33,6 +37,8 @@ const carouselTime = ref(5000)
 const barrageUrl = ref('')
 const barrageLoaded = ref(false)
 const loadedBarrageUrl = ref('')
+// 是否有弹幕数据源：无弹幕时隐藏弹幕叠加层、右缘切换竖条与弹幕侧栏
+const hasBarrage = computed(() => !!barrageUrl.value)
 const realName = ref('')
 const userAvatar = ref('')
 const powerSaveBlockerId = ref<number | null>(null)
@@ -503,6 +509,28 @@ function retryPlayback() {
 
 async function getOne() {
   try {
+    if (props.source === 'open') {
+      // 开放公演回放：getOpenLiveOne 返回 playStreams 数组（VOD m3u8），优先选高清（streamType 2），
+      // 详情里没有用户与在线人数信息，用公演标题与传入的队伍 logo 兜底
+      const data = await Apis.instance().openLive(props.liveId)
+      const streams: Array<{ streamPath: string, streamType: number }> = data.playStreams || []
+      const stream = streams.find(s => s.streamType === 3 && s.streamPath)
+        || streams.find(s => s.streamType === 2 && s.streamPath)
+        || streams.find(s => s.streamPath)
+      if (!stream?.streamPath) {
+        ElMessage({ message: '未获取到公演回放地址', type: 'error' })
+        return
+      }
+      isRadio.value = false
+      number.value = 0
+      realName.value = data.subTitle || data.title || '开放公演'
+      userAvatar.value = props.avatarUrl
+      emit('avatar', userAvatar.value)
+      barrageUrl.value = data.msgFilePath || ''
+      playStreamPath.value = stream.streamPath
+      return
+    }
+
     const data = await Apis.instance().live(props.liveId)
 
     const nextPlayStreamPath = Tools.streamPathHandle(data.playStreamPath, props.startTime)
@@ -573,6 +601,9 @@ function togglePlay() {
 }
 
 function toggleDanmaku() {
+  // 无弹幕数据源时开关无意义，直接忽略（含快捷键 D）
+  if (!hasBarrage.value)
+    return
   settings.enabled = !settings.enabled
   if (!settings.enabled)
     clearOverlay()
@@ -745,7 +776,7 @@ onUnmounted(() => {
           />
 
           <div
-            v-show="settings.enabled"
+            v-show="settings.enabled && hasBarrage"
             class="danmaku-container"
             :style="{ opacity: settings.opacity, fontSize: `${settings.fontSize}px` }"
           >
@@ -789,7 +820,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 视频窗口右边缘：hover 时才浮出的弹幕列表显隐竖条（B站式边缘吸附） -->
-          <div v-if="!compact" class="sidebar-toggle">
+          <div v-if="!compact && hasBarrage" class="sidebar-toggle">
             <div
               class="sidebar-toggle-tab"
               :title="sidebarVisible ? '隐藏弹幕列表' : '显示弹幕列表'"
@@ -804,7 +835,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-show="sidebarVisible && !compact" class="barrage-box">
+      <div v-show="sidebarVisible && !compact && hasBarrage" class="barrage-box">
         <BarrageBox
           :number="number"
           :start-time="startTime"
