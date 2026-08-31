@@ -53,20 +53,18 @@ async function selectFfmpegDir() {
 </script>
 
 <template>
-  <el-container>
-    <el-main class="init-main">
-      <div>
-        <el-icon class="is-loading">
-          <Loading />
-        </el-icon>
-        <span class="init-text">{{ initText }}</span>
-      </div>
+  <div class="init-main">
+    <div>
+      <el-icon class="is-loading">
+        <Loading />
+      </el-icon>
+      <span class="init-text">{{ initText }}</span>
+    </div>
 
-      <el-button class="select-btn" type="primary" :loading="checking" @click="selectFfmpegDir">
-        手动选择ffmpeg目录
-      </el-button>
-    </el-main>
-  </el-container>
+    <el-button class="select-btn" type="primary" :loading="checking" @click="selectFfmpegDir">
+      手动选择ffmpeg目录
+    </el-button>
+  </div>
 </template>
 
 <style scoped>
@@ -75,7 +73,7 @@ async function selectFfmpegDir() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 600px;
+  height: 100%;
 }
 
 .init-text {

@@ -315,16 +315,16 @@ async function syncMembers() {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--el-bg-color);
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: var(--shadow-sm);
   transition:
     transform 0.2s ease-in-out,
     box-shadow 0.2s ease-in-out;
 
   &:hover {
     transform: translateY(-3px);
-    box-shadow: 0 10px 24px rgba(31, 35, 70, 0.12);
+    box-shadow: var(--shadow-md);
   }
 
   .avatar {

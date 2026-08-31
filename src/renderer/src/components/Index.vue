@@ -54,48 +54,43 @@ onUnmounted(() => {
 
 <template>
   <el-container>
-    <el-aside class="app-aside" width="220px">
-      <div class="app-brand">
-        <div class="app-logo">
-          48
-        </div>
-        <div class="brand-text">
-          <div class="app-title">
-            Desktop48
-          </div>
-          <div class="app-sub">
-            SNH48 直播助手
-          </div>
-        </div>
+    <el-aside class="app-aside" width="180px">
+      <div class="sidebar-inner">
+        <el-menu
+          :default-active="activeIndex" mode="vertical" router class="side-menu"
+          @select="changeMenu"
+        >
+          <el-menu-item :index="Constants.Menu.LIVES">
+            <span class="menu-icon"><el-icon><VideoCamera /></el-icon></span>
+            <span class="menu-text">直播</span>
+          </el-menu-item>
+          <el-menu-item :index="Constants.Menu.Shows">
+            <span class="menu-icon"><el-icon><Microphone /></el-icon></span>
+            <span class="menu-text">公演</span>
+          </el-menu-item>
+          <el-menu-item :index="Constants.Menu.Members">
+            <span class="menu-icon"><el-icon><User /></el-icon></span>
+            <span class="menu-text">成员</span>
+          </el-menu-item>
+          <el-menu-item :index="Constants.Menu.DOWNLOADS">
+            <span class="menu-icon"><el-icon><Download /></el-icon></span>
+            <span class="menu-text">下载</span>
+          </el-menu-item>
+        </el-menu>
+
+        <el-menu
+          :default-active="activeIndex" mode="vertical" router class="side-menu side-menu-bottom"
+          @select="changeMenu"
+        >
+          <el-menu-item :index="Constants.Menu.SETTING" class="setting-item">
+            <span class="menu-icon"><el-icon><Setting /></el-icon></span>
+            <span class="menu-text">设置</span>
+          </el-menu-item>
+        </el-menu>
       </div>
-      <el-menu
-        :default-active="activeIndex" mode="vertical" router class="side-menu"
-        @select="changeMenu"
-      >
-        <el-menu-item :index="Constants.Menu.LIVES">
-          <el-icon><VideoCamera /></el-icon>
-          <span>直播</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.Shows">
-          <el-icon><Microphone /></el-icon>
-          <span>公演</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.Members">
-          <el-icon><User /></el-icon>
-          <span>成员</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.DOWNLOADS">
-          <el-icon><Download /></el-icon>
-          <span>下载</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.SETTING">
-          <el-icon><Setting /></el-icon>
-          <span>设置</span>
-        </el-menu-item>
-      </el-menu>
     </el-aside>
 
-    <el-main>
+    <div class="app-content">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <Suspense>
@@ -108,7 +103,7 @@ onUnmounted(() => {
           </Suspense>
         </keep-alive>
       </router-view>
-    </el-main>
+    </div>
 
     <!-- 全局画中画迷你窗：跨页面持续播放 -->
     <FloatPlayerHost />
@@ -116,92 +111,112 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-.el-main {
+.el-menu-item [class^='el-icon'] {
+  margin-right: 0px;
+}
+
+/* 内容区：接替原 el-main 的职责（撑满剩余空间 + 自身滚动 + 收窄留白）。
+ * 背景完全透明，直接透出 App.vue 的画布层 */
+.app-content {
+  flex: 1;
+  min-width: 0;
   height: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  overflow: auto;
 }
 
 .app-aside {
   display: flex;
   flex-direction: column;
-  background: var(--el-bg-color);
-  border-right: 1px solid var(--el-border-color-lighter);
+  padding: 10px 4px 10px 10px;
+  background: transparent;
 }
 
-.app-brand {
+.sidebar-inner {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 16px 16px;
-
-  .app-logo {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
-  }
-
-  .brand-text {
-    min-width: 0;
-  }
-
-  .app-title {
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.2;
-    color: var(--el-text-color-primary);
-  }
-
-  .app-sub {
-    margin-top: 2px;
-    font-size: 11px;
-    line-height: 1.2;
-    color: var(--el-text-color-secondary);
-  }
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 45%, transparent);
+  box-shadow:
+    var(--shadow-sm),
+    1px 1px 0 rgba(255, 255, 255, 0.5) inset;
 }
 
 .side-menu {
   user-select: none;
-  flex: 1;
-  padding: 6px 0 12px;
   height: auto;
   border-right: none;
   background: transparent;
 
   :deep(.el-menu-item) {
     height: 44px;
-    margin: 4px 12px;
-    padding: 0 14px !important;
-    border-radius: 10px;
+    margin: 3px 0;
+    padding: 0 10px !important;
+    border-radius: 12px;
     color: var(--el-text-color-regular);
     transition:
       background-color 0.2s ease,
       color 0.2s ease,
+      transform 0.2s ease,
       box-shadow 0.2s ease;
 
-    .el-icon {
-      margin-right: 8px;
-      font-size: 18px;
+    .menu-icon {
+      width: 30px;
+      height: 30px;
+      margin-right: 10px;
+      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: color-mix(in srgb, var(--el-fill-color-light) 70%, transparent);
+      color: inherit;
+      transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
+
+      .el-icon {
+        font-size: 17px;
+      }
+    }
+
+    .menu-text {
+      font-size: 14px;
+      letter-spacing: 0.3px;
     }
 
     &:hover {
       background: var(--el-color-primary-light-9);
       color: var(--el-color-primary);
+
+      .menu-icon {
+        background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+      }
     }
 
     &.is-active {
       background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-light));
       color: #fff;
       font-weight: 600;
-      box-shadow: 0 6px 16px rgba(108, 92, 231, 0.28);
+      box-shadow: var(--shadow-glow);
+
+      .menu-icon {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      }
     }
   }
+}
+
+.side-menu-bottom {
+  margin-top: auto;
+  padding-top: 4px;
 }
 </style>

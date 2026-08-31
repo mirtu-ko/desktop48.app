@@ -160,7 +160,7 @@ async function setUserAgent() {
 :deep(.glass-card .el-button--primary) {
   background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
   border: none;
-  box-shadow: 0 6px 16px -4px rgba(108, 92, 231, 0.5);
+  box-shadow: var(--shadow-glow);
 
   &:hover {
     background: linear-gradient(135deg, var(--brand-primary-light), var(--brand-secondary));

@@ -72,6 +72,13 @@ export interface mainAPI {
   preventSleep: () => Promise<any>
   allowSleep: (id: number) => Promise<any>
 
+  // 窗口控制
+  windowMinimize: () => Promise<any>
+  windowToggleMaximize: () => Promise<any>
+  windowClose: () => Promise<any>
+  windowIsMaximized: () => Promise<boolean>
+  windowOnMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
+
   // 可继续扩展更多API
 }
 

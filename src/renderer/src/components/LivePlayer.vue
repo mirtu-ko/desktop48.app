@@ -851,7 +851,7 @@ onUnmounted(() => {
   inset: 0;
   border: 3px solid rgba(255, 255, 255, 0.14);
   border-top-color: var(--brand-primary);
-  box-shadow: 0 0 18px rgba(108, 92, 231, 0.35);
+  box-shadow: 0 0 18px rgba(109, 90, 224, 0.35);
   animation: spin 1.1s linear infinite;
 }
 

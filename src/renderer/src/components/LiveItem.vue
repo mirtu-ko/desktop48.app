@@ -79,7 +79,8 @@ const liveBadge = computed(() => {
   margin: 0;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   cursor: pointer;
   transition:
@@ -88,7 +89,7 @@ const liveBadge = computed(() => {
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
 
     .cover {
       transform: scale(1.05);

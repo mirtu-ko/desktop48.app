@@ -236,9 +236,9 @@ function openReviews() {
     flex: none;
     width: 120px;
     aspect-ratio: 3 / 4;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     overflow: hidden;
-    box-shadow: var(--el-box-shadow-light);
+    box-shadow: var(--shadow-sm);
   }
 
   .avatar-ph {
@@ -364,7 +364,7 @@ function openReviews() {
 
   .photo {
     cursor: zoom-in;
-    box-shadow: var(--el-box-shadow-light);
+    box-shadow: var(--shadow-sm);
   }
 
   .photo-ph {

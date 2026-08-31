@@ -81,6 +81,16 @@ const api = {
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
   recordTaskList: () => ipcRenderer.invoke('recordTaskList'),
   recordTaskRemove: (liveId: string) => ipcRenderer.invoke('recordTaskRemove', liveId),
+  // 窗口控制
+  windowMinimize: () => ipcRenderer.invoke('window-minimize'),
+  windowToggleMaximize: () => ipcRenderer.invoke('window-toggle-maximize'),
+  windowClose: () => ipcRenderer.invoke('window-close'),
+  windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+  windowOnMaximizeChange: (callback: (_isMaximized: boolean) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, isMaximized: boolean) => callback(isMaximized)
+    ipcRenderer.on('window-maximized-changed', listener)
+    return () => ipcRenderer.removeListener('window-maximized-changed', listener)
+  },
   // 阻止系统休眠
   preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
   // 允许系统休眠

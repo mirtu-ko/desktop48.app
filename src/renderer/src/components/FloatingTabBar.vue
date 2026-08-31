@@ -73,7 +73,7 @@ function dblClick(tab: FloatingTabItem) {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 4px 8px;
   border-radius: 999px;
   max-width: 75%;
   overflow: auto;
@@ -116,7 +116,7 @@ function dblClick(tab: FloatingTabItem) {
     color: #fff;
     font-weight: 600;
     /* 激活态背景由内联主题渐变提供，见 tabStyle */
-    box-shadow: 0 4px 12px -4px rgba(108, 92, 231, 0.5);
+    box-shadow: var(--shadow-glow);
   }
 }
 </style>

@@ -330,10 +330,10 @@ function openHistoryStream(show: OpenLive) {
 
 .show-item {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--el-bg-color);
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: var(--shadow-sm);
   transition:
     transform 0.2s ease-in-out,
     box-shadow 0.2s ease-in-out;
@@ -345,7 +345,7 @@ function openHistoryStream(show: OpenLive) {
 
 .show-item.clickable:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(31, 35, 70, 0.12);
+  box-shadow: var(--shadow-md);
 }
 
 /* 空态：竖直居中，视觉上与浮动切换器保持对称 */

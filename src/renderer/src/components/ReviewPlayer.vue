@@ -931,8 +931,8 @@ onUnmounted(() => {
   backdrop-filter: blur(8px);
 
   &.is-active {
-    --el-button-bg-color: rgba(108, 92, 231, 0.85);
-    --el-button-border-color: rgba(108, 92, 231, 0.9);
+    --el-button-bg-color: rgba(109, 90, 224, 0.85);
+    --el-button-border-color: rgba(109, 90, 224, 0.9);
   }
 }
 
@@ -969,7 +969,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   padding: 8px 2px;
   border-radius: 10px 0 0 10px;
-  background: rgba(108, 92, 231, 0.75);
+  background: rgba(109, 90, 224, 0.75);
   color: #fff;
   font-size: 11px;
   line-height: 1.2;
@@ -991,7 +991,7 @@ onUnmounted(() => {
 }
 
 .sidebar-toggle-tab:hover {
-  background: rgba(108, 92, 231, 0.75);
+  background: rgba(109, 90, 224, 0.75);
 }
 
 .toggle-icon {

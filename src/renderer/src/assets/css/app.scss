@@ -1,25 +1,46 @@
 /* ============ 精致浅色主题 ============ */
 :root {
-  /* 品牌色 */
-  --brand-primary: #6c5ce7;
-  --brand-primary-light: #8f7dfa;
-  --brand-secondary: #ff8ab0;
+  /* 品牌色：轻盈紫罗兰，整体更柔和、不厚重 */
+  --brand-primary: #6d5ae0;
+  --brand-primary-light: #a89df6;
+  --brand-primary-dark: #4f3fc4;
+  --brand-secondary: #ff8fb8;
+
+  /* ===== 阴影体系：统一为偏紫的柔和多层阴影，替代零散的黑灰投影 ===== */
+  --shadow-rgb: 79, 63, 196;
+  --shadow-xs: 0 1px 2px rgba(var(--shadow-rgb), 0.05);
+  --shadow-sm: 0 1px 2px rgba(var(--shadow-rgb), 0.05), 0 4px 12px -2px rgba(var(--shadow-rgb), 0.1);
+  --shadow-md: 0 4px 12px -2px rgba(var(--shadow-rgb), 0.12), 0 14px 30px -8px rgba(var(--shadow-rgb), 0.2);
+  --shadow-lg: 0 12px 28px -8px rgba(var(--shadow-rgb), 0.18), 0 30px 60px -12px rgba(var(--shadow-rgb), 0.3);
+  /* 品牌主色光晕：渐变按钮 / 激活态使用 */
+  --shadow-glow: 0 6px 18px -6px rgba(109, 90, 224, 0.55);
+
+  /* ===== 圆角体系 ===== */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
 
   /* Element Plus 主题色覆写（浅色） */
-  --el-color-primary: #6c5ce7;
-  --el-color-primary-light-3: #9990ef;
-  --el-color-primary-light-5: #b6b0f4;
-  --el-color-primary-light-7: #d3d0f9;
-  --el-color-primary-light-8: #e1dffb;
-  --el-color-primary-light-9: #f0effd;
-  --el-color-primary-dark-2: #5449cd;
+  --el-color-primary: #6d5ae0;
+  --el-color-primary-light-3: #8f82ee;
+  --el-color-primary-light-5: #b6abf6;
+  --el-color-primary-light-7: #ddd6fb;
+  --el-color-primary-light-8: #eae6fd;
+  --el-color-primary-light-9: #f3f0fe;
+  --el-color-primary-dark-2: #5946c7;
 
-  --el-border-radius-base: 8px;
-  --el-border-radius-small: 6px;
+  --el-border-radius-base: 10px;
+  --el-border-radius-small: 8px;
   --el-border-radius-round: 20px;
 
-  --el-bg-color-page: #f6f7fb;
-  --el-card-border-radius: 12px;
+  /* 页面底色与边框：带一点紫调的冷灰，边缘与层级更清晰 */
+  --el-bg-color-page: #eef0f8;
+  --el-border-color: #c9cbe0;
+  --el-border-color-light: #dcddeb;
+  --el-border-color-lighter: #e7e7f2;
+  --el-border-color-extra-light: #f1f2fa;
+  --el-card-border-radius: 14px;
 }
 
 html,
@@ -36,26 +57,31 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
-/* 主内容区：柔和渐变底 + 角落淡彩光晕
- * padding 覆盖 Element Plus 默认的 20px，收窄整体四周留白，让三色列表页更紧凑 */
-.el-main {
-  background:
-    radial-gradient(1100px 480px at 90% -8%, rgba(108, 92, 231, 0.05), transparent 60%),
-    radial-gradient(900px 420px at -8% 108%, rgba(255, 138, 176, 0.04), transparent 55%), var(--el-bg-color-page);
-  padding: 10px 12px 12px;
-}
-
-/* 顶栏：透明底 + 细分隔线，与渐变背景融合 */
-.el-header {
+/* 布局容器一律透明：整窗只有 .app-body 一层画布背景，
+ * 侧边栏与内容区共享同一底色，缝隙两侧永远同色，不会出现色差 */
+.el-container {
   background: transparent;
-  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-/* 分区标题 */
+/* 分区标题：画布是渐变，靠不透明底色遮住横线的老办法会露出色块，
+ * 因此直接去掉横线，只保留标题文字 */
+.el-divider.el-divider--horizontal {
+  border-top: none;
+}
+
 .el-divider__text {
+  padding: 0;
   font-weight: 600;
+  font-size: 13px;
   letter-spacing: 0.5px;
-  background-color: var(--el-bg-color-page);
+  color: var(--el-text-color-secondary);
+  background-color: transparent;
+}
+
+/* 横线移除后，左对齐标题不再需要为让位横线而留的缩进，
+ * 与下方卡片左边缘对齐 */
+.el-divider__text.is-left {
+  left: 0;
 }
 
 /* 精致滚动条 */
@@ -64,11 +90,14 @@ body,
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(31, 35, 70, 0.18);
+  background: rgba(var(--shadow-rgb), 0.16);
   border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 
   &:hover {
-    background: rgba(31, 35, 70, 0.32);
+    background: rgba(var(--shadow-rgb), 0.3);
+    background-clip: content-box;
   }
 }
 ::-webkit-scrollbar-track {
@@ -87,23 +116,23 @@ body,
 .frosted-surface {
   background: color-mix(in srgb, var(--el-bg-color) 78%, transparent);
   backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
-  box-shadow: 0 12px 32px -12px rgba(31, 35, 70, 0.3);
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 45%, transparent);
+  box-shadow: var(--shadow-md);
 }
 
 /* 磨砂玻璃卡片（设置 / 下载等页面的内容卡片统一外观） */
 .glass-card {
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
-  background: color-mix(in srgb, var(--el-bg-color) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 55%, #ffffff);
+  background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
   backdrop-filter: blur(16px) saturate(180%);
-  box-shadow: 0 8px 24px -12px rgba(31, 35, 70, 0.22);
+  box-shadow: var(--shadow-sm);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 14px 32px -14px rgba(31, 35, 70, 0.28);
+    box-shadow: var(--shadow-md);
   }
 }
 
@@ -118,146 +147,4 @@ body,
   border-radius: 24px;
   color: white;
   font-size: 12px;
-}
-
-.cover-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 0;
-  padding-bottom: 100%;
-  position: relative;
-
-  .cover {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-  }
-}
-
-.live-card {
-  cursor: pointer;
-  margin-top: 8px;
-
-  .live-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .live-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .live-info {
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .member-info {
-    display: flex;
-    align-items: center;
-    font-size: 12px;
-  }
-
-  .live-date {
-    margin: 3px 0;
-    color: #919191;
-    text-align: left;
-    font-size: 12px;
-  }
-}
-
-.header-box {
-  margin: 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.player-container {
-  display: flex;
-}
-
-$height: 640px;
-$width: 400px;
-
-.video {
-  display: flex;
-  justify-content: center;
-  width: $width;
-  height: $height;
-}
-
-.carousel-box {
-  position: relative;
-  width: $width;
-  height: 100%;
-}
-
-.barrage-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  font-size: small;
-
-  .barrage-box {
-    padding-right: 20px;
-    flex: 1 0 auto;
-    overflow: hidden;
-    padding-left: 0;
-  }
-}
-
-.versions {
-  position: absolute;
-  left: calc(50% - 240px);
-  bottom: 15px;
-  margin: 0 auto;
-  padding: 10px 0;
-  font-family: 'Menlo', 'Lucida Console', monospace;
-  display: inline-flex;
-  overflow: hidden;
-  align-items: center;
-  border-radius: 22px;
-  border: 1px solid #d9d9d9;
-  background-color: #fefefe;
-  backdrop-filter: blur(24px);
-}
-
-.versions li {
-  display: block;
-  float: left;
-  border-right: 1px solid #d9d9d9;
-  padding: 0 15px;
-  font-size: 12px;
-  line-height: 12px;
-  opacity: 0.8;
-  &:last-child {
-    border: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .text {
-    font-size: 18px;
-  }
-}
-
-@media (max-width: 620px) {
-  .versions {
-    display: none;
-  }
-}
-
-@media (max-width: 350px) {
-  .tip,
-  .actions {
-    display: none;
-  }
 }
