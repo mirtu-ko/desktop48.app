@@ -60,6 +60,10 @@ class Database {
       )
       return t?.teamSort ?? Number.MAX_SAFE_INTEGER
     }
+    const teamBadgeOf = (teamId: number) => {
+      const t = this.db.teamInfo?.find((i: any) => Number(i.teamId) === Number(teamId))
+      return t?.seineTeamBadge || ''
+    }
 
     // 转换为数组结构，直接存到 this.db.memberTree；group/team/member 的 value 用 id 字符串，便于回放按维度筛选
     this.memberTree = [...groupMap.values()]
@@ -71,6 +75,8 @@ class Database {
             teamName: team.teamName,
             label: team.teamName,
             value: String(team.teamId),
+            // 队伍徽章（seineTeamBadge，可能是相对路径，渲染端负责归一化），供成员页分组标题展示
+            teamBadge: teamBadgeOf(team.teamId),
             children: team.members.map((member: any) => ({
               label: member.realName,
               value: String(member.userId),
@@ -113,13 +119,36 @@ class Database {
   }
 
   private memberTeamUpdate() {
-    // 为 starInfo 每一项新增 teamColor 字段
+    // 为 starInfo 每一项补 teamColor；查不到队伍时保留旧值（粘性），
+    // 保证解散队伍被清洗后，退团成员仍保留最后一次已知的队伍颜色（颜色随成员持久化）
     if (Array.isArray(this.db.starInfo) && Array.isArray(this.db.teamInfo)) {
       this.db.starInfo.forEach((member: any) => {
         const team = this.db.teamInfo.find((t: any) => Number(t.teamId) === Number(member.teamId))
-        member.teamColor = team?.teamColor || ''
+        member.teamColor = team?.teamColor || member.teamColor || ''
       })
     }
+  }
+
+  private pruneTeamsAndGroups() {
+    // 清洗 teamInfo/groupInfo：存活 = 被在团/暂休成员引用（status !== 3，含旧数据缺 status 的兜底）
+    // 或 API 标记 status === 1；两者都说死才删除，任一信号存活即保留（防 API 误标/缺字段）
+    if (!Array.isArray(this.db.starInfo) || !Array.isArray(this.db.teamInfo) || !Array.isArray(this.db.groupInfo)) {
+      return
+    }
+    const activeTeamIds = new Set(
+      this.db.starInfo.filter((m: any) => m.status !== 3).map((m: any) => Number(m.teamId)),
+    )
+    this.db.teamInfo = this.db.teamInfo.filter(
+      (t: any) => t.status === 1 || activeTeamIds.has(Number(t.teamId)),
+    )
+    const activeGroupIds = new Set(
+      this.db.starInfo.filter((m: any) => m.status !== 3).map((m: any) => Number(m.groupId)),
+    )
+    this.db.groupInfo = this.db.groupInfo.filter(
+      (g: any) => g.status === 1 || activeGroupIds.has(Number(g.groupId)),
+    )
+    this.teamsDB = this.db.teamInfo
+    this.groupsDB = this.db.groupInfo
   }
 
   public init() {
@@ -130,17 +159,11 @@ class Database {
     }
     this.db = this.lowdb.data
     this.membersDB = this.db.starInfo
-    // 统计starInfo里所有成员的teamId，并排重。如果teamInfo里的teamId不在starInfo里，就删除
-    const teamIds = Array.from(new Set(this.db.starInfo.map((m: any) => m.teamId)))
-    this.db.teamInfo = this.db.teamInfo.filter((t: any) => teamIds.includes(t.teamId))
-    this.teamsDB = this.db.teamInfo
-    // 统计starInfo里所有成员的groupId，并排重。如果groupInfo里的groupId不在starInfo里，就删除
-    const groupIds = Array.from(new Set(this.db.starInfo.map((m: any) => m.groupId)))
-    this.db.groupInfo = this.db.groupInfo.filter((g: any) => groupIds.includes(g.groupId))
-    this.groupsDB = this.db.groupInfo
 
-    this.buildMemberTree()
+    // 统一顺序：先补颜色（粘性留存）→ 再清洗（解散队伍移除）→ 再建树（树的孩子是 spread 拷贝，最后建才能带上 teamColor）
     this.memberTeamUpdate()
+    this.pruneTeamsAndGroups()
+    this.buildMemberTree()
     this.lowdb.write()
     // 调试打印数据库路径
     log('[database.ts]数据库路径', this.dbPath)
@@ -161,9 +184,12 @@ class Database {
       groupInfo: this.db.groupInfo?.length,
       memberTree: this.db.memberTree?.length,
     })
-    // 更新 memberTree
-    this.buildMemberTree()
+    // 同步缓存引用：starInfo 是整组替换，不刷新的话 hasMembers 等会读到旧数据直到重启
+    this.membersDB = this.db.starInfo
+    // 统一顺序：先补颜色（粘性留存）→ 再清洗（解散队伍移除）→ 再建树（最后建才能带上 teamColor）
     this.memberTeamUpdate()
+    this.pruneTeamsAndGroups()
+    this.buildMemberTree()
     // 写入数据库
     this.lowdb.write()
     return { ok: true }
@@ -217,7 +243,10 @@ class Database {
   }
 
   public removeHiddenMember(userId: number) {
-    this.db.hiddenMemberIds = this.db.hiddenMemberIds.filter((id: number) => id !== userId)
+    // Number 归一化：历史数据里存的可能级联选择器的字符串 id，严格比较会删不掉
+    this.db.hiddenMemberIds = this.db.hiddenMemberIds.filter(
+      (id: number | string) => Number(id) !== Number(userId),
+    )
     this.lowdb.write()
   }
 

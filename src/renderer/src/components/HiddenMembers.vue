@@ -44,7 +44,8 @@ async function addHiddenMember() {
     })
     return
   }
-  const exists = hiddenMembers.value.some((member: any) => member.userId == selectedMember.value[2])
+  const memberId = Number(selectedMember.value[2])
+  const exists = hiddenMembers.value.some((member: any) => Number(member.userId) === memberId)
   if (exists) {
     ElMessage({
       message: '请勿重复添加',
@@ -52,8 +53,9 @@ async function addHiddenMember() {
     })
     return
   }
-  const tempIds = hiddenMembers.value.map((m: any) => m.userId)
-  tempIds.push(selectedMember.value[2])
+  // 统一存数字 id：级联选择器的值是字符串，存成字符串会让主进程的移除匹配不上
+  const tempIds = hiddenMembers.value.map((m: any) => Number(m.userId))
+  tempIds.push(memberId)
   window.mainAPI.setHiddenMembers(tempIds)
   selectedMember.value = []
   hiddenMembers.value = await window.mainAPI.getHiddenMembers()

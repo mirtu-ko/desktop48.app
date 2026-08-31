@@ -18,6 +18,8 @@ const { openLive } = useFloatPlayers()
 const activeTab = ref<'live' | 'review'>('live')
 // 是否加载过回放面板，首次切换到回放时才渲染，避免进入页面即请求回放列表
 const reviewMounted = ref(false)
+// 成员详情「看 TA 的回放」预置筛选：每次跳转都新建对象，同一成员连续跳转也能触发 Reviews 的 watch
+const memberPreset = ref<{ userId: string } | null>(null)
 
 const viewTabs = [
   { label: '直播', key: 'live', icon: VideoCamera },
@@ -28,6 +30,22 @@ function switchTab(tab: string) {
   if (tab === 'review')
     reviewMounted.value = true
   activeTab.value = tab as 'live' | 'review'
+}
+
+// 成员详情抽屉跳转：切到回放面板并按该成员预置级联筛选
+function onOpenMemberReviews(userId: unknown) {
+  memberPreset.value = { userId: String(userId) }
+  switchTab('review')
+}
+
+// 双击当前 tab：直播 tab 刷新直播列表，回放 tab 转发给回放组件刷新
+const reviewsRef = ref<InstanceType<typeof Reviews> | null>(null)
+
+function onTabsRefresh() {
+  if (activeTab.value === 'review')
+    reviewsRef.value?.refreshFromTop()
+  else
+    refreshList()
 }
 
 // 分页列表状态/逻辑/触底加载统一由组合式函数管理，直播与回放共用同一套
@@ -84,17 +102,19 @@ function refreshList() {
 onMounted(() => {
   getLiveList()
   EventBus.on('live-unavailable', onLiveUnavailable)
+  EventBus.on('open-member-reviews', onOpenMemberReviews)
 })
 
 onUnmounted(() => {
   EventBus.off('live-unavailable', onLiveUnavailable)
+  EventBus.off('open-member-reviews', onOpenMemberReviews)
 })
 </script>
 
 <template>
   <div class="lives-root">
-    <!-- 左上角浮层 tab：在直播与回放之间切换，悬浮于列表之上 -->
-    <FloatingTabBar :tabs="viewTabs" :active="activeTab" @change="switchTab" />
+    <!-- 左上角浮层 tab：在直播与回放之间切换，悬浮于列表之上；双击当前 tab 刷新 -->
+    <FloatingTabBar :tabs="viewTabs" :active="activeTab" @change="switchTab" @refresh="onTabsRefresh" />
 
     <div v-show="activeTab === 'live'" v-loading="loading" class="live-main">
       <!-- 无直播时显示 -->
@@ -132,7 +152,7 @@ onUnmounted(() => {
 
     <!-- 回放面板：复用回放组件，首次切换时才渲染并保持状态 -->
     <div v-show="activeTab === 'review'" class="review-main">
-      <Reviews v-if="reviewMounted" />
+      <Reviews v-if="reviewMounted" ref="reviewsRef" :member-preset="memberPreset" />
     </div>
   </div>
 </template>

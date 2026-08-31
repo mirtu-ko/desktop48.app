@@ -8,6 +8,11 @@ import usePagedLiveList from '../assets/js/use-paged-live-list'
 import FloatingDock from '../components/FloatingDock.vue'
 import LiveItem from '../components/LiveItem.vue'
 
+// 组件 props：成员详情「看 TA 的回放」跳转时预置的成员筛选；每次跳转都是新对象，保证 watch 必触发
+const props = withDefaults(defineProps<{ memberPreset?: { userId: string } | null }>(), {
+  memberPreset: null,
+})
+
 // 画中画迷你窗：回放播放挂载点与直播共用同一套
 const { openReview } = useFloatPlayers()
 
@@ -72,8 +77,54 @@ function filterMethod(node: any, keyword: string) {
 // 初始化
 onMounted(async () => {
   memberOption.value = await window.mainAPI.getMemberTree()
-  refresh()
+  // 先应用预置筛选再拉列表，避免挂载时重复请求
+  if (!applyPreset())
+    refresh()
 })
+
+/** 在成员树里按 userId 找到 [groupId, teamId, userId] 完整路径 */
+function findFilterPath(userId: string): any[] | null {
+  for (const group of memberOption.value) {
+    for (const team of group.children || []) {
+      for (const member of team.children || []) {
+        if (member.value === userId)
+          return [group.value, team.value, member.value]
+      }
+    }
+  }
+  return null
+}
+
+/** 应用预置筛选；返回是否实际应用（预置为空或树里找不到时返回 false） */
+function applyPreset(): boolean {
+  const userId = props.memberPreset?.userId
+  if (!userId)
+    return false
+  const path = findFilterPath(userId)
+  if (!path)
+    return false
+  if (JSON.stringify(selectedFilter.value) !== JSON.stringify(path)) {
+    // 筛选变化：交给下方 selectedFilter 的 watch 自动刷新
+    selectedFilter.value = path
+  }
+  else {
+    // 筛选没变也要重新拉取：上次请求可能失败或返回为空
+    reviewScrollRef.value?.setScrollTop?.(0)
+    refresh()
+  }
+  return true
+}
+
+// 成员页每次跳转（含同一成员连续跳转）都应用预置筛选
+watch(() => props.memberPreset, applyPreset)
+
+/** 供父组件（直播页双击「回放」tab）调用：回到顶部并刷新列表 */
+function refreshFromTop() {
+  reviewScrollRef.value?.setScrollTop?.(0)
+  refresh()
+}
+
+defineExpose({ refreshFromTop })
 
 // 点击回放：以画中画迷你窗打开，可边看边继续浏览列表
 function onReviewClick(item: any) {
@@ -121,7 +172,8 @@ watch(selectedFilter, () => {
       <!-- 右下角浮动筛选/刷新工具条：不占行，内容滚过时呈现磨砂玻璃 -->
       <FloatingDock>
         <el-cascader
-          v-model="selectedFilter" transfer
+          v-model="selectedFilter"
+          style="width: 240px" transfer
           clearable placeholder="请选择团体/队伍/成员"
           filterable :filter-method="filterMethod" :options="memberOption" :props="{
             label: 'label',

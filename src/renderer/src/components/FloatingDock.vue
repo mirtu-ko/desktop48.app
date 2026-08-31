@@ -12,7 +12,7 @@
 .floating-dock {
   position: absolute;
   right: 8px;
-  bottom: 20px;
+  top: 6px;
   z-index: 6;
   display: flex;
   align-items: center;

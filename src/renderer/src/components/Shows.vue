@@ -38,8 +38,8 @@ const groupTabs = [
   { label: 'SNH48', key: '10', color: '#8FD3F6' },
   { label: 'BEJ48', key: '11', color: '#FE2472' },
   { label: 'GNZ48', key: '12', color: '#ABCA14' },
-  { label: 'CKG48', key: '13', color: '#FFBA07' },
-  { label: 'CGT48', key: '14', color: '#D21217' },
+  { label: 'CKG48', key: '14', color: '#FFBA07' },
+  { label: 'CGT48', key: '21', color: '#D21217' },
 ]
 
 /** 触底加载禁用态：任一列表加载中、或两份列表都无更多时禁用 */
@@ -207,8 +207,8 @@ function openHistoryStream(show: OpenLive) {
 
 <template>
   <div v-loading="loading || historyLoading" class="container">
-    <!-- 左上角浮动团体切换：不占行，内容滚过时呈现磨砂玻璃 -->
-    <FloatingTabBar :tabs="groupTabs" :active="groupId" @change="groupId = $event" />
+    <!-- 左上角浮动团体切换：不占行，内容滚过时呈现磨砂玻璃；双击当前分团刷新列表 -->
+    <FloatingTabBar :tabs="groupTabs" :active="groupId" @change="groupId = $event" @refresh="refresh" />
     <div class="shows-main">
       <el-scrollbar
         ref="showsScrollRef"

@@ -31,7 +31,7 @@ $ npm run build:linux
 
 ## 预览
 
-![Desktop48 截图](resources/screenshot.png)
+![Desktop48 截图](resources/screenshot.jpg)
 
 ## macOS 常见问题
 

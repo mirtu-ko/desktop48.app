@@ -1,26 +1,8 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, ref } from 'vue'
-import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import HiddenMembers from '../components/HiddenMembers.vue'
-
-const isUpdating = ref(false)
-
-// 更新成员信息
-function updateInfo() {
-  isUpdating.value = true
-  Apis.instance().syncInfo().then(() => {
-    ElMessage({
-      message: '更新完毕',
-      type: 'success',
-    })
-    isUpdating.value = false
-  }).catch((error: any) => {
-    console.error(error)
-    isUpdating.value = false
-  })
-}
 
 // 下载目录 / ffmpeg目录 / User-Agent
 const downloadDirectory = ref('')
@@ -97,16 +79,6 @@ async function setUserAgent() {
     wrap-class="scrollbar-wrapper"
   >
     <div class="setting-root">
-      <el-divider content-position="left" class="section-divider">
-        更新成员数据库
-      </el-divider>
-
-      <el-card class="glass-card" shadow="hover">
-        <el-button type="primary" :loading="isUpdating" @click="updateInfo">
-          更新成员数据库
-        </el-button>
-      </el-card>
-
       <el-divider content-position="left" class="section-divider">
         User-Agent设置
       </el-divider>
