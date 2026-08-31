@@ -1,0 +1,378 @@
+<script lang="ts">
+/** 成员详情（树节点为 starInfo 全量字段的 spread，这里声明展示用到的字段） */
+</script>
+
+<script setup lang="ts">
+import { Film, Link, User } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import EventBus from '../assets/js/event-bus'
+import Tools from '../assets/js/tools'
+
+export interface MemberDetail {
+  userId: number
+  realName: string
+  nickname: string
+  avatar: string
+  teamName: string
+  teamColor: string
+  /** 1 在团 2 暂休 3 退团 */
+  status: number
+  birthday: string
+  constellation: string
+  bloodType: string
+  height: string
+  birthplace: string
+  joinTime: string
+  periodName: string
+  specialty: string
+  hobbies: string
+  wbName: string
+  wbUid: string
+  fullPhoto1?: string
+  fullPhoto2?: string
+  fullPhoto3?: string
+  fullPhoto4?: string
+  [key: string]: any
+}
+
+const props = defineProps<{ member: MemberDetail | null }>()
+const emit = defineEmits<{ close: [] }>()
+
+const router = useRouter()
+
+/** 成员状态元信息 */
+const STATUS_META: Record<number, { label: string, tag: 'success' | 'warning' | 'info' }> = {
+  1: { label: '在团', tag: 'success' },
+  2: { label: '暂休', tag: 'warning' },
+  3: { label: '退团', tag: 'info' },
+}
+
+const statusMeta = computed(() =>
+  STATUS_META[props.member?.status ?? 1] || STATUS_META[1],
+)
+
+/** 归一化后的头像 */
+const avatar = computed(() =>
+  props.member?.avatar ? Tools.sourceUrl(props.member.avatar) : '',
+)
+
+/** 基础资料（空值字段不展示） */
+const profileItems = computed(() => {
+  const member = props.member
+  if (!member)
+    return []
+  return [
+    { label: '生日', value: member.birthday },
+    { label: '星座', value: member.constellation },
+    { label: '血型', value: member.bloodType },
+    { label: '身高', value: member.height ? `${member.height}cm` : '' },
+    { label: '出生地', value: member.birthplace },
+    { label: '入团时间', value: member.joinTime },
+    { label: '期数', value: member.periodName },
+  ].filter(item => item.value)
+})
+
+/** 写真图集（fullPhoto1-4，空值过滤 + 相对路径归一化） */
+const photos = computed(() => {
+  const member = props.member
+  if (!member)
+    return []
+  return [member.fullPhoto1, member.fullPhoto2, member.fullPhoto3, member.fullPhoto4]
+    .filter(photo => !!photo)
+    .map(photo => Tools.sourceUrl(photo as string))
+})
+
+/** 关闭抽屉（点击遮罩 / ESC / 关闭按钮） */
+function onVisibilityChange(value: boolean) {
+  if (!value)
+    emit('close')
+}
+
+/** 点击卡片「看 TA 的回放」：通知直播页切到回放 tab 并按该成员预置筛选 */
+function openReviews() {
+  if (!props.member)
+    return
+  EventBus.emit('open-member-reviews', props.member.userId)
+  emit('close')
+  router.push('/lives')
+}
+</script>
+
+<template>
+  <el-drawer
+    :model-value="!!member"
+    size="420px"
+    @update:model-value="onVisibilityChange"
+  >
+    <div v-if="member" class="detail">
+      <!-- 头部：头像 + 姓名/昵称 + 队伍徽章 + 状态 -->
+      <div class="hero">
+        <el-image class="avatar" :src="avatar" fit="cover">
+          <template #placeholder>
+            <div class="avatar-ph" />
+          </template>
+          <template #error>
+            <div class="avatar-ph">
+              <el-icon :size="30">
+                <User />
+              </el-icon>
+            </div>
+          </template>
+        </el-image>
+        <div class="head">
+          <p class="name">
+            {{ member.realName }}
+          </p>
+          <p class="nick" :title="member.nickname">
+            {{ member.nickname }}
+          </p>
+          <div class="tags">
+            <span
+              v-if="member.teamName"
+              class="team-badge"
+              :style="{ backgroundColor: member.teamColor ? `#${member.teamColor}` : '#909399' }"
+            >
+              {{ member.teamName.replace('TEAM ', '') }}
+            </span>
+            <el-tag :type="statusMeta.tag" size="small" effect="light">
+              {{ statusMeta.label }}
+            </el-tag>
+          </div>
+        </div>
+      </div>
+
+      <!-- 基础资料 -->
+      <div v-if="profileItems.length" class="profile-grid">
+        <div v-for="item in profileItems" :key="item.label" class="cell">
+          <span class="label">{{ item.label }}</span>
+          <span class="value" :title="item.value">{{ item.value }}</span>
+        </div>
+      </div>
+
+      <div v-if="member.specialty" class="block">
+        <p class="label">
+          特长
+        </p>
+        <p class="value">
+          {{ member.specialty }}
+        </p>
+      </div>
+
+      <div v-if="member.hobbies" class="block">
+        <p class="label">
+          兴趣爱好
+        </p>
+        <p class="value">
+          {{ member.hobbies }}
+        </p>
+      </div>
+
+      <!-- 微博直达 -->
+      <div v-if="member.wbUid" class="block">
+        <p class="label">
+          微博
+        </p>
+        <a
+          class="weibo-link"
+          :href="`https://weibo.com/u/${member.wbUid}`"
+          target="_blank"
+          rel="noopener"
+        >
+          {{ member.wbName || member.wbUid }}
+          <el-icon class="link-icon">
+            <Link />
+          </el-icon>
+        </a>
+      </div>
+
+      <!-- 写真图集：点击放大预览 -->
+      <div v-if="photos.length" class="block">
+        <p class="label">
+          写真
+        </p>
+        <div class="photos">
+          <el-image
+            v-for="(photo, index) in photos"
+            :key="photo"
+            class="photo"
+            :src="photo"
+            :preview-src-list="photos"
+            :initial-index="index"
+            fit="cover"
+            lazy
+          >
+            <template #placeholder>
+              <div class="photo-ph" />
+            </template>
+            <template #error>
+              <div class="photo-ph" />
+            </template>
+          </el-image>
+        </div>
+      </div>
+
+      <!-- 回放直达 -->
+      <el-button type="primary" class="review-btn" :icon="Film" @click="openReviews">
+        看 TA 的回放
+      </el-button>
+    </div>
+  </el-drawer>
+</template>
+
+<style scoped lang="scss">
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hero {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+
+  .avatar {
+    flex: none;
+    width: 120px;
+    aspect-ratio: 3 / 4;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--el-box-shadow-light);
+  }
+
+  .avatar-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--el-text-color-placeholder);
+    background: var(--el-fill-color-light);
+  }
+
+  .head {
+    min-width: 0;
+    padding-top: 6px;
+  }
+
+  .name {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--el-text-color-primary);
+  }
+
+  .nick {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tags {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .team-badge {
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #fff;
+  }
+}
+
+.profile-grid {
+  display: grid;
+  gap: 10px 14px;
+  grid-template-columns: repeat(2, 1fr);
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--el-fill-color-lighter);
+
+  .cell {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .label {
+    flex: none;
+    color: var(--el-text-color-secondary);
+  }
+
+  .value {
+    color: var(--el-text-color-primary);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.block {
+  .label {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .value {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--el-text-color-primary);
+  }
+
+  .weibo-link {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 14px;
+    color: var(--el-color-primary);
+    text-decoration: none;
+
+    .link-icon {
+      font-size: 13px;
+    }
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .photos {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .photo,
+  .photo-ph {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .photo {
+    cursor: zoom-in;
+    box-shadow: var(--el-box-shadow-light);
+  }
+
+  .photo-ph {
+    background: var(--el-fill-color-light);
+  }
+}
+
+.review-btn {
+  width: 100%;
+}
+</style>

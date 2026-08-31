@@ -14,7 +14,7 @@ const props = defineProps<{
   active: string
 }>()
 
-const emit = defineEmits<{ change: [key: string] }>()
+const emit = defineEmits<{ change: [key: string], refresh: [] }>()
 
 /** 激活 tab 的主题渐变：有主题色用之，否则回退品牌渐变 */
 const activeColor = computed(
@@ -38,6 +38,12 @@ function tabStyle(key: string) {
 function change(key: string) {
   emit('change', key)
 }
+
+/** 双击当前 tab：通知父组件刷新该 tab 对应的内容 */
+function dblClick(tab: FloatingTabItem) {
+  if (tab.key === props.active)
+    emit('refresh')
+}
 </script>
 
 <template>
@@ -49,6 +55,7 @@ function change(key: string) {
       :class="{ 'is-active': active === tab.key }"
       :style="tabStyle(tab.key)"
       @click="change(tab.key)"
+      @dblclick="dblClick(tab)"
     >
       <el-icon v-if="tab.icon" class="tab-icon">
         <component :is="tab.icon" />
@@ -91,6 +98,7 @@ function change(key: string) {
   color: var(--el-text-color-secondary);
   background: transparent;
   cursor: pointer;
+  user-select: none;
   transition:
     background 0.2s ease,
     color 0.2s ease;

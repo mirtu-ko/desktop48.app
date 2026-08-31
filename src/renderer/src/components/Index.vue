@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, Microphone, Setting, VideoCamera } from '@element-plus/icons-vue'
+import { Download, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
@@ -14,6 +14,7 @@ const route = useRoute()
 const pathToMenu = {
   '/lives': Constants.Menu.LIVES,
   '/shows': Constants.Menu.Shows,
+  '/members': Constants.Menu.Members,
   '/downloads': Constants.Menu.DOWNLOADS,
   '/setting': Constants.Menu.SETTING,
 }
@@ -78,6 +79,10 @@ onUnmounted(() => {
         <el-menu-item :index="Constants.Menu.Shows">
           <el-icon><Microphone /></el-icon>
           <span>公演</span>
+        </el-menu-item>
+        <el-menu-item :index="Constants.Menu.Members">
+          <el-icon><User /></el-icon>
+          <span>成员</span>
         </el-menu-item>
         <el-menu-item :index="Constants.Menu.DOWNLOADS">
           <el-icon><Download /></el-icon>
@@ -163,6 +168,7 @@ onUnmounted(() => {
 }
 
 .side-menu {
+  user-select: none;
   flex: 1;
   padding: 6px 0 12px;
   height: auto;
