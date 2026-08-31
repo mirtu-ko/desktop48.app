@@ -1139,15 +1139,12 @@ onUnmounted(() => {
   gap: 2px;
 }
 
+/* 电台轮播铺满整个窗口，音频控件悬浮底部居中 */
 .radio-player {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 24px;
-  box-sizing: border-box;
 }
 
 .radio-carousel {
@@ -1157,15 +1154,21 @@ onUnmounted(() => {
   display: flex;
 }
 
+/* 轮播图铺满：object-fit: cover 裁边填充 */
 .radio-cover {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
 }
 
 .audio-player {
-  width: min(560px, 100%);
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 92%);
+  z-index: 5;
   flex-shrink: 0;
 }
 

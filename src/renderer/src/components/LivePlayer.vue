@@ -20,6 +20,11 @@ interface LiveDetail {
   }
   onlineNum?: number
   liveId?: string
+  /** 电台轮播图（liveType !== 1 时接口返回） */
+  carousels?: {
+    carousels: string[]
+    carouselTime?: number | string
+  }
 }
 
 const props = defineProps({
@@ -59,6 +64,9 @@ const coverImage = ref('')
 const onlineNum = ref(0)
 const powerSaveBlockerId = ref<number | null>(null)
 const elapsedTime = ref(0)
+/** 电台轮播图与切换间隔（毫秒） */
+const carousels = ref<string[]>([])
+const carouselTime = ref(5000)
 
 const isRadio = computed(() => props.liveType !== 1)
 const isVerticalRotation = computed(() => {
@@ -132,6 +140,13 @@ let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
 // 这一组方法只负责“直播详情”和界面状态同步，不直接处理播放器。
 function applyLiveDetail(data: LiveDetail) {
   coverImage.value = Tools.sourceUrl(data.coverPath)
+  // 电台轮播图：接口返回 carousels 时使用，否则回退封面图单张展示
+  carousels.value = isRadio.value && data.carousels?.carousels?.length
+    ? data.carousels.carousels.map(carousel => Tools.sourceUrl(carousel))
+    : (data.coverPath ? [Tools.sourceUrl(data.coverPath)] : [])
+  carouselTime.value = data.carousels?.carouselTime
+    ? Number.parseInt(String(data.carousels.carouselTime))
+    : 5000
   realName.value = data.user.userName
   // open 模式优先用传入的队伍 logo 作为顶部头像
   userAvatar.value = props.source === 'open' && props.avatarUrl
@@ -608,7 +623,19 @@ onUnmounted(() => {
   <div class="live-player">
     <div ref="videoBoxRef" class="video-box" :class="{ 'vertical-rotation': !isRadio && isVerticalRotation, 'video-box-background': !isRadio }">
       <div v-if="isRadio" class="radio-box">
-        <img :src="coverImage" class="radio-cover" alt="cover">
+        <div class="radio-carousel">
+          <el-carousel
+            v-if="carousels.length > 0"
+            :interval="carouselTime"
+            indicator-position="none"
+            arrow="never"
+            height="100%"
+          >
+            <el-carousel-item v-for="carousel in carousels" :key="carousel">
+              <img :src="carousel" class="radio-cover" alt="cover">
+            </el-carousel-item>
+          </el-carousel>
+        </div>
         <audio
           ref="nativeAudio"
           controls
@@ -628,7 +655,7 @@ onUnmounted(() => {
           :poster="coverImage"
         />
       </div>
-      <div v-if="loading" class="loading-container">
+      <div v-if="loading" class="loading-container" :class="{ 'loading-masked': isRadio }">
         <div v-if="coverImage" class="loading-bg" :style="{ backgroundImage: `url(${coverImage})` }" />
         <div class="loading-spinner" aria-hidden="true">
           <div class="ring ring--outer" />
@@ -730,23 +757,43 @@ onUnmounted(() => {
 }
 
 .radio-box {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* 轮播铺满整个窗口 */
+.radio-carousel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+:deep(.el-carousel) {
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-evenly;
-  gap: 16px;
 }
 
+:deep(.el-carousel__container) {
+  height: 100%;
+}
+
+/* 电台封面铺满整个窗口：object-fit: cover 裁边填充 */
 .radio-cover {
-  max-width: 60%;
-  max-height: 80%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
+/* 音频控件悬浮在封面底部居中 */
 .audio-player {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   width: min(600px, 90%);
+  z-index: 5;
 }
 
 .loading-container {
@@ -762,6 +809,11 @@ onUnmounted(() => {
   text-align: center;
   pointer-events: none;
   overflow: hidden;
+}
+
+/* 电台模式下封面轮播铺满窗口且较亮，加载时叠加深色蒙层保证动画可读 */
+.loading-container.loading-masked {
+  background: rgba(0, 0, 0, 0.55);
 }
 
 /* 用封面图作加载背景，0.1 透明度淡显，不遮挡居中内容 */
