@@ -22,9 +22,10 @@ const api = {
   getTeamOptions: () => ipcRenderer.invoke('getTeamOptions'),
   getGroupOptions: () => ipcRenderer.invoke('getGroupOptions'),
   getMemberTree: () => ipcRenderer.invoke('getMemberTree'),
-  getHiddenMembers: () => ipcRenderer.invoke('getHiddenMembers'),
-  setHiddenMembers: (ids: number[]) => ipcRenderer.invoke('setHiddenMembers', ids),
-  removeHiddenMember: (userId: number) => ipcRenderer.invoke('removeHiddenMember', userId),
+  getBlockedMembers: () => ipcRenderer.invoke('getBlockedMembers'),
+  setBlockedMembers: (ids: number[]) => ipcRenderer.invoke('setBlockedMembers', ids),
+  addBlockedMember: (userId: number) => ipcRenderer.invoke('addBlockedMember', userId),
+  removeBlockedMember: (userId: number) => ipcRenderer.invoke('removeBlockedMember', userId),
   hasMembers: () => ipcRenderer.invoke('hasMembers'),
   // 配置相关
   getConfig: (key: string, defaultValue: any) => ipcRenderer.invoke('getConfig', key, defaultValue),

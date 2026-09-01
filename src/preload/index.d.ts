@@ -18,6 +18,14 @@ export interface electronAPI {
   }
 }
 
+// 被屏蔽成员：主进程从 starInfo 中按 userId 挑出的成员对象
+export interface BlockedMember {
+  userId: number
+  realName: string
+  teamColor: string
+  [key: string]: any
+}
+
 // 主 API 类型定义
 export interface mainAPI {
   // 网络
@@ -32,10 +40,12 @@ export interface mainAPI {
   // 数据库相关
   getMember: (userId: number) => Promise<any>
   getMemberTree: () => Promise<any[]>
-  getMemberOptions: () => Promise<Array<{ label: string, value: number }>>
-  getHiddenMembers: () => Promise<any>
-  setHiddenMembers: (ids: number[]) => Promise<any>
-  removeHiddenMember: (userId: number) => Promise<any>
+  /** 成员级联树（分组 → 队伍 → 成员），value 均为字符串 id */
+  getMemberOptions: () => Promise<any[]>
+  getBlockedMembers: () => Promise<BlockedMember[]>
+  setBlockedMembers: (ids: number[]) => Promise<any>
+  addBlockedMember: (userId: number) => Promise<any>
+  removeBlockedMember: (userId: number) => Promise<any>
   getConfig: (key: string, defaultValue?: any) => Promise<any>
   setConfig: (key: string, value: any) => Promise<any>
 

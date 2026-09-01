@@ -22,13 +22,13 @@ const pathToMenu = {
 
 const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Constants.Menu.LIVES)
 
-// 底部 Dock 菜单项
+// 底部 Dock 菜单项（每项带专属主题色，用于激活/悬浮的图标渐变）
 const dockItems = [
-  { index: Constants.Menu.LIVES, label: '直播', icon: VideoCamera },
-  { index: Constants.Menu.Shows, label: '公演', icon: Microphone },
-  { index: Constants.Menu.Members, label: '成员', icon: User },
-  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download },
-  { index: Constants.Menu.SETTING, label: '设置', icon: Setting },
+  { index: Constants.Menu.LIVES, label: '直播', icon: VideoCamera, color: '#ff5e7e' },
+  { index: Constants.Menu.Shows, label: '公演', icon: Microphone, color: '#f59e0b' },
+  { index: Constants.Menu.Members, label: '成员', icon: User, color: '#3b82f6' },
+  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: '#10b981' },
+  { index: Constants.Menu.SETTING, label: '设置', icon: Setting, color: '#6d5ae0' },
 ]
 
 function changeMenu(menu: string) {

@@ -2,7 +2,7 @@
 import type { Ref } from 'vue'
 import type TaskBase from '../assets/js/task-base'
 import type { TaskPayload, TaskSnapshot } from '../assets/js/task-payload'
-import { Check, Loading } from '@element-plus/icons-vue'
+import { Check, Download, Loading, VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import DownloadTask from '../assets/js/download-task'
@@ -112,9 +112,10 @@ onMounted(() => {
   restoreTasks('record')
 })
 
+// 分区展示配置：图标与主题色与底部 Dock 的语义保持一致（下载-绿 / 直播-玫红）
 const taskGroups = computed(() => [
-  { kind: 'download' as TaskKind, title: '回放下载任务', emptyText: '无下载任务', tasks: downloadTasks.value },
-  { kind: 'record' as TaskKind, title: '直播录制任务', emptyText: '无录制任务', tasks: recordTasks.value },
+  { kind: 'record' as TaskKind, title: '直播录制', icon: VideoCamera, color: '#ff5e7e', emptyText: '暂无录制任务', tasks: recordTasks.value },
+  { kind: 'download' as TaskKind, title: '回放下载', icon: Download, color: '#10b981', emptyText: '暂无下载任务', tasks: downloadTasks.value },
 ])
 
 // 在 setup 阶段就订阅（早于 onMounted）：播放页跳转后立即 emit 事件，
@@ -138,53 +139,119 @@ onUnmounted(() => {
     wrap-class="scrollbar-wrapper"
   >
     <div class="downloads-root">
-      <template v-for="group in taskGroups" :key="group.kind">
-        <el-divider content-position="left" class="section-divider">
-          {{ group.title }}
-        </el-divider>
+      <section
+        v-for="group in taskGroups"
+        :key="group.kind"
+        class="task-section"
+        :style="{ '--group-color': group.color }"
+      >
+        <!-- 分区头：主题色图标 + 标题 + 任务数 -->
+        <header class="section-head">
+          <span class="section-icon">
+            <el-icon><component :is="group.icon" /></el-icon>
+          </span>
+          <span class="section-title">{{ group.title }}</span>
+          <span class="section-count">{{ group.tasks.length }}</span>
+        </header>
 
-        <el-card v-if="group.tasks.length === 0" class="glass-card glass-card--empty" shadow="never">
-          <div class="task-empty">
-            {{ group.emptyText }}
-          </div>
-        </el-card>
+        <!-- 空态 -->
+        <div
+          v-if="group.tasks.length === 0"
+          class="empty-card glass-card"
+        >
+          <el-icon class="empty-icon">
+            <component :is="group.icon" />
+          </el-icon>
+          <p>{{ group.emptyText }}</p>
+        </div>
 
-        <template v-else>
-          <el-card
-            v-for="task in group.tasks" :key="task.getLiveId()" class="glass-card task-card"
-            shadow="hover"
+        <!-- 任务卡片列表 -->
+        <div
+          v-else
+          class="task-list"
+        >
+          <article
+            v-for="task in group.tasks"
+            :key="task.getLiveId()"
+            class="task-card glass-card"
           >
-            <div class="task-info">
-              <div class="task-main">
-                <el-tag v-if="task.isRunning()" type="primary" size="small" round class="task-tag">
-                  <el-icon class="is-loading">
-                    <Loading />
-                  </el-icon>
-                  <span>运行中</span>
-                </el-tag>
-                <el-tag v-else type="success" size="small" round class="task-tag">
-                  <el-icon><Check /></el-icon>
-                  <span>已完成</span>
-                </el-tag>
-                <span class="task-path" :title="task.getFilePath()">{{ task.getFilePath() }}</span>
+            <span
+              class="task-icon"
+              :class="{ 'is-running': task.isRunning() }"
+            >
+              <el-icon><component :is="group.icon" /></el-icon>
+            </span>
+
+            <div class="task-meta">
+              <div
+                class="task-name"
+                :title="task.getFilename()"
+              >
+                {{ task.getFilename() }}
               </div>
-              <div class="task-actions">
-                <el-button v-if="task.isRunning()" type="danger" size="small" @click="task.stop()">
-                  结束
-                </el-button>
-                <template v-else>
-                  <el-button type="success" size="small" @click="task.openSaveDirectory()">
-                    打开文件夹
-                  </el-button>
-                  <el-button size="small" @click="removeTask(task, group.kind)">
-                    移除
-                  </el-button>
-                </template>
+              <div
+                v-if="task.getFilePath()"
+                class="task-path"
+                :title="task.getFilePath()"
+              >
+                {{ task.getFilePath() }}
               </div>
             </div>
-          </el-card>
-        </template>
-      </template>
+
+            <el-tag
+              v-if="task.isRunning()"
+              type="primary"
+              size="small"
+              round
+              class="task-tag"
+            >
+              <el-icon class="is-loading">
+                <Loading />
+              </el-icon>
+              <span>运行中</span>
+            </el-tag>
+            <el-tag
+              v-else
+              type="success"
+              size="small"
+              round
+              class="task-tag"
+            >
+              <el-icon><Check /></el-icon>
+              <span>已完成</span>
+            </el-tag>
+
+            <div class="task-actions">
+              <el-button
+                v-if="task.isRunning()"
+                type="danger"
+                size="small"
+                round
+                @click="task.stop()"
+              >
+                结束
+              </el-button>
+              <template v-else>
+                <el-button
+                  type="primary"
+                  size="small"
+                  round
+                  @click="task.openSaveDirectory()"
+                >
+                  打开文件夹
+                </el-button>
+                <el-button
+                  size="small"
+                  round
+                  @click="removeTask(task, group.kind)"
+                >
+                  移除
+                </el-button>
+              </template>
+            </div>
+          </article>
+        </div>
+      </section>
     </div>
   </el-scrollbar>
 </template>
@@ -195,72 +262,190 @@ onUnmounted(() => {
 }
 
 .downloads-root {
-  padding: 16px 20px 28px;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
 }
 
-/* 分区标题与下方卡片统一间距（与设置页一致） */
-:deep(.section-divider) {
-  --el-divider-margin: 4px 0 16px;
+.task-section + .task-section {
+  margin-top: 26px;
 }
 
-/* 全新风格卡片：基础样式见全局 .glass-card，仅保留空态与任务卡片特有样式 */
-.glass-card--empty {
-  opacity: 0.85;
-
-  :deep(.el-card__body) {
-    padding: 16px 20px;
-  }
-}
-
-.task-card {
+/* 分区头 */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   margin-bottom: 12px;
 
-  :deep(.el-card__body) {
-    padding: 12px 16px;
+  .section-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--group-color) 75%, #fff), var(--group-color));
+    color: #fff;
+    box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--group-color) 65%, transparent);
+
+    .el-icon {
+      font-size: 15px;
+    }
+  }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--el-text-color-primary);
+  }
+
+  .section-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--group-color) 12%, transparent);
+    color: color-mix(in srgb, var(--group-color) 85%, #000);
   }
 }
 
-.task-empty {
-  padding: 4px 0;
-  text-align: center;
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
-}
-
-.task-info {
+/* 空态：虚线玻璃卡 */
+.empty-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.task-main {
-  display: flex;
-  flex: 1;
-  align-items: center;
+  justify-content: center;
   gap: 8px;
-  min-width: 0;
-}
+  padding: 30px 0;
+  border-style: dashed;
+  opacity: 0.9;
 
-.task-tag {
-  flex-shrink: 0;
+  &:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
 
-  .el-icon {
-    margin-right: 4px;
+  .empty-icon {
+    font-size: 30px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--el-text-color-placeholder);
   }
 }
 
-.task-path {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--el-text-color-regular);
+/* 任务卡片：主题色磁贴 + 文件名/路径 + 状态 + 操作 */
+.task-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  border-radius: var(--radius-lg);
+
+  & + .task-card {
+    margin-top: 12px;
+  }
+
+  .task-icon {
+    position: relative;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--group-color) 18%, #fff),
+      color-mix(in srgb, var(--group-color) 8%, #fff)
+    );
+    border: 1px solid color-mix(in srgb, var(--group-color) 20%, transparent);
+    color: var(--group-color);
+
+    .el-icon {
+      font-size: 20px;
+    }
+
+    /* 运行中：磁贴右上角呼吸圆点 */
+    &.is-running::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--group-color);
+      border: 2px solid var(--el-bg-color);
+      animation: task-pulse 1.6s ease-in-out infinite;
+    }
+  }
+
+  .task-meta {
+    flex: 1;
+    min-width: 0;
+
+    .task-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+
+    .task-path {
+      margin-top: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+  }
+
+  .task-tag {
+    flex-shrink: 0;
+
+    .el-icon {
+      margin-right: 4px;
+    }
+  }
+
+  .task-actions {
+    flex-shrink: 0;
+    display: flex;
+  }
 }
 
-.task-actions {
-  flex-shrink: 0;
+/* 品牌主按钮统一为渐变风格 */
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
+  border: none;
+  box-shadow: var(--shadow-glow);
+
+  &:hover {
+    background: linear-gradient(135deg, var(--brand-primary-light), var(--brand-secondary));
+  }
+}
+
+@keyframes task-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--group-color) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
 }
 </style>

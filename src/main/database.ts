@@ -160,6 +160,12 @@ class Database {
     this.db = this.lowdb.data
     this.membersDB = this.db.starInfo
 
+    // 迁移旧存储字段：hiddenMemberIds → blockedMemberIds（一次性，读到旧键即搬运并删除）
+    if (this.db.blockedMemberIds === undefined && this.db.hiddenMemberIds !== undefined) {
+      this.db.blockedMemberIds = this.db.hiddenMemberIds
+      delete this.db.hiddenMemberIds
+    }
+
     // 统一顺序：先补颜色（粘性留存）→ 再清洗（解散队伍移除）→ 再建树（树的孩子是 spread 拷贝，最后建才能带上 teamColor）
     this.memberTeamUpdate()
     this.pruneTeamsAndGroups()
@@ -217,10 +223,10 @@ class Database {
     return (this.groupsDB || []).map((g: any) => ({ label: g.groupName, value: g.groupId }))
   }
 
-  public getHiddenMembers() {
-    // 确保 hiddenMemberIds 存在且为数组
-    if (!this.db.hiddenMemberIds) {
-      this.db.hiddenMemberIds = []
+  public getBlockedMembers() {
+    // 确保 blockedMemberIds 存在且为数组
+    if (!this.db.blockedMemberIds) {
+      this.db.blockedMemberIds = []
       this.lowdb.write()
     }
 
@@ -229,25 +235,45 @@ class Database {
       return []
     }
 
-    const hiddenMembers = this.db.hiddenMemberIds.map(id =>
+    const blockedMembers = this.db.blockedMemberIds.map(id =>
       this.db.starInfo.find((m: any) => Number(m.userId) === Number(id)),
     )
 
     // 过滤掉可能的 undefined 结果
-    return hiddenMembers.filter(member => member !== undefined)
+    return blockedMembers.filter(member => member !== undefined)
   }
 
-  public setHiddenMembers(ids: number[]) {
-    this.db.hiddenMemberIds = ids
+  public setBlockedMembers(ids: number[]) {
+    this.db.blockedMemberIds = ids
     this.lowdb.write()
   }
 
-  public removeHiddenMember(userId: number) {
+  public addBlockedMember(userId: number) {
+    this.ensureBlockedMemberIds()
+    // Number 归一化：历史数据里存的可能级联选择器的字符串 id，严格比较会判重失败
+    const exists = this.db.blockedMemberIds.some(
+      (id: number | string) => Number(id) === Number(userId),
+    )
+    if (!exists) {
+      this.db.blockedMemberIds.push(userId)
+      this.lowdb.write()
+    }
+  }
+
+  public removeBlockedMember(userId: number) {
+    this.ensureBlockedMemberIds()
     // Number 归一化：历史数据里存的可能级联选择器的字符串 id，严格比较会删不掉
-    this.db.hiddenMemberIds = this.db.hiddenMemberIds.filter(
+    this.db.blockedMemberIds = this.db.blockedMemberIds.filter(
       (id: number | string) => Number(id) !== Number(userId),
     )
     this.lowdb.write()
+  }
+
+  /** 兜底：老库缺 blockedMemberIds 字段时初始化为空数组 */
+  private ensureBlockedMemberIds() {
+    if (!Array.isArray(this.db.blockedMemberIds)) {
+      this.db.blockedMemberIds = []
+    }
   }
 
   public hasMembers() {
@@ -286,9 +312,10 @@ Database.instance().init()
 ipcMain.handle('saveMemberData', async (_event, content) => Database.instance().saveMemberData(content))
 ipcMain.handle('getMember', async (_event, userId) => Database.instance().getMember(userId))
 ipcMain.handle('getMemberOptions', async () => Database.instance().getMemberOptions())
-ipcMain.handle('getHiddenMembers', async () => Database.instance().getHiddenMembers())
-ipcMain.handle('setHiddenMembers', async (_event, ids) => Database.instance().setHiddenMembers(ids))
-ipcMain.handle('removeHiddenMember', async (_event, userId) => Database.instance().removeHiddenMember(userId))
+ipcMain.handle('getBlockedMembers', async () => Database.instance().getBlockedMembers())
+ipcMain.handle('setBlockedMembers', async (_event, ids) => Database.instance().setBlockedMembers(ids))
+ipcMain.handle('addBlockedMember', async (_event, userId) => Database.instance().addBlockedMember(userId))
+ipcMain.handle('removeBlockedMember', async (_event, userId) => Database.instance().removeBlockedMember(userId))
 ipcMain.handle('hasMembers', async () => Database.instance().hasMembers())
 ipcMain.handle('getConfig', async (_event, key, defaultValue?: any) => Database.instance().getConfig(key, defaultValue))
 ipcMain.handle('setConfig', async (_event, key, value) => Database.instance().setConfig(key, value))
