@@ -264,7 +264,8 @@ onUnmounted(() => {
 .downloads-root {
   max-width: 880px;
   margin: 0 auto;
-  padding: 20px 24px 32px;
+  /* 底部留出悬浮 Dock 的高度，避免最后一张卡片被遮挡 */
+  padding: 20px 24px 120px;
 }
 
 .task-section + .task-section {

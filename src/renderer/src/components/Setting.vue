@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Connection, Cpu, Folder, Hide } from '@element-plus/icons-vue'
+import { Connection, Cpu, Document, Folder, Hide } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -41,6 +41,37 @@ async function confirmClearBlockedMembers() {
 /** 屏蔽 / 解除成员的入口在成员页 */
 function goMembers() {
   router.push('/members')
+}
+
+/** 友情链接（logo 加载失败时回退为首字磁贴） */
+interface FriendLink {
+  name: string
+  url: string
+  abbr: string
+  color: string
+  logo?: string
+}
+
+const friendLinks: FriendLink[] = [
+  { name: 'SNH48 官方网站', url: 'https://www.snh48.com/', abbr: 'SNH', color: '#8FD3F6' },
+  { name: '官方直播', url: 'https://live.48.cn/', abbr: 'Live', color: '#ff5e7e' },
+  { name: '口袋48 APP', url: 'https://h5.48.cn/pocket48/index_pc.html', abbr: '48', color: '#3b82f6', logo: 'https://h5.48.cn/pocket48/image/logo.png' },
+  { name: '塞纳河48 APP', url: 'https://www.ckg48.cn/', abbr: 'CKG', color: '#f59e0b', logo: 'https://www.ckg48.cn/favicon.ico' },
+]
+
+/** 展示链接域名 */
+function linkHost(url: string) {
+  try {
+    return new URL(url).hostname
+  }
+  catch {
+    return url
+  }
+}
+
+/** logo 加载失败时隐藏图片，露出首字磁贴 */
+function hideLogo(event: Event) {
+  (event.target as HTMLImageElement).style.display = 'none'
 }
 
 async function setDownloadDirectory() {
@@ -256,6 +287,69 @@ async function setUserAgent() {
           </div>
         </div>
       </section>
+
+      <!-- 权利声明 -->
+      <section class="setting-card glass-card">
+        <div class="setting-row">
+          <span class="row-icon" style="--row-color: #909399">
+            <el-icon><Document /></el-icon>
+          </span>
+          <div class="row-text">
+            <div class="row-title">
+              权利声明
+            </div>
+            <div class="row-desc">
+              免责声明与版权归属说明
+            </div>
+          </div>
+        </div>
+        <div class="row-body">
+          <div class="legal-block">
+            <p class="legal-title">
+              免责声明
+            </p>
+            <p class="legal-text">
+              本应用数据数据来源于SNH48 官方网站、live.48.cn、口袋48 APP 等互联网公开数据。仅供参考，一切数据以官方信息为准。
+            </p>
+            <p class="legal-text">
+              本应用为非官方项目，与 SNH48 Group 及其运营方（上海丝芭文化传媒集团有限公司）无任何关联，所有数据、商标、肖像权等归相关权利人所有。
+            </p>
+          </div>
+          <div class="legal-block">
+            <p class="legal-title">
+              版权声明
+            </p>
+            <p class="legal-text">
+              本应用不存储任何音视频资源，所有音视频资源均来自互联网公开渠道，版权均归上海丝芭文化传媒集团有限公司及相关权利人所有。
+            </p>
+            <p class="legal-text">
+              本应用不对任何音视频资源的版权合法性承担责任。用户在使用本应用时，应当遵守相关法律法规，不得将本应用用于商业用途。
+            </p>
+          </div>
+          <div class="friend-links">
+            <span class="links-label">推荐链接</span>
+            <div class="links-grid">
+              <a
+                v-for="link in friendLinks"
+                :key="link.name"
+                class="friend-link"
+                :href="link.url"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="link-logo" :style="{ '--logo-color': link.color }">
+                  <span class="link-abbr">{{ link.abbr }}</span>
+                  <img v-if="link.logo" :src="link.logo" alt="" @error="hideLogo">
+                </span>
+                <span class="link-meta">
+                  <span class="link-name">{{ link.name }}</span>
+                  <span class="link-host">{{ linkHost(link.url) }}</span>
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </el-scrollbar>
 </template>
@@ -268,7 +362,8 @@ async function setUserAgent() {
 .setting-root {
   max-width: 880px;
   margin: 0 auto;
-  padding: 20px 24px 32px;
+  /* 底部留出悬浮 Dock 的高度，避免最后一张卡片被遮挡 */
+  padding: 20px 24px 120px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -367,6 +462,119 @@ async function setUserAgent() {
 .empty-hint {
   font-size: 12px;
   color: var(--el-text-color-placeholder);
+}
+
+/* 权利声明：小字号次要色，低调呈现 */
+.legal-block + .legal-block {
+  margin-top: 10px;
+}
+
+.legal-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.legal-text {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
+}
+
+.legal-text:last-child {
+  margin-bottom: 0;
+}
+
+/* 友情链接：logo 卡片网格，悬浮上浮高亮 */
+.friend-links {
+  margin-top: 14px;
+
+  .links-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+}
+
+.links-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.friend-link {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--brand-primary) 45%, transparent);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+
+    .link-name {
+      color: var(--brand-primary);
+    }
+  }
+
+  /* 主题色首字磁贴：logo 加载失败 / 无 logo 时兜底展示 */
+  .link-logo {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    overflow: hidden;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--logo-color) 72%, #fff), var(--logo-color));
+
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #fff;
+    }
+  }
+
+  .link-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .link-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    transition: color 0.18s ease;
+  }
+
+  .link-host {
+    overflow: hidden;
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 
 /* 品牌主按钮统一为渐变风格 */

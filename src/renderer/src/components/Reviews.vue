@@ -241,7 +241,7 @@ watch(selectedFilter, () => {
 
 /* 给列表底部留出浮动工具条的空间 */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 88px;
+  padding-bottom: 120px;
 }
 
 .review-list {
