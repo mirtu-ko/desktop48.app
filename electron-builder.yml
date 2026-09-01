@@ -42,5 +42,6 @@ publish:
   provider: github
   owner: mirtu-ko
   repo: desktop48.app
+  releaseType: release # 与 CI 预创建的正式 release 匹配，否则 electron-builder 默认发 draft，类型不兼容会跳过上传
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
