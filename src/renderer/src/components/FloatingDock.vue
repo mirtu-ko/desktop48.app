@@ -18,7 +18,7 @@
   align-items: center;
   gap: 12px;
   max-width: calc(100% - 40px);
-  padding: 4px 6px;
+  padding: 4px;
   border-radius: 999px;
   overflow-x: auto;
 }

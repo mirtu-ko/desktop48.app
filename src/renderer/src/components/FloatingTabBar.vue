@@ -74,7 +74,7 @@ function dblClick(tab: FloatingTabItem) {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 4px;
   border-radius: 999px;
   max-width: 75%;
   overflow: auto;
