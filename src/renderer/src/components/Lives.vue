@@ -182,11 +182,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.scrollbar-wrapper {
-  height: 100%;
-  overflow-x: hidden !important;
-}
-
 /* 给列表底部留出浮动操作条的空间 */
 :deep(.el-scrollbar__view) {
   padding-bottom: 120px;

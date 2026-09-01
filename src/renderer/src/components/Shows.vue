@@ -51,7 +51,18 @@ const showsScrollRef = ref<any>(null)
 // 统一的触底加载：直播/回放/公演三页共用同一套交互逻辑
 // 最近的公演翻完后接着翻历史公演；historyNext 为 '0' 时拉首页（整体替换），否则追加
 const { onInfiniteScroll } = useLoadMore({
-  load: () => (noMore.value ? fetchHistoryShows(historyNext.value !== '0') : fetchShows(true)),
+  load: async () => {
+    if (!noMore.value) {
+      await fetchShows(true)
+      // 最近公演本次触底刚好翻完时，无缝衔接历史公演，避免用户需要再滚一次触底
+      if (noMore.value) {
+        await fetchHistoryShows(false)
+      }
+    }
+    else {
+      await fetchHistoryShows(historyNext.value !== '0')
+    }
+  },
   disabled,
   scrollbarRef: showsScrollRef,
 })
@@ -67,17 +78,12 @@ function isBroken(show: OpenLive): boolean {
   return !show.coverPath || brokenImages.value.has(show.liveId)
 }
 
-/** coverPath / teamLogo 可能是相对路径（如 /mediasource/...），统一补全为 source.48.cn 完整 URL */
+/** coverPath 可能是相对路径（如 /mediasource/...），统一补全为 source.48.cn 完整 URL */
 function normalizeShowCovers(list: OpenLive[]) {
   list.forEach((item) => {
     if (item.coverPath) {
       item.coverPath = Tools.sourceUrl(item.coverPath)
     }
-    item.teamList?.forEach((team) => {
-      if (team.teamLogo) {
-        team.teamLogo = Tools.sourceUrl(team.teamLogo)
-      }
-    })
   })
 }
 
@@ -181,7 +187,6 @@ function openLiveStream(show: OpenLive) {
     nickname: show.teamList?.[0]?.teamName || '',
     title: show.subTitle || show.title,
     startTime: Number.parseInt(show.stime),
-    avatar: show.teamList?.[0]?.teamLogo || '',
     source: 'open',
     liveType: 1,
     liveMode: 0,
@@ -197,7 +202,6 @@ function openHistoryStream(show: OpenLive) {
     nickname: '',
     title: show.subTitle || show.title,
     startTime: Number.parseInt(show.stime),
-    avatar: show.teamList?.[0]?.teamLogo || '',
     source: 'open',
     liveType: 1,
     liveMode: 0,
@@ -218,7 +222,9 @@ function openHistoryStream(show: OpenLive) {
       >
         <div class="shows-container">
           <template v-if="todayShows.length">
-            <h2>即将开始</h2>
+            <h2 class="section-title section-title--live">
+              即将开始
+            </h2>
             <div class="shows-list">
               <div
                 v-for="show in todayShows"
@@ -233,7 +239,9 @@ function openHistoryStream(show: OpenLive) {
           </template>
 
           <template v-if="recentShows.length">
-            <h2>最近公演</h2>
+            <h2 class="section-title">
+              最近公演
+            </h2>
             <div class="shows-list">
               <div
                 v-for="show in recentShows"
@@ -248,7 +256,9 @@ function openHistoryStream(show: OpenLive) {
           </template>
 
           <template v-if="historyList.length">
-            <h2>历史公演</h2>
+            <h2 class="section-title section-title--muted">
+              历史公演
+            </h2>
             <div class="shows-list">
               <div
                 v-for="show in historyList"
@@ -303,13 +313,6 @@ function openHistoryStream(show: OpenLive) {
 .shows-container {
   /* 顶部留出左上角浮动切换器的空间，避免遮挡内容 */
   padding: 72px 10px 12px;
-
-  h2 {
-    margin: 14px 4px 12px;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--el-text-color-primary);
-  }
 }
 
 /* 给列表底部留出右上角浮动刷新按钮的空间 */
@@ -317,12 +320,8 @@ function openHistoryStream(show: OpenLive) {
   padding-bottom: 120px;
 }
 
-.scrollbar-wrapper {
-  height: 100%;
-  overflow-x: hidden !important;
-}
-
 .shows-list {
+  padding-bottom: 20px;
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

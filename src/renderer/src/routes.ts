@@ -1,3 +1,4 @@
+import Albums from './components/Albums.vue'
 import Downloads from './components/Downloads.vue'
 import Lives from './components/Lives.vue'
 import Members from './components/Members.vue'
@@ -12,6 +13,10 @@ const routes: any[] = [
   {
     path: '/shows',
     component: Shows,
+  },
+  {
+    path: '/albums',
+    component: Albums,
   },
   {
     path: '/members',

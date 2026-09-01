@@ -61,7 +61,7 @@ const liveBadge = computed(() => {
         <span
           v-if="item.member && item.member.teamName"
           class="team-badge"
-          :style="{ backgroundColor: `#${item.member.teamColor}` }"
+          :style="item.member.teamColor ? { '--tb-color': `#${item.member.teamColor}` } : undefined"
         >
           {{ item.member.teamName.replace('TEAM ', '') }}
         </span>
@@ -177,10 +177,6 @@ const liveBadge = computed(() => {
       min-width: 0;
       font-size: 12px;
       color: var(--el-text-color-regular);
-    }
-
-    .team-badge {
-      flex-shrink: 0;
     }
   }
 

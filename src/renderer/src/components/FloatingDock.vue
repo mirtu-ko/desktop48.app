@@ -22,11 +22,4 @@
   border-radius: 999px;
   overflow-x: auto;
 }
-
-/* 渐变刷新悬浮球 */
-.floating-dock :deep(.el-button--primary) {
-  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
-  border: none;
-  box-shadow: var(--shadow-glow);
-}
 </style>

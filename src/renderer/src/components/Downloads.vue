@@ -257,10 +257,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-.scrollbar-wrapper {
-  height: 100%;
-}
-
 .downloads-root {
   max-width: 880px;
   margin: 0 auto;
@@ -296,9 +292,14 @@ onUnmounted(() => {
   }
 
   .section-title {
-    font-size: 15px;
-    font-weight: 700;
+    margin: 0;
+    gap: 0;
     color: var(--el-text-color-primary);
+
+    /* 已有主题色图标磁贴，隐藏全局 .section-title 的左侧竖条 */
+    &::before {
+      display: none;
+    }
   }
 
   .section-count {
@@ -323,7 +324,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 30px 0;
+  padding: 80px 0;
   border-style: dashed;
   opacity: 0.9;
 
@@ -420,17 +421,6 @@ onUnmounted(() => {
   .task-actions {
     flex-shrink: 0;
     display: flex;
-  }
-}
-
-/* 品牌主按钮统一为渐变风格 */
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
-  border: none;
-  box-shadow: var(--shadow-glow);
-
-  &:hover {
-    background: linear-gradient(135deg, var(--brand-primary-light), var(--brand-secondary));
   }
 }
 

@@ -12,6 +12,7 @@ export default class Constants {
     SETTING: 'setting',
     DOWNLOADS: 'downloads',
     Shows: 'shows',
+    Albums: 'albums',
     Members: 'members',
   }
 

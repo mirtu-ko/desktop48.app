@@ -23,15 +23,15 @@ function formatTime(stime: string): string {
       <div v-else class="image-placeholder">
         {{ show.title }}
       </div>
-      <div v-if="show.teamList?.length" class="team-logos">
-        <img
+      <div v-if="show.teamList?.length" class="team-badges">
+        <span
           v-for="team in show.teamList"
           :key="team.teamId"
-          class="team-logo"
-          :src="team.teamLogo"
-          :alt="team.teamName"
-          :title="team.teamName"
+          class="team-badge"
+          :style="team.teamColor ? { '--tb-color': `#${team.teamColor}` } : undefined"
         >
+          {{ team.teamName.replace('TEAM ', '') }}
+        </span>
       </div>
       <el-tag v-if="show.status === 2" class="show-tag" type="danger" size="small">
         进行中
@@ -89,21 +89,13 @@ function formatTime(stime: string): string {
   padding: 5px 10px;
 }
 
-.team-logos {
+.team-badges {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 1;
   display: flex;
   gap: 4px;
-}
-
-.team-logo {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .show-info h3 {

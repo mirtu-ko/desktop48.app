@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Download, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
+import { Download, Headset, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
 import AppDock from './AppDock.vue'
+import FloatAudioBar from './FloatAudioBar.vue'
 import FloatPlayerHost from './FloatPlayerHost.vue'
 
 const router = useRouter()
@@ -15,6 +16,7 @@ const route = useRoute()
 const pathToMenu = {
   '/lives': Constants.Menu.LIVES,
   '/shows': Constants.Menu.Shows,
+  '/albums': Constants.Menu.Albums,
   '/members': Constants.Menu.Members,
   '/downloads': Constants.Menu.DOWNLOADS,
   '/setting': Constants.Menu.SETTING,
@@ -26,6 +28,7 @@ const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Con
 const dockItems = [
   { index: Constants.Menu.LIVES, label: '直播', icon: VideoCamera, color: '#ff5e7e' },
   { index: Constants.Menu.Shows, label: '公演', icon: Microphone, color: '#f59e0b' },
+  { index: Constants.Menu.Albums, label: '专辑', icon: Headset, color: '#d946ef' },
   { index: Constants.Menu.Members, label: '成员', icon: User, color: '#3b82f6' },
   { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: '#10b981' },
   { index: Constants.Menu.SETTING, label: '设置', icon: Setting, color: '#6d5ae0' },
@@ -88,6 +91,9 @@ onUnmounted(() => {
 
     <!-- 全局画中画迷你窗：跨页面持续播放 -->
     <FloatPlayerHost />
+
+    <!-- 全局音乐迷你播放条：跨页面持续播放专辑歌曲 -->
+    <FloatAudioBar />
   </div>
 </template>
 

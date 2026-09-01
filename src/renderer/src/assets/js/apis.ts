@@ -6,8 +6,6 @@ export interface OpenLiveTeam {
   teamId: number
   groupId: number
   teamName: string
-  /** 队伍 logo 路径（可能是相对路径，需 sourceUrl 归一化） */
-  teamLogo: string
   teamColor?: string
 }
 
@@ -124,6 +122,23 @@ export default class Apis {
    */
   public barrage(barrageUrl: string): Promise<any> {
     return Request.get(barrageUrl)
+  }
+
+  /**
+   * 音乐专辑列表（CDN 静态 JSON，tag：ep=EP / zj=专辑 / sg=单曲）
+   */
+  public async musicAlbums(): Promise<any[]> {
+    let data: any = await Request.get(ApiUrls.MUSIC_LIST_URL)
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data)
+      }
+      catch (e) {
+        console.warn('[apis.ts]musicAlbums 响应不是 JSON', e)
+        throw new Error('[apis.ts]音乐专辑接口返回非JSON')
+      }
+    }
+    return data?.all || [...(data?.ep || []), ...(data?.zj || []), ...(data?.sg || [])]
   }
 
   private async request(url: string, data: any, headers: any): Promise<any> {

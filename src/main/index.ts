@@ -6,6 +6,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
+import ApiUrls from '../renderer/src/assets/js/api-urls'
 import { Database } from './database'
 import { stopAllFfmpegTasks } from './ffmpeg-task'
 import { getLogPathForDisplay, log } from './logger'
@@ -32,8 +33,8 @@ log('[index.ts] Chromium 版本:', process.versions.chrome)
 
 // IPC 事件注册
 
-// 网络请求域名白名单
-const ALLOWED_HOSTS = ['pocketapi.48.cn', 'live.48.cn', 'source.48.cn', 'cdns.48.cn', 'api.snh48.com']
+// 网络请求域名白名单：自动从 ApiUrls 的 URL 常量中提取，动态媒体域名由下方后缀规则兜底
+const ALLOWED_HOSTS = ApiUrls.hosts
 
 function isAllowedHost(url: string): boolean {
   try {

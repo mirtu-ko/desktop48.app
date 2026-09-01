@@ -121,7 +121,7 @@ function change(index: string) {
   animation: dock-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 
   /* 入场依次弹出的小动效 */
-  @for $i from 1 through 5 {
+  @for $i from 1 through 6 {
     &:nth-child(#{$i}) {
       animation-delay: $i * 0.04s;
     }

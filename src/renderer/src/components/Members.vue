@@ -49,6 +49,9 @@ const STATUS_LEFT = 3
 interface MemberSection {
   title: string
   teamBadge: string
+  /** 分区标题主题色：跟随队伍 teamColor；暂休/退团走弱化灰变体 */
+  accent?: string
+  muted?: boolean
   members: MemberDetail[]
 }
 
@@ -115,9 +118,12 @@ const sections = computed<MemberSection[]>(() => {
         .filter(member => member.status === STATUS_ACTIVE)
         .map(normalizeMember)
       if (members.length) {
+        // 队伍主题色：取队伍内任一成员的 teamColor（与成员卡片徽章同源）
+        const teamColor = team.children.find(member => member.teamColor)?.teamColor || ''
         result.push({
           title: groupId.value === '0' ? `${group.groupName} · ${team.teamName}` : team.teamName,
           teamBadge: team.teamBadge ? Tools.sourceUrl(team.teamBadge) : '',
+          accent: teamColor ? `#${teamColor}` : '',
           members,
         })
       }
@@ -125,11 +131,11 @@ const sections = computed<MemberSection[]>(() => {
   }
   const hiatus = collect(STATUS_HIATUS)
   if (hiatus.length) {
-    result.push({ title: '暂休', teamBadge: '', members: hiatus })
+    result.push({ title: '暂休', teamBadge: '', muted: true, members: hiatus })
   }
   const left = collect(STATUS_LEFT)
   if (left.length) {
-    result.push({ title: '退团', teamBadge: '', members: left })
+    result.push({ title: '退团', teamBadge: '', muted: true, members: left })
   }
   return result
 })
@@ -194,7 +200,13 @@ async function syncMembers() {
                 alt=""
                 @error="hideBadge"
               >
-              <span>{{ section.title }}</span>
+              <span
+                class="section-title"
+                :class="{ 'section-title--muted': section.muted }"
+                :style="section.accent ? { '--st-accent': section.accent } : undefined"
+              >
+                {{ section.title }}
+              </span>
             </h2>
             <div class="member-list">
               <div
@@ -224,7 +236,7 @@ async function syncMembers() {
                 <span
                   v-if="member.teamName"
                   class="team-badge team-badge--overlay"
-                  :style="{ backgroundColor: member.teamColor ? `#${member.teamColor}` : '#909399' }"
+                  :style="member.teamColor ? { '--tb-color': `#${member.teamColor}` } : undefined"
                 >
                   {{ member.teamName.replace('TEAM ', '') }}
                 </span>
@@ -304,12 +316,7 @@ async function syncMembers() {
 
 .members-container {
   /* 顶部留出左上角浮动切换器的空间；底部给右上角浮动按钮留空间 */
-  padding: 72px 10px 88px;
-}
-
-.scrollbar-wrapper {
-  height: 100%;
-  overflow-x: hidden !important;
+  padding: 72px 10px 120px;
 }
 
 .group-section {
@@ -321,18 +328,19 @@ async function syncMembers() {
   flex-direction: column;
   gap: 8px;
   align-items: center;
-  justify-content: center;
   margin: 14px 4px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 
-  /* 徽章保持原始宽高比，高度与文字对齐 */
+  /* 徽章保持原始宽高比 */
   .team-badge-img {
     flex: none;
     height: 144px;
     width: auto;
     object-fit: contain;
+  }
+
+  /* 复用全局分区标题：撑满行宽以展示右侧渐隐细线 */
+  .section-title {
+    width: 100%;
   }
 }
 

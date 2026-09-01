@@ -355,10 +355,6 @@ async function setUserAgent() {
 </template>
 
 <style scoped lang="scss">
-.scrollbar-wrapper {
-  height: 100%;
-}
-
 .setting-root {
   max-width: 880px;
   margin: 0 auto;
@@ -573,14 +569,5 @@ async function setUserAgent() {
   }
 }
 
-/* 品牌主按钮统一为渐变风格 */
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
-  border: none;
-  box-shadow: var(--shadow-glow);
-
-  &:hover {
-    background: linear-gradient(135deg, var(--brand-primary-light), var(--brand-secondary));
-  }
-}
+/* 品牌渐变主按钮已全局统一，见 app.scss */
 </style>
