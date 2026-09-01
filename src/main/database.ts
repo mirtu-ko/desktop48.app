@@ -206,10 +206,6 @@ class Database {
     return this.db.starInfo.find((m: any) => Number(m.userId) === Number(userId))
   }
 
-  public getMemberOptions() {
-    return this.db.memberTree
-  }
-
   public getTeamOptions() {
     // 拼接 groupName-teamName 作为 label，不修改原始数据，避免重复调用导致名字叠加
     return (this.teamsDB || []).map((t: any) => {
@@ -311,7 +307,6 @@ Database.instance().init()
 // 注册 IPC handler
 ipcMain.handle('saveMemberData', async (_event, content) => Database.instance().saveMemberData(content))
 ipcMain.handle('getMember', async (_event, userId) => Database.instance().getMember(userId))
-ipcMain.handle('getMemberOptions', async () => Database.instance().getMemberOptions())
 ipcMain.handle('getBlockedMembers', async () => Database.instance().getBlockedMembers())
 ipcMain.handle('setBlockedMembers', async (_event, ids) => Database.instance().setBlockedMembers(ids))
 ipcMain.handle('addBlockedMember', async (_event, userId) => Database.instance().addBlockedMember(userId))

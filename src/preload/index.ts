@@ -18,7 +18,6 @@ const api = {
   saveMemberData: (data: any) => ipcRenderer.invoke('saveMemberData', data),
   // 成员
   getMember: (userId: number) => ipcRenderer.invoke('getMember', userId),
-  getMemberOptions: () => ipcRenderer.invoke('getMemberOptions'),
   getTeamOptions: () => ipcRenderer.invoke('getTeamOptions'),
   getGroupOptions: () => ipcRenderer.invoke('getGroupOptions'),
   getMemberTree: () => ipcRenderer.invoke('getMemberTree'),

@@ -40,8 +40,6 @@ export interface mainAPI {
   // 数据库相关
   getMember: (userId: number) => Promise<any>
   getMemberTree: () => Promise<any[]>
-  /** 成员级联树（分组 → 队伍 → 成员），value 均为字符串 id */
-  getMemberOptions: () => Promise<any[]>
   getBlockedMembers: () => Promise<BlockedMember[]>
   setBlockedMembers: (ids: number[]) => Promise<any>
   addBlockedMember: (userId: number) => Promise<any>

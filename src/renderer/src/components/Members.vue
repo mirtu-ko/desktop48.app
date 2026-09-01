@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { MemberDetail } from './MemberDetailDrawer.vue'
-import { Refresh, User } from '@element-plus/icons-vue'
+import { Hide, Refresh, User, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import Apis from '../assets/js/apis'
 import Tools from '../assets/js/tools'
+import { useBlockedMembers } from '../assets/js/use-blocked-members'
 import FloatingDock from './FloatingDock.vue'
 import FloatingTabBar from './FloatingTabBar.vue'
 import MemberDetailDrawer from './MemberDetailDrawer.vue'
@@ -64,6 +65,9 @@ function hideBadge(event: Event) {
 /** 当前查看详情的成员（null = 抽屉关闭） */
 const selectedMember = ref<MemberDetail | null>(null)
 
+/** 屏蔽名单为模块级共享状态（与设置页同源），任一页面操作后另一页面自动同步 */
+const { refreshBlockedMembers, isBlocked, toggleBlock } = useBlockedMembers()
+
 /** API 把“明星殿堂”建模成独立分团（groupId 19），展示上并入 SNH48 的同名队伍（teamId 1008） */
 const HALL_GROUP_NAME = '明星殿堂'
 const HALL_HOST_GROUP_NAME = 'SNH48'
@@ -71,7 +75,7 @@ const HALL_HOST_GROUP_NAME = 'SNH48'
 /** 展示分节：分团队伍只收在团成员（status=1），末尾追加 暂休（status=2）/ 退团（status=3），均受分团筛选影响 */
 const sections = computed<MemberSection[]>(() => {
   const hall = groups.value.find(group => group.groupName === HALL_GROUP_NAME)
-  // 纯展示层合并：不改原树，避免副作用（回放筛选、隐藏成员仍用原结构）
+  // 纯展示层合并：不改原树，避免副作用（回放筛选、屏蔽成员仍用原结构）
   const merged = groups.value
     .filter(group => group.groupName !== HALL_GROUP_NAME)
     .map((group) => {
@@ -135,7 +139,10 @@ const memberCount = computed(() =>
   sections.value.reduce((sum, section) => sum + section.members.length, 0),
 )
 
-onMounted(fetchGroups)
+onMounted(() => {
+  fetchGroups()
+  refreshBlockedMembers()
+})
 
 /** 拉取成员树（挂载初始化 / 双击分团 tab 刷新共用） */
 async function fetchGroups() {
@@ -194,6 +201,7 @@ async function syncMembers() {
                 v-for="member in section.members"
                 :key="member.userId"
                 class="member-card clickable"
+                :class="{ 'is-blocked': isBlocked(member.userId) }"
                 @click="selectedMember = member"
               >
                 <el-image class="avatar" :src="member.avatar" fit="cover" lazy>
@@ -220,6 +228,34 @@ async function syncMembers() {
                 >
                   {{ member.teamName.replace('TEAM ', '') }}
                 </span>
+
+                <!-- 未屏蔽：悬浮卡片时右上角快捷屏蔽 -->
+                <button
+                  v-if="!isBlocked(member.userId)"
+                  class="quick-block"
+                  title="屏蔽 TA 的直播与回放"
+                  @click.stop="toggleBlock(member)"
+                >
+                  <el-icon :size="13">
+                    <Hide />
+                  </el-icon>
+                </button>
+
+                <!-- 已屏蔽：状态标记 + 悬浮解除按钮 -->
+                <template v-else>
+                  <span class="blocked-flag">
+                    <el-icon :size="12">
+                      <Hide />
+                    </el-icon>
+                    已屏蔽
+                  </span>
+                  <button class="unblock-btn" @click.stop="toggleBlock(member)">
+                    <el-icon :size="13">
+                      <View />
+                    </el-icon>
+                    解除屏蔽
+                  </button>
+                </template>
               </div>
             </div>
           </section>
@@ -244,7 +280,12 @@ async function syncMembers() {
     </FloatingDock>
 
     <!-- 成员详情抽屉 -->
-    <MemberDetailDrawer :member="selectedMember" @close="selectedMember = null" />
+    <MemberDetailDrawer
+      :member="selectedMember"
+      :blocked="selectedMember ? isBlocked(selectedMember.userId) : false"
+      @close="selectedMember = null"
+      @toggle-block="toggleBlock"
+    />
   </div>
 </template>
 
@@ -372,6 +413,99 @@ async function syncMembers() {
     line-height: 1.4;
     color: #fff;
     opacity: 0.9;
+  }
+
+  /* 快捷屏蔽：悬浮卡片时右上角出现 */
+  .quick-block {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    font-family: inherit;
+    color: var(--el-text-color-regular);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.9);
+    transition:
+      opacity 0.15s ease,
+      transform 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      color: var(--el-color-danger);
+      transform: scale(1.05);
+    }
+  }
+
+  &:hover .quick-block {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* 已屏蔽：头像去色弱化 */
+  &.is-blocked .avatar {
+    filter: grayscale(1);
+    opacity: 0.55;
+  }
+
+  .blocked-flag {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #fff;
+    background: var(--el-color-danger);
+    opacity: 0.92;
+  }
+
+  .unblock-btn {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(4px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease,
+      background 0.18s ease;
+
+    &:hover {
+      background: var(--el-color-danger);
+    }
+  }
+
+  &:hover .unblock-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
   }
 }
 

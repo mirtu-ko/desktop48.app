@@ -3,7 +3,7 @@
 </script>
 
 <script setup lang="ts">
-import { Film, Link, User } from '@element-plus/icons-vue'
+import { Film, Hide, Link, User, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import EventBus from '../assets/js/event-bus'
@@ -36,8 +36,8 @@ export interface MemberDetail {
   [key: string]: any
 }
 
-const props = defineProps<{ member: MemberDetail | null }>()
-const emit = defineEmits<{ close: [] }>()
+const props = defineProps<{ member: MemberDetail | null, blocked?: boolean }>()
+const emit = defineEmits<{ close: [], toggleBlock: [member: MemberDetail] }>()
 
 const router = useRouter()
 
@@ -135,6 +135,9 @@ function openReviews() {
             >
               {{ member.teamName.replace('TEAM ', '') }}
             </span>
+            <el-tag v-if="blocked" type="danger" size="small" effect="light">
+              已屏蔽
+            </el-tag>
             <el-tag :type="statusMeta.tag" size="small" effect="light">
               {{ statusMeta.label }}
             </el-tag>
@@ -212,10 +215,30 @@ function openReviews() {
         </div>
       </div>
 
-      <!-- 回放直达 -->
-      <el-button type="primary" class="review-btn" :icon="Film" @click="openReviews">
-        看 TA 的回放
-      </el-button>
+      <!-- 回放直达 + 屏蔽操作 -->
+      <div class="actions">
+        <el-button type="primary" class="review-btn" :icon="Film" @click="openReviews">
+          看 TA 的回放
+        </el-button>
+        <el-button
+          v-if="blocked"
+          class="block-btn"
+          :icon="View"
+          @click="emit('toggleBlock', member)"
+        >
+          解除屏蔽
+        </el-button>
+        <el-button
+          v-else
+          type="danger"
+          plain
+          class="block-btn"
+          :icon="Hide"
+          @click="emit('toggleBlock', member)"
+        >
+          屏蔽
+        </el-button>
+      </div>
     </div>
   </el-drawer>
 </template>
@@ -372,7 +395,16 @@ function openReviews() {
   }
 }
 
-.review-btn {
-  width: 100%;
+.actions {
+  display: flex;
+  gap: 10px;
+
+  .el-button {
+    margin-left: 0;
+  }
+
+  .review-btn {
+    flex: 1;
+  }
 }
 </style>
