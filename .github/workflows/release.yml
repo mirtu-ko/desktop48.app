@@ -9,7 +9,20 @@ permissions:
   contents: write
 
 jobs:
+  # 先创建 release，避免 matrix 并行 job 各自创建导致重复 release（竞态）
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out git repository
+        uses: actions/checkout@v4
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes
+
   release:
+    needs: create-release # 等待 release 创建完成，后续 job 只上传产物
     runs-on: ${{ matrix.os }}
 
     strategy:

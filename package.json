@@ -22,41 +22,11 @@
     "build:linux": "npm run build && electron-builder --linux",
     "release": "npm run build && electron-builder --publish always"
   },
-  "build": {
-    "appId": "com.electron.desktop48",
-    "productName": "Desktop48",
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "mirtu-ko",
-        "repo": "desktop48.app"
-      }
-    ],
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "identity": null
-    },
-    "win": {
-      "target": [
-        "nsis"
-      ],
-      "verifyUpdateCodeSignature": false
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ]
-    }
-  },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
     "@element-plus/icons-vue": "^2.3.2",
     "element-plus": "^2.14.5",
     "hls.js": "^1.7.1",
-    "lodash": "^4.18.1",
     "lowdb": "^7.0.1",
     "mitt": "^3.0.1",
     "mpegts.js": "^1.8.2"
@@ -64,19 +34,25 @@
   "devDependencies": {
     "@antfu/eslint-config": "^9.3.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0-beta.1",
-    "eslint": "^10.9.0",
+    "eslint": "^10.9.1",
     "eslint-plugin-format": "^2.0.1",
     "prettier": "^3.9.6",
     "sass-embedded": "^1.103.1",
     "typescript": "~6.0.3",
     "vite": "^8.2.2",
-    "vue": "^3.5.41",
-    "vue-router": "^5.2.0",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.0",
     "vue-tsc": "^3.3.11"
+  },
+  "allowScripts": {
+    "@parcel/watcher@2.5.1": true,
+    "esbuild@0.25.12": true,
+    "electron-winstaller@5.4.0": true,
+    "fsevents@2.3.3": true
   }
 }
