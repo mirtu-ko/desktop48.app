@@ -68,7 +68,8 @@ function dblClick(tab: FloatingTabItem) {
 <style scoped lang="scss">
 .float-tab-bar {
   position: absolute;
-  top: 6px;
+  top: 12px;
+  left: 6px;
   z-index: 6;
   display: flex;
   align-items: center;

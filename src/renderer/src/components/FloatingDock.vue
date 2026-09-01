@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 统一右下角磨砂玻璃浮层：直播/回放/公演三页共用
+// 统一右上角磨砂玻璃浮层：直播/回放/公演三页共用
 </script>
 
 <template>
@@ -12,7 +12,7 @@
 .floating-dock {
   position: absolute;
   right: 8px;
-  top: 6px;
+  top: 12px;
   z-index: 6;
   display: flex;
   align-items: center;

@@ -58,7 +58,7 @@ const size = computed(() => {
   return MINI_SIZE[kind.value][orientName.value]
 })
 
-// 初始位置：从右下角开始按创建序号级联错位，避免多窗完全重叠
+// 初始位置：从右上角开始按创建序号级联错位，避免多窗完全重叠
 const order = props.item.order
 const pos = ref({
   x: Math.max(12, window.innerWidth - MINI_SIZE[kind.value].portrait.w - 24 - (order % 6) * 36),

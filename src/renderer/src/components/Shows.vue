@@ -273,7 +273,7 @@ function openHistoryStream(show: OpenLive) {
         </div>
       </el-scrollbar>
     </div>
-    <!-- 右下角浮动操作条：磨砂玻璃 dock 衬托刷新按钮，空数据时也可用 -->
+    <!-- 右上角浮动操作条：磨砂玻璃 dock 衬托刷新按钮，空数据时也可用 -->
     <FloatingDock>
       <el-button
         circle
@@ -312,7 +312,7 @@ function openHistoryStream(show: OpenLive) {
   }
 }
 
-/* 给列表底部留出右下角浮动刷新按钮的空间 */
+/* 给列表底部留出右上角浮动刷新按钮的空间 */
 :deep(.el-scrollbar__view) {
   padding-bottom: 88px;
 }

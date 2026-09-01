@@ -169,7 +169,7 @@ watch(selectedFilter, () => {
         </div>
       </el-scrollbar>
 
-      <!-- 右下角浮动筛选/刷新工具条：不占行，内容滚过时呈现磨砂玻璃 -->
+      <!-- 右上角浮动筛选/刷新工具条：不占行，内容滚过时呈现磨砂玻璃 -->
       <FloatingDock>
         <el-cascader
           v-model="selectedFilter"

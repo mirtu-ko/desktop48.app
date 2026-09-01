@@ -112,7 +112,7 @@ body,
   color: var(--el-text-color-placeholder);
 }
 
-/* 磨砂玻璃浮层面板（右下操作条 / 左上 tab 栏共用的表层） */
+/* 磨砂玻璃浮层面板（右上操作条 / 左上 tab 栏共用的表层） */
 .frosted-surface {
   background: color-mix(in srgb, var(--el-bg-color) 78%, transparent);
   backdrop-filter: blur(16px) saturate(180%);

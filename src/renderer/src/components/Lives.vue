@@ -140,7 +140,7 @@ onUnmounted(() => {
         </div>
       </el-scrollbar>
 
-      <!-- 右下角浮动操作条：不占行，内容从下方滚过呈现磨砂玻璃 -->
+      <!-- 右上角浮动操作条：不占行，内容从下方滚过呈现磨砂玻璃 -->
       <FloatingDock>
         <span class="live-count">已加载 {{ liveList.length }} 个直播</span>
         <el-button
@@ -170,6 +170,7 @@ onUnmounted(() => {
 }
 
 .live-count {
+  margin-left: 6px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
   white-space: nowrap;

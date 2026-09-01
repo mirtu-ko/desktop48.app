@@ -234,7 +234,7 @@ async function syncMembers() {
       </el-scrollbar>
     </div>
 
-    <!-- 右下角浮动操作条：更新成员数据库 -->
+    <!-- 右上角浮动操作条：更新成员数据库 -->
     <FloatingDock>
       <span class="member-count">更新成员数据库</span>
       <el-button
@@ -262,7 +262,7 @@ async function syncMembers() {
 }
 
 .members-container {
-  /* 顶部留出左上角浮动切换器的空间；底部给右下角浮动按钮留空间 */
+  /* 顶部留出左上角浮动切换器的空间；底部给右上角浮动按钮留空间 */
   padding: 72px 10px 88px;
 }
 
@@ -296,6 +296,7 @@ async function syncMembers() {
 }
 
 .member-count {
+  margin-left: 6px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
   white-space: nowrap;
