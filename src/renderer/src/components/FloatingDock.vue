@@ -3,7 +3,7 @@
 </script>
 
 <template>
-  <div class="floating-dock frosted-surface">
+  <div class="floating-dock frosted-surface no-scrollbar">
     <slot />
   </div>
 </template>
@@ -21,11 +21,6 @@
   padding: 4px 6px;
   border-radius: 999px;
   overflow-x: auto;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    height: 0;
-  }
 }
 
 /* 渐变刷新悬浮球 */

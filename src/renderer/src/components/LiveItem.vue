@@ -53,11 +53,11 @@ const liveBadge = computed(() => {
     </div>
 
     <div class="card-body">
-      <p class="live-title" :title="item.title">
+      <p class="live-title ellipsis" :title="item.title">
         {{ item.title }}
       </p>
       <div class="member-info">
-        <span class="nickname">{{ item.userInfo.nickname }}</span>
+        <span class="nickname ellipsis">{{ item.userInfo.nickname }}</span>
         <span
           v-if="item.member && item.member.teamName"
           class="team-badge"
@@ -163,9 +163,6 @@ const liveBadge = computed(() => {
     font-weight: 500;
     line-height: 1.5;
     color: var(--el-text-color-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     transition: color 0.25s ease;
   }
 
@@ -180,9 +177,6 @@ const liveBadge = computed(() => {
       min-width: 0;
       font-size: 12px;
       color: var(--el-text-color-regular);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .team-badge {

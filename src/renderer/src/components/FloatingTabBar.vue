@@ -47,7 +47,7 @@ function dblClick(tab: FloatingTabItem) {
 </script>
 
 <template>
-  <div class="float-tab-bar frosted-surface">
+  <div class="float-tab-bar frosted-surface no-scrollbar">
     <button
       v-for="tab in tabs"
       :key="tab.key"
@@ -78,11 +78,6 @@ function dblClick(tab: FloatingTabItem) {
   border-radius: 999px;
   max-width: 75%;
   overflow: auto;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    height: 0;
-  }
 }
 
 .float-tab {

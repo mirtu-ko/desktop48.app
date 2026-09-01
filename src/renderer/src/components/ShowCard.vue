@@ -39,7 +39,9 @@ function formatTime(stime: string): string {
       <span class="show-time">{{ formatTime(show.stime) }}</span>
     </div>
     <div class="show-info">
-      <h3>{{ show.title }}</h3>
+      <h3 class="ellipsis">
+        {{ show.title }}
+      </h3>
       <el-text v-if="show.subTitle" size="small" type="info">
         {{ show.subTitle }}
       </el-text>
@@ -108,9 +110,6 @@ function formatTime(stime: string): string {
   margin: 10px 0 4px;
   font-size: 16px;
   color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .show-tag {

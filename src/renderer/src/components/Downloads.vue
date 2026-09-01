@@ -184,14 +184,14 @@ onUnmounted(() => {
 
             <div class="task-meta">
               <div
-                class="task-name"
+                class="task-name ellipsis"
                 :title="task.getFilename()"
               >
                 {{ task.getFilename() }}
               </div>
               <div
                 v-if="task.getFilePath()"
-                class="task-path"
+                class="task-path ellipsis"
                 :title="task.getFilePath()"
               >
                 {{ task.getFilePath() }}
@@ -397,9 +397,6 @@ onUnmounted(() => {
     min-width: 0;
 
     .task-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       font-size: 14px;
       font-weight: 600;
       color: var(--el-text-color-primary);
@@ -407,9 +404,6 @@ onUnmounted(() => {
 
     .task-path {
       margin-top: 3px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       font-size: 12px;
       color: var(--el-text-color-secondary);
     }

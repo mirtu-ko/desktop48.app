@@ -199,7 +199,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="fp-window"
+    class="fp-window frosted-surface frosted-surface--deep"
     :class="{ 'is-collapsed': collapsed }"
     :style="windowStyle"
   >
@@ -212,7 +212,7 @@ onUnmounted(() => {
         {{ kind === 'live' ? '直播' : '回放' }}
       </span>
       <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="fp-avatar">
-      <span class="fp-title" :title="barTitle">
+      <span class="fp-title ellipsis" :title="barTitle">
         {{ barTitle }}
       </span>
       <div class="fp-actions">
@@ -274,9 +274,6 @@ onUnmounted(() => {
   flex-direction: column;
   border-radius: 14px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--el-bg-color) 90%, transparent);
-  backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 45%, transparent);
   box-shadow: var(--shadow-lg);
   transition:
     width 0.2s ease,
@@ -330,9 +327,6 @@ onUnmounted(() => {
 .fp-title {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
   color: var(--el-text-color-primary);

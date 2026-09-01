@@ -68,7 +68,8 @@ function change(index: string) {
     linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08) 55%),
     color-mix(in srgb, var(--el-bg-color) 58%, transparent);
   backdrop-filter: blur(28px) saturate(170%);
-  border-color: transparent;
+  /* 去掉 .frosted-surface 的 1px 边框，避免与 ::before 渐变描边形成双线 */
+  border: none;
   box-shadow:
     var(--shadow-lg),
     0 18px 44px -14px rgba(109, 90, 224, 0.35),
@@ -88,6 +89,9 @@ function change(index: string) {
       rgba(109, 90, 224, 0.35)
     );
     -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask:
       linear-gradient(#fff 0 0) content-box,
       linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;

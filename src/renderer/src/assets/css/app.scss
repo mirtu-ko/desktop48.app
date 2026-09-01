@@ -120,6 +120,12 @@ body,
   box-shadow: var(--shadow-md);
 }
 
+/* 深磨砂变体：更实底色、更强模糊，悬浮窗（FloatPlayer）使用 */
+.frosted-surface--deep {
+  background: color-mix(in srgb, var(--el-bg-color) 90%, transparent);
+  backdrop-filter: blur(18px) saturate(180%);
+}
+
 /* 磨砂玻璃卡片（设置 / 下载等页面的内容卡片统一外观） */
 .glass-card {
   border: 1px solid color-mix(in srgb, var(--el-border-color) 55%, #ffffff);
@@ -147,4 +153,41 @@ body,
   border-radius: 24px;
   color: white;
   font-size: 12px;
+}
+
+/* 徽章变体：跟随文字行高的行内款（成员详情头部） */
+.team-badge--inline {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  line-height: 1.5;
+}
+
+/* 徽章变体：卡片左上角悬浮款（成员卡片） */
+.team-badge--overlay {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  padding: 2px 2px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
+/* ===== 通用工具类 ===== */
+
+/* 单行省略号 */
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 隐藏滚动条（内容仍可滚动） */
+.no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }

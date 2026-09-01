@@ -217,13 +217,13 @@ async function syncMembers() {
                   </template>
                 </el-image>
                 <div class="member-meta">
-                  <p class="member-name" :title="member.realName">
+                  <p class="member-name ellipsis" :title="member.realName">
                     {{ member.realName }}
                   </p>
                 </div>
                 <span
                   v-if="member.teamName"
-                  class="team-badge"
+                  class="team-badge team-badge--overlay"
                   :style="{ backgroundColor: member.teamColor ? `#${member.teamColor}` : '#909399' }"
                 >
                   {{ member.teamName.replace('TEAM ', '') }}
@@ -391,9 +391,6 @@ async function syncMembers() {
 
     p {
       margin: 0;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
     }
   }
 
@@ -401,18 +398,6 @@ async function syncMembers() {
     font-size: 14px;
     font-weight: 600;
     color: var(--el-text-color-primary);
-  }
-
-  .team-badge {
-    position: absolute;
-    top: 4px;
-    left: 0px;
-    padding: 2px 2px;
-    border-radius: 999px;
-    font-size: 11px;
-    line-height: 1.4;
-    color: #fff;
-    opacity: 0.9;
   }
 
   /* 快捷屏蔽：悬浮卡片时右上角出现 */

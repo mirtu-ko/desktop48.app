@@ -813,7 +813,7 @@ onUnmounted(() => {
 
 /* 电台模式下封面轮播铺满窗口且较亮，加载时叠加深色蒙层保证动画可读 */
 .loading-container.loading-masked {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 /* 用封面图作加载背景，0.1 透明度淡显，不遮挡居中内容 */

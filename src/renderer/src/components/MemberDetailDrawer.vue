@@ -124,13 +124,13 @@ function openReviews() {
           <p class="name">
             {{ member.realName }}
           </p>
-          <p class="nick" :title="member.nickname">
+          <p class="nick ellipsis" :title="member.nickname">
             {{ member.nickname }}
           </p>
           <div class="tags">
             <span
               v-if="member.teamName"
-              class="team-badge"
+              class="team-badge team-badge--inline"
               :style="{ backgroundColor: member.teamColor ? `#${member.teamColor}` : '#909399' }"
             >
               {{ member.teamName.replace('TEAM ', '') }}
@@ -149,7 +149,7 @@ function openReviews() {
       <div v-if="profileItems.length" class="profile-grid">
         <div v-for="item in profileItems" :key="item.label" class="cell">
           <span class="label">{{ item.label }}</span>
-          <span class="value" :title="item.value">{{ item.value }}</span>
+          <span class="value ellipsis" :title="item.value">{{ item.value }}</span>
         </div>
       </div>
 
@@ -290,9 +290,6 @@ function openReviews() {
     margin: 4px 0 0;
     font-size: 13px;
     color: var(--el-text-color-secondary);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   .tags {
@@ -300,14 +297,6 @@ function openReviews() {
     gap: 8px;
     align-items: center;
     margin-top: 10px;
-  }
-
-  .team-badge {
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #fff;
   }
 }
 
@@ -334,9 +323,6 @@ function openReviews() {
 
   .value {
     color: var(--el-text-color-primary);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 }
 

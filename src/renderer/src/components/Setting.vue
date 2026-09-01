@@ -304,6 +304,28 @@ async function setUserAgent() {
           </div>
         </div>
         <div class="row-body">
+          <div class="friend-links">
+            <span class="links-label">推荐链接</span>
+            <div class="links-grid">
+              <a
+                v-for="link in friendLinks"
+                :key="link.name"
+                class="friend-link"
+                :href="link.url"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="link-logo" :style="{ '--logo-color': link.color }">
+                  <span class="link-abbr">{{ link.abbr }}</span>
+                  <img v-if="link.logo" :src="link.logo" alt="" @error="hideLogo">
+                </span>
+                <span class="link-meta">
+                  <span class="link-name">{{ link.name }}</span>
+                  <span class="link-host ellipsis">{{ linkHost(link.url) }}</span>
+                </span>
+              </a>
+            </div>
+          </div>
           <div class="legal-block">
             <p class="legal-title">
               免责声明
@@ -325,28 +347,6 @@ async function setUserAgent() {
             <p class="legal-text">
               本应用不对任何音视频资源的版权合法性承担责任。用户在使用本应用时，应当遵守相关法律法规，不得将本应用用于商业用途。
             </p>
-          </div>
-          <div class="friend-links">
-            <span class="links-label">推荐链接</span>
-            <div class="links-grid">
-              <a
-                v-for="link in friendLinks"
-                :key="link.name"
-                class="friend-link"
-                :href="link.url"
-                target="_blank"
-                rel="noopener"
-              >
-                <span class="link-logo" :style="{ '--logo-color': link.color }">
-                  <span class="link-abbr">{{ link.abbr }}</span>
-                  <img v-if="link.logo" :src="link.logo" alt="" @error="hideLogo">
-                </span>
-                <span class="link-meta">
-                  <span class="link-name">{{ link.name }}</span>
-                  <span class="link-host">{{ linkHost(link.url) }}</span>
-                </span>
-              </a>
-            </div>
           </div>
         </div>
       </section>
@@ -465,8 +465,19 @@ async function setUserAgent() {
 }
 
 /* 权利声明：小字号次要色，低调呈现 */
-.legal-block + .legal-block {
+.legal-block + .legal-block,
+.friend-links + .legal-block {
   margin-top: 10px;
+}
+
+/* 友情链接：logo 卡片网格，悬浮上浮高亮（现位于权利声明卡片顶部，无需上边距） */
+.friend-links {
+  .links-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
 }
 
 .legal-title {
@@ -485,18 +496,6 @@ async function setUserAgent() {
 
 .legal-text:last-child {
   margin-bottom: 0;
-}
-
-/* 友情链接：logo 卡片网格，悬浮上浮高亮 */
-.friend-links {
-  margin-top: 14px;
-
-  .links-label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-  }
 }
 
 .links-grid {
@@ -569,11 +568,8 @@ async function setUserAgent() {
   }
 
   .link-host {
-    overflow: hidden;
     font-size: 11px;
     color: var(--el-text-color-secondary);
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 }
 
