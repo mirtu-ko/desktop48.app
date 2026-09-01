@@ -32,13 +32,4 @@ export default class ApiUrls {
   public static readonly CHECK_IN_URL = 'https://pocketapi.48.cn/user/api/v1/checkin'
 
   public static readonly TRIP_LIST_URL = 'https://pocketapi.48.cn/trip/api/trip/v1/list'
-
-  /** 从所有 URL 常量中自动提取去重后的域名（供主进程白名单使用） */
-  public static get hosts(): string[] {
-    return [...new Set(
-      Object.values(this)
-        .filter((value): value is string => typeof value === 'string' && value.startsWith('http'))
-        .map(value => new URL(value).hostname),
-    )]
-  }
 }

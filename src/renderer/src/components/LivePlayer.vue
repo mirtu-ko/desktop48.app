@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../assets/js/task-payload'
-import { Refresh, RefreshLeft, RefreshRight, VideoCamera } from '@element-plus/icons-vue'
+import { VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 
-import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
+import useTasks from '../assets/js/use-tasks'
+import { useVideoRotation } from '../composables/use-video-rotation'
+
+import MiniControls from './MiniControls.vue'
+import RotationControls from './RotationControls.vue'
 
 interface LiveDetail {
   playStreamPath: string
@@ -56,10 +60,6 @@ const maxRetries = 3
 const isManuallyUnmounted = ref(false)
 const streamRestartToken = ref(0)
 const isRecoveringStream = ref(false)
-const rotationAngle = ref(0)
-const videoWidth = ref(0)
-const videoHeight = ref(0)
-const boxDimensions = ref({ width: 0, height: 0 })
 const coverImage = ref('')
 const onlineNum = ref(0)
 const powerSaveBlockerId = ref<number | null>(null)
@@ -69,62 +69,32 @@ const carousels = ref<string[]>([])
 const carouselTime = ref(5000)
 
 const isRadio = computed(() => props.liveType !== 1)
-const isVerticalRotation = computed(() => {
-  const normalizedAngle = ((rotationAngle.value % 360) + 360) % 360
-  return normalizedAngle === 90 || normalizedAngle === 270
-})
 
-// 旋转 90/270 度时，视频显示宽高会交换，这里单独计算一个缩放系数，
-// 保证旋转后的画面仍然完整落在容器内。
-function calculateRotationScale() {
-  if (!isVerticalRotation.value)
-    return 1
-
-  const boxWidth = boxDimensions.value.width || videoBoxRef.value?.clientWidth || 0
-  const boxHeight = boxDimensions.value.height || videoBoxRef.value?.clientHeight || 0
-  const sourceWidth = videoWidth.value
-  const sourceHeight = videoHeight.value
-
-  if (boxWidth <= 0 || boxHeight <= 0 || sourceWidth <= 0 || sourceHeight <= 0)
-    return 1
-
-  const videoRatio = sourceWidth / sourceHeight
-  const boxRatio = boxWidth / boxHeight
-  let renderedWidth = 0
-  let renderedHeight = 0
-
-  if (videoRatio < boxRatio) {
-    renderedHeight = boxHeight
-    renderedWidth = renderedHeight * videoRatio
-  }
-  else {
-    renderedWidth = boxWidth
-    renderedHeight = renderedWidth / videoRatio
-  }
-
-  return Math.min(boxWidth / renderedHeight, boxHeight / renderedWidth)
-}
-
-const videoWrapperStyle = computed(() => {
-  const angle = rotationAngle.value
-  const scale = calculateRotationScale()
-
-  return {
-    transform: `rotate(${angle}deg) scale(${scale})`,
-  }
-})
-
-const videoStyle = computed(() => {
-  if (isVerticalRotation.value) {
-    return {
-      maxWidth: '100%',
-      maxHeight: '100%',
-      width: 'auto',
-      height: 'auto',
-    }
-  }
-
-  return {}
+// 旋转 / 容器全屏 / 迷你控制条状态：与 ReviewPlayer 共用同一套实现（useVideoRotation）
+const {
+  rotationAngle,
+  isVerticalRotation,
+  videoWrapperStyle,
+  videoStyle,
+  rotateHint,
+  rotateLeft,
+  rotateRight,
+  resetRotation,
+  onBoxDblClick,
+  isFullscreen,
+  toggleFullscreen,
+  playing,
+  muted,
+  togglePlay,
+  toggleMute,
+  onVolumeChange,
+  updateVideoDimensions,
+} = useVideoRotation({
+  videoBoxRef,
+  getMedia: () => (isRadio.value ? nativeAudio.value : nativeVideo.value),
+  getVideo: () => nativeVideo.value,
+  isRadio,
+  onOrientation: landscape => emit('orientation', landscape),
 })
 
 const router = useRouter()
@@ -134,7 +104,6 @@ let activeStreamRequestId = 0
 let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
 let elapsedTimer: ReturnType<typeof setInterval> | null = null
 let playerWatchStopHandle: (() => void) | null = null
-let resizeObserver: ResizeObserver | null = null
 let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
 
 // 这一组方法只负责“直播详情”和界面状态同步，不直接处理播放器。
@@ -247,45 +216,41 @@ function updateOnlineNum() {
   })
 }
 
-function rotateLeft() {
-  rotationAngle.value = ((rotationAngle.value - 90) % 360 + 360) % 360
-}
+// 鼠标悬浮才响应快捷键：同屏可能有多个浮窗播放器，否则一次按键会把它们全部转一遍
+const hovered = ref(false)
 
-function rotateRight() {
-  rotationAngle.value = (rotationAngle.value + 90) % 360
-}
-
-function resetRotation() {
-  rotationAngle.value = 0
-}
-
-// 旋转后画面横竖比例随之交换，重新上报给浮窗调整窗口比例
-watch(rotationAngle, () => reportOrientation())
-
-function updateVideoDimensions() {
-  if (nativeVideo.value) {
-    const nextVideoWidth = nativeVideo.value.videoWidth || 0
-    const nextVideoHeight = nativeVideo.value.videoHeight || 0
-
-    videoWidth.value = nextVideoWidth
-    videoHeight.value = nextVideoHeight
+function onKeyDown(event: KeyboardEvent) {
+  if (isRadio.value || !hovered.value || event.repeat || event.ctrlKey || event.metaKey || event.altKey)
+    return
+  const target = event.target as HTMLElement | null
+  if (target?.closest('input, textarea, [contenteditable="true"]'))
+    return
+  if (event.key === 'r' || event.key === 'R') {
+    event.preventDefault()
+    if (event.shiftKey)
+      rotateLeft()
+    else
+      rotateRight()
+    return
   }
-  reportOrientation()
+  if (event.key === '0') {
+    event.preventDefault()
+    resetRotation()
+  }
 }
 
-// 计算旋转后画面实际呈现是否为横屏（90/270° 旋转会让源宽高交换），上报给浮窗决定窗口横竖比例
-function reportOrientation() {
-  if (isRadio.value)
-    return
-  const w = videoWidth.value
-  const h = videoHeight.value
-  if (!w || !h)
-    return
-  emit('orientation', isVerticalRotation.value ? h > w : w > h)
-}
+// 录制状态取共享任务 store：任务由谁发起、下载页是否挂载都不影响这里；
+// 停止也走同一个任务对象，避免两处各持一份状态互相打架
+const { handleTask, isTaskRunning, stopTask } = useTasks()
+const recording = computed(() => isTaskRunning('record', props.liveId))
 
-function handleNativeVideoResize() {
-  updateVideoDimensions()
+function onRecordClick() {
+  if (!recording.value) {
+    record()
+    return
+  }
+  stopTask('record', props.liveId)
+  ElMessage({ message: '已结束录制', type: 'info' })
 }
 
 // 这一组方法只处理“本地直播流会话”与播放器实例的清理，不涉及列表/录制逻辑。
@@ -398,9 +363,8 @@ function scheduleStreamRetry() {
         console.error('停止直播流失败:', err)
       })
     }
-    // 重试耗尽视为直播结束，广播通知列表页刷新（流已不存在）
+    // 重试耗尽视为直播结束：广播通知列表页刷新（流已不存在），并直接关闭当前 tab
     EventBus.emit('live-unavailable', props.liveId)
-    // 重试耗尽视为直播结束，直接关闭当前 tab
     emit('close')
   }
 }
@@ -446,11 +410,9 @@ async function record() {
       filename,
       liveId: props.liveId,
     }
-    EventBus.emit('change-selected-menu', Constants.Menu.DOWNLOADS)
-    router.push('/downloads')
-    setTimeout(() => {
-      EventBus.emit('record-task', recordTask)
-    })
+    // 任务由 useTasks 这个模块级单例直接接住并启动，状态在按钮上就地可见，
+    // 不再跳转下载页——完整播放器本身也是浮窗，跳走反而打断浏览
+    await handleTask(recordTask, 'record')
   }).catch((error) => {
     console.error(error)
   })
@@ -556,27 +518,6 @@ async function resumeLive() {
 onMounted(() => {
   console.log('[LivePlayer.vue] onMounted', props)
 
-  if (!isRadio.value && videoBoxRef.value) {
-    boxDimensions.value = {
-      width: videoBoxRef.value.clientWidth,
-      height: videoBoxRef.value.clientHeight,
-    }
-
-    resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        boxDimensions.value = {
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        }
-      }
-    })
-
-    resizeObserver.observe(videoBoxRef.value)
-  }
-
-  if (nativeVideo.value)
-    nativeVideo.value.addEventListener('resize', handleNativeVideoResize)
-
   playerWatchStopHandle = watch(
     () => playStreamPath.value,
     (newPath) => {
@@ -586,6 +527,8 @@ onMounted(() => {
     },
     { immediate: true },
   )
+
+  window.addEventListener('keydown', onKeyDown)
 
   // 迷你窗存在即启动播放会话
   resumeLive()
@@ -602,8 +545,6 @@ onUnmounted(() => {
   }
   destroyLivePlayer()
   resetMediaElement()
-  if (nativeVideo.value)
-    nativeVideo.value.removeEventListener('resize', handleNativeVideoResize)
   if (streamId.value) {
     window.mainAPI.stopLiveStream(streamId.value).catch((err) => {
       console.error('停止直播流失败:', err)
@@ -612,16 +553,20 @@ onUnmounted(() => {
   if (powerSaveBlockerId.value !== null)
     window.mainAPI.allowSleep(powerSaveBlockerId.value)
   stopOnlineNumTimer()
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-    resizeObserver = null
-  }
+  window.removeEventListener('keydown', onKeyDown)
 })
 </script>
 
 <template>
   <div class="live-player">
-    <div ref="videoBoxRef" class="video-box" :class="{ 'vertical-rotation': !isRadio && isVerticalRotation, 'video-box-background': !isRadio }">
+    <div
+      ref="videoBoxRef"
+      class="video-box"
+      :class="{ 'vertical-rotation': !isRadio && isVerticalRotation, 'video-box-background': !isRadio }"
+      @dblclick="onBoxDblClick"
+      @mouseenter="hovered = true"
+      @mouseleave="hovered = false"
+    >
       <div v-if="isRadio" class="radio-box">
         <div class="radio-carousel">
           <el-carousel
@@ -647,12 +592,15 @@ onUnmounted(() => {
       <div v-else class="video-wrapper" :style="videoWrapperStyle">
         <video
           ref="nativeVideo"
-          controls
+          :controls="!isVerticalRotation"
           autoplay
           class="video-player"
           :class="{ 'media-hidden': loading }"
           :style="videoStyle"
           :poster="coverImage"
+          @play="playing = true"
+          @pause="playing = false"
+          @volumechange="onVolumeChange"
         />
       </div>
       <div v-if="loading" class="loading-container" :class="{ 'loading-masked': isRadio }">
@@ -676,28 +624,51 @@ onUnmounted(() => {
         <span v-if="!compact && onlineNum > 0" class="live-online">在线 {{ onlineNum }}</span>
       </div>
       <div class="player-actions">
-        <template v-if="liveType === 1">
-          <el-button circle class="action-btn" title="向左旋转90°" @click="rotateLeft">
-            <el-icon>
-              <RefreshLeft />
+        <RotationControls
+          v-if="liveType === 1"
+          :angle="rotationAngle"
+          @rotate-left="rotateLeft"
+          @rotate-right="rotateRight"
+          @reset="resetRotation"
+        />
+        <el-tooltip :content="recording ? '录制中，点击结束' : '录制'" placement="bottom" :show-after="400">
+          <button
+            class="action-btn action-record"
+            :class="{ 'is-recording': recording }"
+            :aria-label="recording ? '结束录制' : '录制'"
+            @click="onRecordClick"
+          >
+            <el-icon :size="16">
+              <VideoCamera />
             </el-icon>
-          </el-button>
-          <el-button circle class="action-btn" title="重置旋转" @click="resetRotation">
-            <el-icon>
-              <Refresh />
+          </button>
+        </el-tooltip>
+        <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏'" placement="bottom" :show-after="400">
+          <button
+            class="action-btn"
+            :aria-label="isFullscreen ? '退出全屏' : '全屏'"
+            @click="toggleFullscreen"
+          >
+            <el-icon :size="16">
+              <FullScreen />
             </el-icon>
-          </el-button>
-          <el-button circle class="action-btn" title="向右旋转90°" @click="rotateRight">
-            <el-icon>
-              <RefreshRight />
-            </el-icon>
-          </el-button>
-        </template>
-        <el-button circle class="action-btn action-record" title="录制" @click="record()">
-          <el-icon>
-            <VideoCamera />
-          </el-icon>
-        </el-button>
+          </button>
+        </el-tooltip>
+      </div>
+
+      <!-- 旋转 90/270 时原生控制条会跟着侧躺，换成不参与旋转的自绘迷你条（直播无需进度条） -->
+      <MiniControls
+        v-if="!isRadio && isVerticalRotation"
+        :playing="playing"
+        :muted="muted"
+        :is-fullscreen="isFullscreen"
+        @toggle-play="togglePlay"
+        @toggle-mute="toggleMute"
+        @toggle-fullscreen="toggleFullscreen"
+      />
+
+      <div v-if="rotateHint" class="rotate-hint">
+        {{ rotateHint }}
       </div>
     </div>
   </div>
@@ -730,30 +701,8 @@ onUnmounted(() => {
   background: #0c0c0c;
 }
 
-.video-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: transform 0.3s ease;
-  transform-origin: center center;
-  width: 100%;
-  height: 100%;
-}
-
 .video-box.vertical-rotation {
   overflow: hidden;
-}
-
-.video-box.vertical-rotation .video-wrapper {
-  width: 100%;
-  height: 100%;
-}
-
-.video-player {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
 }
 
 .radio-box {
@@ -934,30 +883,55 @@ onUnmounted(() => {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   z-index: 30;
 }
 
-/* 统一按钮尺寸，覆盖 Element Plus 同级选择器引入的 margin-left */
+/* 悬浮操作按钮（录制 / 全屏）；旋转胶囊样式见 RotationControls.vue */
 .action-btn {
   width: 32px;
   height: 32px;
   padding: 0;
-  /* 覆盖 Element Plus 的 .el-button + .el-button { margin-left: 12px }（同级选择器且其样式表后加载） */
-  margin-left: 0 !important;
   flex-shrink: 0;
-  --el-button-bg-color: rgba(15, 17, 26, 0.55);
-  --el-button-border-color: rgba(255, 255, 255, 0.16);
-  --el-button-hover-bg-color: rgba(30, 33, 50, 0.8);
-  --el-button-hover-border-color: rgba(255, 255, 255, 0.3);
-  --el-button-text-color: #fff;
-  --el-button-hover-text-color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  font-size: 12px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: rgba(15, 17, 26, 0.55);
   backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.1s ease;
+
+  &:hover {
+    background: rgba(30, 33, 50, 0.85);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
 }
 
 .action-record {
-  --el-button-text-color: #ff8fa3;
-  --el-button-hover-text-color: #ff5c7a;
+  color: #ff8fa3;
+
+  &:hover {
+    color: #ff5c7a;
+  }
+
+  /* 录制中：常亮玫红底 + 呼吸光圈，切回播放器也能一眼看出在录 */
+  &.is-recording {
+    color: #fff;
+    background: #ff5c7a;
+    animation: record-pulse 1.4s ease-in-out infinite;
+  }
 }
 
 .live-dot {
@@ -987,6 +961,16 @@ onUnmounted(() => {
   50% {
     opacity: 0.6;
     box-shadow: 0 0 0 4px rgba(245, 108, 108, 0);
+  }
+}
+
+@keyframes record-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 92, 122, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 92, 122, 0);
   }
 }
 

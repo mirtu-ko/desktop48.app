@@ -7,20 +7,23 @@ import Hls from 'hls.js'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
-import EventBus from '../assets/js/event-bus'
 import Tools from '../assets/js/tools'
+import useTasks from '../assets/js/use-tasks'
 
 import BarrageBox from '../components/BarrageBox.vue'
+import { useVideoRotation } from '../composables/use-video-rotation'
+import MiniControls from './MiniControls.vue'
+import RotationControls from './RotationControls.vue'
 
 const props = defineProps({
   liveTitle: { type: String, required: true },
   liveId: { type: String, required: true },
   startTime: { type: Number, required: true },
-  // 数据源：user=用户直播回放(getLiveOne)，open=开放公演回放(getOpenLiveOne)
+  /** 数据源：user=用户直播回放(getLiveOne)，open=开放公演回放(getOpenLiveOne) */
   source: { type: String, default: 'user' },
-  // open 模式下的顶部头像（队伍 logo，完整 URL）
+  /** open 模式下的顶部头像（队伍 logo，完整 URL） */
   avatarUrl: { type: String, default: '' },
-  // 迷你窗紧凑模式：隐藏弹幕侧栏与对应头部按钮，适配画中画小窗口
+  /** 迷你窗紧凑模式：隐藏弹幕侧栏与对应头部按钮，适配画中画小窗口 */
   compact: { type: Boolean, default: false },
 })
 
@@ -163,6 +166,47 @@ function destroyPlayer() {
 
 const videoBoxRef = ref<HTMLElement | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
+
+// =========== 画面旋转 / 容器全屏 / 迷你控制条（与 LivePlayer 共用 useVideoRotation） ===========
+// 旋转作用于 video wrapper，弹幕叠加层与之同级、不参与旋转：
+// 弹幕的轨道/坐标体系基于容器宽高，保持横向滚动即可，旋转不影响弹幕任何逻辑。
+const mediaDuration = ref(0)
+
+const {
+  rotationAngle,
+  isVerticalRotation,
+  videoWrapperStyle,
+  videoStyle,
+  rotateHint,
+  rotateLeft,
+  rotateRight,
+  resetRotation,
+  onBoxDblClick,
+  isFullscreen,
+  toggleFullscreen,
+  playing,
+  muted,
+  togglePlay,
+  toggleMute,
+  onVolumeChange,
+  updateVideoDimensions,
+} = useVideoRotation({
+  videoBoxRef,
+  getMedia: () => (isRadio.value ? nativeAudio.value : nativeVideo.value),
+  getVideo: () => nativeVideo.value,
+  isRadio,
+  onOrientation: landscape => emit('orientation', landscape),
+})
+
+// 迷你条拖进度：录播必须可 seek，弹幕游标由 onseeking 统一同步
+function onMiniSeek(value: number) {
+  const mediaElement = getActiveMediaElement()
+  if (!mediaElement)
+    return
+  mediaElement.currentTime = value
+  currentTime.value = value
+}
+// =========== 画面旋转结束 ===========
 
 // =========== 视频弹幕叠加层 ===========
 // 位置不再逐帧累加，而是由播放进度反推：x = 容器宽度 - (currentTime - bornAt) * speed。
@@ -421,13 +465,10 @@ function bindMediaEvents(mediaElement: HTMLMediaElement) {
   mediaElement.onloadedmetadata = async () => {
     lastPlaybackError.value = ''
     mediaLoading.value = false
-    // 回放无旋转按钮，直接按源宽高比上报横竖屏
-    if (!isRadio.value) {
-      const w = nativeVideo.value?.videoWidth || 0
-      const h = nativeVideo.value?.videoHeight || 0
-      if (w && h)
-        emit('orientation', w > h)
-    }
+    // 记录源尺寸供旋转缩放计算，并按（可能旋转后的）画面比例上报浮窗
+    if (!isRadio.value)
+      updateVideoDimensions()
+    mediaDuration.value = mediaElement.duration || 0
     await ensureBarragesLoaded()
     attemptAutoplay(mediaElement)
   }
@@ -590,16 +631,7 @@ function seekTo(seconds: number) {
   void mediaElement.play()
 }
 
-function togglePlay() {
-  const mediaElement = getActiveMediaElement()
-  if (!mediaElement)
-    return
-  if (mediaElement.paused)
-    void mediaElement.play()
-  else
-    mediaElement.pause()
-}
-
+// 切换弹幕显隐：状态持久化到 localStorage，关闭时清空叠加层，重新打开不补灌历史弹幕
 function toggleDanmaku() {
   // 无弹幕数据源时开关无意义，直接忽略（含快捷键 D）
   if (!hasBarrage.value)
@@ -608,17 +640,6 @@ function toggleDanmaku() {
   if (!settings.enabled)
     clearOverlay()
   saveDanmakuSettings()
-}
-
-function toggleFullscreen() {
-  // 对 video-box-inner 请求全屏，弹幕叠加层才会跟着一起放大
-  const target = videoBoxRef.value
-  if (!target)
-    return
-  if (document.fullscreenElement)
-    void document.exitFullscreen()
-  else
-    void target.requestFullscreen()
 }
 
 // 快捷键绑定在根节点而不是 window：回放页会以多标签形式同时存在多个实例，
@@ -638,6 +659,7 @@ function onKeydown(event: KeyboardEvent) {
 
   const mediaElement = getActiveMediaElement()
   switch (event.key) {
+    // 空格/播放键与迷你条统一走 useVideoRotation 的 togglePlay（getMedia 即 getActiveMediaElement）
     case ' ':
       togglePlay()
       break
@@ -664,6 +686,21 @@ function onKeydown(event: KeyboardEvent) {
     case 'f':
     case 'F':
       toggleFullscreen()
+      break
+    case 'r':
+    case 'R':
+      // 长按 repeat 只响应第一次，避免连续转圈
+      if (event.repeat)
+        return
+      if (event.shiftKey)
+        rotateLeft()
+      else
+        rotateRight()
+      break
+    case '0':
+      if (event.repeat)
+        return
+      resetRotation()
       break
     default:
       return
@@ -696,6 +733,10 @@ function getReviewDownloadFilename() {
   return `${realName.value}${date}.mp4`
 }
 
+// 任务通过共享 store 直接下发，不再绕 EventBus 中转
+const { handleTask, isTaskRunning, stopTask } = useTasks()
+const downloading = computed(() => isTaskRunning('download', props.liveId))
+
 async function download() {
   const valid = await checkDownloadDirectory()
   if (!valid)
@@ -707,11 +748,19 @@ async function download() {
     filename,
     liveId: props.liveId,
   }
-  EventBus.emit('change-selected-menu', 'downloads')
-  router.push('/downloads')
-  setTimeout(() => {
-    EventBus.emit('download-task', downloadTask)
-  })
+  // 任务由 useTasks 这个模块级单例直接接住并启动，状态在按钮上就地可见，
+  // 不再跳转下载页——播放器本身也是浮窗，跳走反而打断浏览
+  await handleTask(downloadTask, 'download')
+}
+
+/** 下载中再次点击 = 取消下载 */
+function onDownloadClick() {
+  if (!downloading.value) {
+    download()
+    return
+  }
+  stopTask('download', props.liveId)
+  ElMessage({ message: '已停止下载', type: 'info' })
 }
 
 // 组件卸载时该 watch 会随作用域自动停止，无需手动持有停止函数
@@ -733,6 +782,7 @@ onMounted(async () => {
   loadDanmakuSettings()
   startDanmakuAnimation()
   rootRef.value?.focus()
+
   await getOne()
 })
 
@@ -747,7 +797,12 @@ onUnmounted(() => {
   <div ref="rootRef" class="review-player" tabindex="-1" @keydown="onKeydown">
     <div class="review-content">
       <div class="video-box">
-        <div ref="videoBoxRef" class="video-box-inner">
+        <div
+          ref="videoBoxRef"
+          class="video-box-inner"
+          :class="{ 'vertical-rotation': !isRadio && isVerticalRotation }"
+          @dblclick="onBoxDblClick"
+        >
           <div v-if="isRadio" class="radio-player">
             <div class="radio-carousel">
               <el-carousel
@@ -768,12 +823,17 @@ onUnmounted(() => {
               class="audio-player"
             />
           </div>
-          <video
-            v-else
-            ref="nativeVideo"
-            class="video-player"
-            controls
-          />
+          <div v-else class="video-wrapper" :style="videoWrapperStyle">
+            <video
+              ref="nativeVideo"
+              class="video-player"
+              :controls="!isVerticalRotation"
+              :style="videoStyle"
+              @play="playing = true"
+              @pause="playing = false"
+              @volumechange="onVolumeChange"
+            />
+          </div>
 
           <div
             v-show="settings.enabled && hasBarrage"
@@ -805,18 +865,53 @@ onUnmounted(() => {
               <el-button size="small" type="primary" @click="retryPlayback">
                 重试
               </el-button>
-              <el-button size="small" type="success" @click="download">
-                去下载
+              <el-button size="small" type="success" @click="onDownloadClick">
+                {{ downloading ? '取消下载' : '去下载' }}
               </el-button>
             </div>
           </div>
 
           <div class="player-actions">
-            <el-button circle class="action-btn action-download" title="下载" @click="download">
-              <el-icon>
-                <Download />
+            <!-- 旋转三件套：与 LivePlayer 一致的分段胶囊，中段显示当前角度，点击归零 -->
+            <RotationControls
+              v-if="!isRadio"
+              :angle="rotationAngle"
+              @rotate-left="rotateLeft"
+              @rotate-right="rotateRight"
+              @reset="resetRotation"
+            />
+            <el-button
+              circle
+              class="action-btn action-download"
+              :class="{ 'is-downloading': downloading }"
+              :title="downloading ? '下载中，点击取消' : '下载'"
+              @click="onDownloadClick"
+            >
+              <el-icon :class="{ 'is-loading': downloading }">
+                <Loading v-if="downloading" />
+                <Download v-else />
               </el-icon>
             </el-button>
+          </div>
+
+          <!-- 旋转 90/270 时原生控制条会跟着侧躺，换成不参与旋转的自绘迷你条；
+               录播必须保留 seek 能力，因此相比 LivePlayer 额外开启进度条 -->
+          <MiniControls
+            v-if="!isRadio && isVerticalRotation"
+            :playing="playing"
+            :muted="muted"
+            :is-fullscreen="isFullscreen"
+            :show-progress="true"
+            :current-time="currentTime"
+            :duration="mediaDuration"
+            @toggle-play="togglePlay"
+            @toggle-mute="toggleMute"
+            @toggle-fullscreen="toggleFullscreen"
+            @seek="onMiniSeek"
+          />
+
+          <div v-if="rotateHint" class="rotate-hint">
+            {{ rotateHint }}
           </div>
 
           <!-- 视频窗口右边缘：hover 时才浮出的弹幕列表显隐竖条（B站式边缘吸附） -->
@@ -939,6 +1034,24 @@ onUnmounted(() => {
 .action-download {
   --el-button-text-color: #7dd8a4;
   --el-button-hover-text-color: #4fd187;
+
+  /* 下载中：常亮绿色底 + 呼吸光圈，与 LivePlayer 的录制中状态同构 */
+  &.is-downloading {
+    color: #fff;
+    background: #34c07c;
+    border-color: transparent;
+    animation: download-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes download-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 192, 124, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
 }
 
 /* 视频窗口右边缘的弹幕显隐竖条触发区：平时不可见，hover 到右缘才滑出 */
@@ -1077,14 +1190,7 @@ onUnmounted(() => {
   user-select: none;
 }
 
-.video-player {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
+/* video-wrapper / video-player 公共样式见 app.scss */
 
 .video-mask {
   position: absolute;
