@@ -18,13 +18,13 @@ const api = {
   saveMemberData: (data: any) => ipcRenderer.invoke('saveMemberData', data),
   // 成员
   getMember: (userId: number) => ipcRenderer.invoke('getMember', userId),
-  getMemberOptions: () => ipcRenderer.invoke('getMemberOptions'),
   getTeamOptions: () => ipcRenderer.invoke('getTeamOptions'),
   getGroupOptions: () => ipcRenderer.invoke('getGroupOptions'),
   getMemberTree: () => ipcRenderer.invoke('getMemberTree'),
-  getHiddenMembers: () => ipcRenderer.invoke('getHiddenMembers'),
-  setHiddenMembers: (ids: number[]) => ipcRenderer.invoke('setHiddenMembers', ids),
-  removeHiddenMember: (userId: number) => ipcRenderer.invoke('removeHiddenMember', userId),
+  getBlockedMembers: () => ipcRenderer.invoke('getBlockedMembers'),
+  setBlockedMembers: (ids: number[]) => ipcRenderer.invoke('setBlockedMembers', ids),
+  addBlockedMember: (userId: number) => ipcRenderer.invoke('addBlockedMember', userId),
+  removeBlockedMember: (userId: number) => ipcRenderer.invoke('removeBlockedMember', userId),
   hasMembers: () => ipcRenderer.invoke('hasMembers'),
   // 配置相关
   getConfig: (key: string, defaultValue: any) => ipcRenderer.invoke('getConfig', key, defaultValue),
@@ -81,6 +81,16 @@ const api = {
   recordTaskStop: (liveId: string) => ipcRenderer.send(`recordTaskStop:${liveId}`),
   recordTaskList: () => ipcRenderer.invoke('recordTaskList'),
   recordTaskRemove: (liveId: string) => ipcRenderer.invoke('recordTaskRemove', liveId),
+  // 窗口控制
+  windowMinimize: () => ipcRenderer.invoke('window-minimize'),
+  windowToggleMaximize: () => ipcRenderer.invoke('window-toggle-maximize'),
+  windowClose: () => ipcRenderer.invoke('window-close'),
+  windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+  windowOnMaximizeChange: (callback: (_isMaximized: boolean) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, isMaximized: boolean) => callback(isMaximized)
+    ipcRenderer.on('window-maximized-changed', listener)
+    return () => ipcRenderer.removeListener('window-maximized-changed', listener)
+  },
   // 阻止系统休眠
   preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
   // 允许系统休眠

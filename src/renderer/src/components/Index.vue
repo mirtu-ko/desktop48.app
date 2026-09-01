@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { Download, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
+import { Download, Headset, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Apis from '../assets/js/apis'
 import Constants from '../assets/js/constants'
 import EventBus from '../assets/js/event-bus'
+import AppDock from './AppDock.vue'
+import FloatAudioBar from './FloatAudioBar.vue'
 import FloatPlayerHost from './FloatPlayerHost.vue'
 
 const router = useRouter()
@@ -14,12 +16,23 @@ const route = useRoute()
 const pathToMenu = {
   '/lives': Constants.Menu.LIVES,
   '/shows': Constants.Menu.Shows,
+  '/albums': Constants.Menu.Albums,
   '/members': Constants.Menu.Members,
   '/downloads': Constants.Menu.DOWNLOADS,
   '/setting': Constants.Menu.SETTING,
 }
 
 const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Constants.Menu.LIVES)
+
+// 底部 Dock 菜单项（每项带专属主题色，用于激活/悬浮的图标渐变）
+const dockItems = [
+  { index: Constants.Menu.LIVES, label: '直播', icon: VideoCamera, color: '#ff5e7e' },
+  { index: Constants.Menu.Shows, label: '公演', icon: Microphone, color: '#f59e0b' },
+  { index: Constants.Menu.Albums, label: '专辑', icon: Headset, color: '#d946ef' },
+  { index: Constants.Menu.Members, label: '成员', icon: User, color: '#3b82f6' },
+  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: '#10b981' },
+  { index: Constants.Menu.SETTING, label: '设置', icon: Setting, color: '#6d5ae0' },
+]
 
 function changeMenu(menu: string) {
   activeIndex.value = menu
@@ -53,49 +66,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-container>
-    <el-aside class="app-aside" width="220px">
-      <div class="app-brand">
-        <div class="app-logo">
-          48
-        </div>
-        <div class="brand-text">
-          <div class="app-title">
-            Desktop48
-          </div>
-          <div class="app-sub">
-            SNH48 直播助手
-          </div>
-        </div>
-      </div>
-      <el-menu
-        :default-active="activeIndex" mode="vertical" router class="side-menu"
-        @select="changeMenu"
-      >
-        <el-menu-item :index="Constants.Menu.LIVES">
-          <el-icon><VideoCamera /></el-icon>
-          <span>直播</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.Shows">
-          <el-icon><Microphone /></el-icon>
-          <span>公演</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.Members">
-          <el-icon><User /></el-icon>
-          <span>成员</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.DOWNLOADS">
-          <el-icon><Download /></el-icon>
-          <span>下载</span>
-        </el-menu-item>
-        <el-menu-item :index="Constants.Menu.SETTING">
-          <el-icon><Setting /></el-icon>
-          <span>设置</span>
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
-
-    <el-main>
+  <div class="app-layout">
+    <div class="app-content">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <Suspense>
@@ -108,100 +80,32 @@ onUnmounted(() => {
           </Suspense>
         </keep-alive>
       </router-view>
-    </el-main>
+    </div>
+
+    <!-- 底部 Dock 导航栏（磨砂表层复用全局 .frosted-surface） -->
+    <AppDock
+      :items="dockItems"
+      :active="activeIndex"
+      @change="changeMenu"
+    />
 
     <!-- 全局画中画迷你窗：跨页面持续播放 -->
     <FloatPlayerHost />
-  </el-container>
+
+    <!-- 全局音乐迷你播放条：跨页面持续播放专辑歌曲 -->
+    <FloatAudioBar />
+  </div>
 </template>
 
 <style scoped lang="scss">
-.el-main {
-  height: 100%;
-}
-
-.app-aside {
-  display: flex;
-  flex-direction: column;
-  background: var(--el-bg-color);
-  border-right: 1px solid var(--el-border-color-lighter);
-}
-
-.app-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 16px 16px;
-
-  .app-logo {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
-  }
-
-  .brand-text {
-    min-width: 0;
-  }
-
-  .app-title {
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.2;
-    color: var(--el-text-color-primary);
-  }
-
-  .app-sub {
-    margin-top: 2px;
-    font-size: 11px;
-    line-height: 1.2;
-    color: var(--el-text-color-secondary);
-  }
-}
-
-.side-menu {
-  user-select: none;
+/* 内容区：撑满剩余空间 + 自身滚动 + 底部预留 Dock 空间。
+ * 背景完全透明，直接透出 App.vue 的画布层 */
+.app-content {
   flex: 1;
-  padding: 6px 0 12px;
-  height: auto;
-  border-right: none;
-  background: transparent;
-
-  :deep(.el-menu-item) {
-    height: 44px;
-    margin: 4px 12px;
-    padding: 0 14px !important;
-    border-radius: 10px;
-    color: var(--el-text-color-regular);
-    transition:
-      background-color 0.2s ease,
-      color 0.2s ease,
-      box-shadow 0.2s ease;
-
-    .el-icon {
-      margin-right: 8px;
-      font-size: 18px;
-    }
-
-    &:hover {
-      background: var(--el-color-primary-light-9);
-      color: var(--el-color-primary);
-    }
-
-    &.is-active {
-      background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-light));
-      color: #fff;
-      font-weight: 600;
-      box-shadow: 0 6px 16px rgba(108, 92, 231, 0.28);
-    }
-  }
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0px;
+  overflow: auto;
 }
 </style>

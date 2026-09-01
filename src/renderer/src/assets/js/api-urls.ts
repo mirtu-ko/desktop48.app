@@ -3,6 +3,10 @@ export default class ApiUrls {
   public static readonly OPEN_LIVE_URL = 'https://pocketapi.48.cn/live/api/v1/live/getOpenLiveOne'
   public static readonly LIVE_LIST_URL = 'https://pocketapi.48.cn/live/api/v1/live/getLiveList'
   public static readonly LIVE_ONE_URL = 'https://pocketapi.48.cn/live/api/v1/live/getLiveOne'
+  public static readonly MUSIC_LIST_URL = 'https://www.cgt48.com/json/music_snh.json'
+  public static readonly B50_ALBUMS_URL = 'https://b50.ckg48.com/resource/json/albums.json'
+  public static readonly B50_SONGS_URL = 'https://b50.ckg48.com/resource/json/songs.json'
+
   public static readonly UPDATE_INFO_URL = 'https://pocketapi.48.cn/user/api/v1/client/update/group_team_star'
   public static readonly SET_COOKIE_URL = 'https://live.48.cn/Server/do_ajax_setcookie'
 
@@ -28,4 +32,13 @@ export default class ApiUrls {
   public static readonly CHECK_IN_URL = 'https://pocketapi.48.cn/user/api/v1/checkin'
 
   public static readonly TRIP_LIST_URL = 'https://pocketapi.48.cn/trip/api/trip/v1/list'
+
+  /** 从所有 URL 常量中自动提取去重后的域名（供主进程白名单使用） */
+  public static get hosts(): string[] {
+    return [...new Set(
+      Object.values(this)
+        .filter((value): value is string => typeof value === 'string' && value.startsWith('http'))
+        .map(value => new URL(value).hostname),
+    )]
+  }
 }

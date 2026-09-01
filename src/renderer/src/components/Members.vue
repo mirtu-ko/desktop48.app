@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { MemberDetail } from './MemberDetailDrawer.vue'
-import { Refresh, User } from '@element-plus/icons-vue'
+import { Hide, Refresh, User, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import Apis from '../assets/js/apis'
 import Tools from '../assets/js/tools'
+import { useBlockedMembers } from '../assets/js/use-blocked-members'
 import FloatingDock from './FloatingDock.vue'
 import FloatingTabBar from './FloatingTabBar.vue'
 import MemberDetailDrawer from './MemberDetailDrawer.vue'
@@ -48,6 +49,9 @@ const STATUS_LEFT = 3
 interface MemberSection {
   title: string
   teamBadge: string
+  /** 分区标题主题色：跟随队伍 teamColor；暂休/退团走弱化灰变体 */
+  accent?: string
+  muted?: boolean
   members: MemberDetail[]
 }
 
@@ -64,6 +68,9 @@ function hideBadge(event: Event) {
 /** 当前查看详情的成员（null = 抽屉关闭） */
 const selectedMember = ref<MemberDetail | null>(null)
 
+/** 屏蔽名单为模块级共享状态（与设置页同源），任一页面操作后另一页面自动同步 */
+const { refreshBlockedMembers, isBlocked, toggleBlock } = useBlockedMembers()
+
 /** API 把“明星殿堂”建模成独立分团（groupId 19），展示上并入 SNH48 的同名队伍（teamId 1008） */
 const HALL_GROUP_NAME = '明星殿堂'
 const HALL_HOST_GROUP_NAME = 'SNH48'
@@ -71,7 +78,7 @@ const HALL_HOST_GROUP_NAME = 'SNH48'
 /** 展示分节：分团队伍只收在团成员（status=1），末尾追加 暂休（status=2）/ 退团（status=3），均受分团筛选影响 */
 const sections = computed<MemberSection[]>(() => {
   const hall = groups.value.find(group => group.groupName === HALL_GROUP_NAME)
-  // 纯展示层合并：不改原树，避免副作用（回放筛选、隐藏成员仍用原结构）
+  // 纯展示层合并：不改原树，避免副作用（回放筛选、屏蔽成员仍用原结构）
   const merged = groups.value
     .filter(group => group.groupName !== HALL_GROUP_NAME)
     .map((group) => {
@@ -111,9 +118,12 @@ const sections = computed<MemberSection[]>(() => {
         .filter(member => member.status === STATUS_ACTIVE)
         .map(normalizeMember)
       if (members.length) {
+        // 队伍主题色：取队伍内任一成员的 teamColor（与成员卡片徽章同源）
+        const teamColor = team.children.find(member => member.teamColor)?.teamColor || ''
         result.push({
           title: groupId.value === '0' ? `${group.groupName} · ${team.teamName}` : team.teamName,
           teamBadge: team.teamBadge ? Tools.sourceUrl(team.teamBadge) : '',
+          accent: teamColor ? `#${teamColor}` : '',
           members,
         })
       }
@@ -121,11 +131,11 @@ const sections = computed<MemberSection[]>(() => {
   }
   const hiatus = collect(STATUS_HIATUS)
   if (hiatus.length) {
-    result.push({ title: '暂休', teamBadge: '', members: hiatus })
+    result.push({ title: '暂休', teamBadge: '', muted: true, members: hiatus })
   }
   const left = collect(STATUS_LEFT)
   if (left.length) {
-    result.push({ title: '退团', teamBadge: '', members: left })
+    result.push({ title: '退团', teamBadge: '', muted: true, members: left })
   }
   return result
 })
@@ -135,7 +145,10 @@ const memberCount = computed(() =>
   sections.value.reduce((sum, section) => sum + section.members.length, 0),
 )
 
-onMounted(fetchGroups)
+onMounted(() => {
+  fetchGroups()
+  refreshBlockedMembers()
+})
 
 /** 拉取成员树（挂载初始化 / 双击分团 tab 刷新共用） */
 async function fetchGroups() {
@@ -187,13 +200,20 @@ async function syncMembers() {
                 alt=""
                 @error="hideBadge"
               >
-              <span>{{ section.title }}</span>
+              <span
+                class="section-title"
+                :class="{ 'section-title--muted': section.muted }"
+                :style="section.accent ? { '--st-accent': section.accent } : undefined"
+              >
+                {{ section.title }}
+              </span>
             </h2>
             <div class="member-list">
               <div
                 v-for="member in section.members"
                 :key="member.userId"
                 class="member-card clickable"
+                :class="{ 'is-blocked': isBlocked(member.userId) }"
                 @click="selectedMember = member"
               >
                 <el-image class="avatar" :src="member.avatar" fit="cover" lazy>
@@ -209,17 +229,45 @@ async function syncMembers() {
                   </template>
                 </el-image>
                 <div class="member-meta">
-                  <p class="member-name" :title="member.realName">
+                  <p class="member-name ellipsis" :title="member.realName">
                     {{ member.realName }}
                   </p>
                 </div>
                 <span
                   v-if="member.teamName"
-                  class="team-badge"
-                  :style="{ backgroundColor: member.teamColor ? `#${member.teamColor}` : '#909399' }"
+                  class="team-badge team-badge--overlay"
+                  :style="member.teamColor ? { '--tb-color': `#${member.teamColor}` } : undefined"
                 >
                   {{ member.teamName.replace('TEAM ', '') }}
                 </span>
+
+                <!-- 未屏蔽：悬浮卡片时右上角快捷屏蔽 -->
+                <button
+                  v-if="!isBlocked(member.userId)"
+                  class="quick-block"
+                  title="屏蔽 TA 的直播与回放"
+                  @click.stop="toggleBlock(member)"
+                >
+                  <el-icon :size="13">
+                    <Hide />
+                  </el-icon>
+                </button>
+
+                <!-- 已屏蔽：状态标记 + 悬浮解除按钮 -->
+                <template v-else>
+                  <span class="blocked-flag">
+                    <el-icon :size="12">
+                      <Hide />
+                    </el-icon>
+                    已屏蔽
+                  </span>
+                  <button class="unblock-btn" @click.stop="toggleBlock(member)">
+                    <el-icon :size="13">
+                      <View />
+                    </el-icon>
+                    解除屏蔽
+                  </button>
+                </template>
               </div>
             </div>
           </section>
@@ -234,7 +282,7 @@ async function syncMembers() {
       </el-scrollbar>
     </div>
 
-    <!-- 右下角浮动操作条：更新成员数据库 -->
+    <!-- 右上角浮动操作条：更新成员数据库 -->
     <FloatingDock>
       <span class="member-count">更新成员数据库</span>
       <el-button
@@ -244,7 +292,12 @@ async function syncMembers() {
     </FloatingDock>
 
     <!-- 成员详情抽屉 -->
-    <MemberDetailDrawer :member="selectedMember" @close="selectedMember = null" />
+    <MemberDetailDrawer
+      :member="selectedMember"
+      :blocked="selectedMember ? isBlocked(selectedMember.userId) : false"
+      @close="selectedMember = null"
+      @toggle-block="toggleBlock"
+    />
   </div>
 </template>
 
@@ -262,13 +315,8 @@ async function syncMembers() {
 }
 
 .members-container {
-  /* 顶部留出左上角浮动切换器的空间；底部给右下角浮动按钮留空间 */
-  padding: 72px 10px 88px;
-}
-
-.scrollbar-wrapper {
-  height: 100%;
-  overflow-x: hidden !important;
+  /* 顶部留出左上角浮动切换器的空间；底部给右上角浮动按钮留空间 */
+  padding: 72px 10px 120px;
 }
 
 .group-section {
@@ -280,22 +328,24 @@ async function syncMembers() {
   flex-direction: column;
   gap: 8px;
   align-items: center;
-  justify-content: center;
   margin: 14px 4px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 
-  /* 徽章保持原始宽高比，高度与文字对齐 */
+  /* 徽章保持原始宽高比 */
   .team-badge-img {
     flex: none;
     height: 144px;
     width: auto;
     object-fit: contain;
   }
+
+  /* 复用全局分区标题：撑满行宽以展示右侧渐隐细线 */
+  .section-title {
+    width: 100%;
+  }
 }
 
 .member-count {
+  margin-left: 6px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
   white-space: nowrap;
@@ -315,16 +365,16 @@ async function syncMembers() {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--el-bg-color);
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: var(--shadow-sm);
   transition:
     transform 0.2s ease-in-out,
     box-shadow 0.2s ease-in-out;
 
   &:hover {
     transform: translateY(-3px);
-    box-shadow: 0 10px 24px rgba(31, 35, 70, 0.12);
+    box-shadow: var(--shadow-md);
   }
 
   .avatar {
@@ -349,9 +399,6 @@ async function syncMembers() {
 
     p {
       margin: 0;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
     }
   }
 
@@ -361,16 +408,97 @@ async function syncMembers() {
     color: var(--el-text-color-primary);
   }
 
-  .team-badge {
+  /* 快捷屏蔽：悬浮卡片时右上角出现 */
+  .quick-block {
     position: absolute;
-    top: 4px;
-    left: 0px;
-    padding: 2px 2px;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    font-family: inherit;
+    color: var(--el-text-color-regular);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.9);
+    transition:
+      opacity 0.15s ease,
+      transform 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      color: var(--el-color-danger);
+      transform: scale(1.05);
+    }
+  }
+
+  &:hover .quick-block {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* 已屏蔽：头像去色弱化 */
+  &.is-blocked .avatar {
+    filter: grayscale(1);
+    opacity: 0.55;
+  }
+
+  .blocked-flag {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    padding: 2px 8px;
     border-radius: 999px;
     font-size: 11px;
-    line-height: 1.4;
+    line-height: 1.6;
     color: #fff;
-    opacity: 0.9;
+    background: var(--el-color-danger);
+    opacity: 0.92;
+  }
+
+  .unblock-btn {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(4px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease,
+      background 0.18s ease;
+
+    &:hover {
+      background: var(--el-color-danger);
+    }
+  }
+
+  &:hover .unblock-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
   }
 }
 

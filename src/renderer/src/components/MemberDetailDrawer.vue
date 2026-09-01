@@ -3,7 +3,7 @@
 </script>
 
 <script setup lang="ts">
-import { Film, Link, User } from '@element-plus/icons-vue'
+import { Film, Hide, Link, User, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import EventBus from '../assets/js/event-bus'
@@ -36,8 +36,8 @@ export interface MemberDetail {
   [key: string]: any
 }
 
-const props = defineProps<{ member: MemberDetail | null }>()
-const emit = defineEmits<{ close: [] }>()
+const props = defineProps<{ member: MemberDetail | null, blocked?: boolean }>()
+const emit = defineEmits<{ close: [], toggleBlock: [member: MemberDetail] }>()
 
 const router = useRouter()
 
@@ -121,24 +121,41 @@ function openReviews() {
           </template>
         </el-image>
         <div class="head">
-          <p class="name">
-            {{ member.realName }}
-          </p>
-          <p class="nick" :title="member.nickname">
+          <div class="name-row">
+            <p class="name ellipsis" :title="member.realName">
+              {{ member.realName }}
+            </p>
+            <div class="tags">
+              <el-tag v-if="blocked" type="danger" size="small" effect="light">
+                已屏蔽
+              </el-tag>
+              <el-tag :type="statusMeta.tag" size="small" effect="light">
+                {{ statusMeta.label }}
+              </el-tag>
+              <span
+                v-if="member.teamName"
+                class="team-badge"
+                :style="member.teamColor ? { '--tb-color': `#${member.teamColor}` } : undefined"
+              >
+                {{ member.teamName.replace('TEAM ', '') }}
+              </span>
+            </div>
+          </div>
+          <p class="nick ellipsis" :title="member.nickname">
             {{ member.nickname }}
           </p>
-          <div class="tags">
-            <span
-              v-if="member.teamName"
-              class="team-badge"
-              :style="{ backgroundColor: member.teamColor ? `#${member.teamColor}` : '#909399' }"
-            >
-              {{ member.teamName.replace('TEAM ', '') }}
-            </span>
-            <el-tag :type="statusMeta.tag" size="small" effect="light">
-              {{ statusMeta.label }}
-            </el-tag>
-          </div>
+          <a
+            v-if="member.wbUid"
+            class="weibo-link"
+            :href="`https://weibo.com/u/${member.wbUid}`"
+            target="_blank"
+            rel="noopener"
+          >
+            {{ member.wbName || member.wbUid }}
+            <el-icon class="link-icon">
+              <Link />
+            </el-icon>
+          </a>
         </div>
       </div>
 
@@ -146,7 +163,7 @@ function openReviews() {
       <div v-if="profileItems.length" class="profile-grid">
         <div v-for="item in profileItems" :key="item.label" class="cell">
           <span class="label">{{ item.label }}</span>
-          <span class="value" :title="item.value">{{ item.value }}</span>
+          <span class="value ellipsis" :title="item.value">{{ item.value }}</span>
         </div>
       </div>
 
@@ -166,24 +183,6 @@ function openReviews() {
         <p class="value">
           {{ member.hobbies }}
         </p>
-      </div>
-
-      <!-- 微博直达 -->
-      <div v-if="member.wbUid" class="block">
-        <p class="label">
-          微博
-        </p>
-        <a
-          class="weibo-link"
-          :href="`https://weibo.com/u/${member.wbUid}`"
-          target="_blank"
-          rel="noopener"
-        >
-          {{ member.wbName || member.wbUid }}
-          <el-icon class="link-icon">
-            <Link />
-          </el-icon>
-        </a>
       </div>
 
       <!-- 写真图集：点击放大预览 -->
@@ -212,10 +211,30 @@ function openReviews() {
         </div>
       </div>
 
-      <!-- 回放直达 -->
-      <el-button type="primary" class="review-btn" :icon="Film" @click="openReviews">
-        看 TA 的回放
-      </el-button>
+      <!-- 回放直达 + 屏蔽操作 -->
+      <div class="actions">
+        <el-button type="primary" class="review-btn" :icon="Film" @click="openReviews">
+          看 TA 的回放
+        </el-button>
+        <el-button
+          v-if="blocked"
+          class="block-btn"
+          :icon="View"
+          @click="emit('toggleBlock', member)"
+        >
+          解除屏蔽
+        </el-button>
+        <el-button
+          v-else
+          type="danger"
+          plain
+          class="block-btn"
+          :icon="Hide"
+          @click="emit('toggleBlock', member)"
+        >
+          屏蔽
+        </el-button>
+      </div>
     </div>
   </el-drawer>
 </template>
@@ -236,9 +255,9 @@ function openReviews() {
     flex: none;
     width: 120px;
     aspect-ratio: 3 / 4;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     overflow: hidden;
-    box-shadow: var(--el-box-shadow-light);
+    box-shadow: var(--shadow-sm);
   }
 
   .avatar-ph {
@@ -256,7 +275,15 @@ function openReviews() {
     padding-top: 6px;
   }
 
+  .name-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
   .name {
+    flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: 20px;
     font-weight: 700;
@@ -267,24 +294,31 @@ function openReviews() {
     margin: 4px 0 0;
     font-size: 13px;
     color: var(--el-text-color-secondary);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   .tags {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-top: 10px;
+    flex: none;
+  }
+}
+
+.weibo-link {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+
+  .link-icon {
+    font-size: 13px;
   }
 
-  .team-badge {
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #fff;
+  &:hover {
+    text-decoration: underline;
   }
 }
 
@@ -311,9 +345,6 @@ function openReviews() {
 
   .value {
     color: var(--el-text-color-primary);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 }
 
@@ -329,23 +360,6 @@ function openReviews() {
     font-size: 14px;
     line-height: 1.6;
     color: var(--el-text-color-primary);
-  }
-
-  .weibo-link {
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    font-size: 14px;
-    color: var(--el-color-primary);
-    text-decoration: none;
-
-    .link-icon {
-      font-size: 13px;
-    }
-
-    &:hover {
-      text-decoration: underline;
-    }
   }
 
   .photos {
@@ -364,7 +378,7 @@ function openReviews() {
 
   .photo {
     cursor: zoom-in;
-    box-shadow: var(--el-box-shadow-light);
+    box-shadow: var(--shadow-sm);
   }
 
   .photo-ph {
@@ -372,7 +386,16 @@ function openReviews() {
   }
 }
 
-.review-btn {
-  width: 100%;
+.actions {
+  display: flex;
+  gap: 10px;
+
+  .el-button {
+    margin-left: 0;
+  }
+
+  .review-btn {
+    flex: 1;
+  }
 }
 </style>

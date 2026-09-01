@@ -111,7 +111,7 @@ function resumeFollowing() {
           @click="emit('seek', item.seconds)"
         >
           <span class="barrage-time">{{ displayTime(item.time) }}</span>
-          <span class="barrage-username">{{ item.username }}：</span>
+          <span class="barrage-username ellipsis">{{ item.username }}：</span>
           <span class="barrage-content"><template
             v-for="(segment, segmentIndex) in segments(item.content)"
             :key="segmentIndex"
@@ -171,9 +171,6 @@ function resumeFollowing() {
   .barrage-username {
     flex-shrink: 0;
     max-width: 96px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: var(--el-color-primary);
   }
 

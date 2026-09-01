@@ -21,10 +21,11 @@ const MINI_SIZE = {
   review: { portrait: { w: 320, h: 540 }, landscape: { w: 640, h: 360 } },
 }
 const EXPAND_SIZE = {
-  live: { portrait: { w: 600, h: 820 }, landscape: { w: 1080, h: 720 } },
+  live: { portrait: { w: 540, h: 800 }, landscape: { w: 1080, h: 720 } },
   review: { portrait: { w: 1080, h: 720 }, landscape: { w: 1280, h: 800 } },
 }
 const PILL_SIZE = { w: 280, h: 40 }
+const TITLE_BAR_HEIGHT = 36
 
 // 视频是否为横屏（由子播放器上报，含旋转），默认竖屏
 const landscape = ref(false)
@@ -57,11 +58,11 @@ const size = computed(() => {
   return MINI_SIZE[kind.value][orientName.value]
 })
 
-// 初始位置：从右下角开始按创建序号级联错位，避免多窗完全重叠
+// 初始位置：从右上角开始按创建序号级联错位，避免多窗完全重叠
 const order = props.item.order
 const pos = ref({
   x: Math.max(12, window.innerWidth - MINI_SIZE[kind.value].portrait.w - 24 - (order % 6) * 36),
-  y: Math.max(72, 96 + (order % 6) * 36),
+  y: Math.max(TITLE_BAR_HEIGHT + 36, TITLE_BAR_HEIGHT + 60 + (order % 6) * 36),
 })
 
 const windowStyle = computed(() => ({
@@ -81,7 +82,7 @@ function clampX(x: number) {
 }
 
 function clampY(y: number) {
-  return Math.min(Math.max(0, y), Math.max(0, window.innerHeight - 40))
+  return Math.min(Math.max(TITLE_BAR_HEIGHT, y), Math.max(TITLE_BAR_HEIGHT, window.innerHeight - size.value.h))
 }
 
 // 子播放器上报视频宽高比后据此切换窗口横竖比例
@@ -128,8 +129,8 @@ function snapToEdge() {
     pos.value.x = 0
   else if (x + w > window.innerWidth - 16)
     pos.value.x = window.innerWidth - w
-  if (y < 24)
-    pos.value.y = 0
+  if (y < TITLE_BAR_HEIGHT + 24)
+    pos.value.y = TITLE_BAR_HEIGHT
 }
 
 // 窗口尺寸变化（如窗口缩放）时把迷你窗拉回可视区域
@@ -198,7 +199,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="fp-window"
+    class="fp-window frosted-surface frosted-surface--deep"
     :class="{ 'is-collapsed': collapsed }"
     :style="windowStyle"
   >
@@ -211,7 +212,7 @@ onUnmounted(() => {
         {{ kind === 'live' ? '直播' : '回放' }}
       </span>
       <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="fp-avatar">
-      <span class="fp-title" :title="barTitle">
+      <span class="fp-title ellipsis" :title="barTitle">
         {{ barTitle }}
       </span>
       <div class="fp-actions">
@@ -273,10 +274,7 @@ onUnmounted(() => {
   flex-direction: column;
   border-radius: 14px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--el-bg-color) 90%, transparent);
-  backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 45%, transparent);
-  box-shadow: 0 18px 48px -12px rgba(31, 35, 70, 0.42);
+  box-shadow: var(--shadow-lg);
   transition:
     width 0.2s ease,
     height 0.2s ease;
@@ -291,6 +289,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   cursor: move;
   user-select: none;
+  -webkit-app-region: no-drag;
   border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 35%, transparent);
 
   :deep(.el-button) {
@@ -328,9 +327,6 @@ onUnmounted(() => {
 .fp-title {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
   color: var(--el-text-color-primary);

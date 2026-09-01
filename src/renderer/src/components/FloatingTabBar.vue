@@ -47,7 +47,7 @@ function dblClick(tab: FloatingTabItem) {
 </script>
 
 <template>
-  <div class="float-tab-bar frosted-surface">
+  <div class="float-tab-bar frosted-surface no-scrollbar">
     <button
       v-for="tab in tabs"
       :key="tab.key"
@@ -68,20 +68,16 @@ function dblClick(tab: FloatingTabItem) {
 <style scoped lang="scss">
 .float-tab-bar {
   position: absolute;
-  top: 6px;
+  top: 12px;
+  left: 6px;
   z-index: 6;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 4px;
   border-radius: 999px;
   max-width: 75%;
   overflow: auto;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    height: 0;
-  }
 }
 
 .float-tab {
@@ -116,7 +112,7 @@ function dblClick(tab: FloatingTabItem) {
     color: #fff;
     font-weight: 600;
     /* 激活态背景由内联主题渐变提供，见 tabStyle */
-    box-shadow: 0 4px 12px -4px rgba(108, 92, 231, 0.5);
+    box-shadow: var(--shadow-glow);
   }
 }
 </style>

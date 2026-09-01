@@ -27,7 +27,7 @@ export interface UsePagedLiveListOptions<T> {
   /** 并行补全单个条目的展示信息（封面 / 成员 / 日期等）；在过滤屏蔽成员之后执行 */
   processItem?: (_item: T, _index: number) => Promise<void> | void
   /** 是否在每次翻页前拉取并过滤被屏蔽成员，默认 true */
-  filterHidden?: boolean
+  filterBlocked?: boolean
   /** 请求失败时是否标记为"没有更多"，从而停止触底重试；Lives 默认 false，Reviews 为 true */
   stopOnError?: boolean
 }
@@ -43,7 +43,7 @@ export interface UsePagedLiveListOptions<T> {
 export function usePagedLiveList<T extends PagedLive = PagedLive>({
   loadPage,
   processItem,
-  filterHidden = true,
+  filterBlocked = true,
   stopOnError = false,
 }: UsePagedLiveListOptions<T>) {
   const list = ref<T[]>([]) as Ref<T[]>
@@ -53,10 +53,10 @@ export function usePagedLiveList<T extends PagedLive = PagedLive>({
 
   const disabled = computed(() => loading.value || noMore.value)
 
-  const hiddenMemberIds = ref<number[]>([])
-  async function updateHiddenMemberIds() {
-    const hiddenMembers = await window.mainAPI.getHiddenMembers()
-    hiddenMemberIds.value = hiddenMembers.map((member: any) => member.userId)
+  const blockedMemberIds = ref<number[]>([])
+  async function updateBlockedMemberIds() {
+    const blockedMembers = await window.mainAPI.getBlockedMembers()
+    blockedMemberIds.value = blockedMembers.map(member => member.userId)
   }
 
   // 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
@@ -66,8 +66,8 @@ export function usePagedLiveList<T extends PagedLive = PagedLive>({
     const requestId = ++listRequestId
     loading.value = true
     try {
-      if (filterHidden) {
-        await updateHiddenMemberIds()
+      if (filterBlocked) {
+        await updateBlockedMemberIds()
         if (requestId !== listRequestId)
           return
       }
@@ -85,9 +85,9 @@ export function usePagedLiveList<T extends PagedLive = PagedLive>({
 
       // 先过滤被屏蔽成员，再并行补全展示信息，避免逐条串行 await 拖慢列表加载
       let visibleItems = content.liveList as T[]
-      if (filterHidden) {
+      if (filterBlocked) {
         visibleItems = (content.liveList as T[]).filter(
-          (item: any) => !hiddenMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
+          (item: any) => !blockedMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
         )
       }
       if (processItem)
@@ -131,8 +131,8 @@ export function usePagedLiveList<T extends PagedLive = PagedLive>({
     loading,
     noMore,
     disabled,
-    hiddenMemberIds,
-    updateHiddenMemberIds,
+    blockedMemberIds,
+    updateBlockedMemberIds,
     scrollbarRef,
     onInfiniteScroll,
     getList,

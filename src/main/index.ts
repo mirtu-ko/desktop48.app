@@ -6,6 +6,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BaseWindow, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, shell } from 'electron'
 
 import icon from '../../resources/icon.png?asset'
+import ApiUrls from '../renderer/src/assets/js/api-urls'
 import { Database } from './database'
 import { stopAllFfmpegTasks } from './ffmpeg-task'
 import { getLogPathForDisplay, log } from './logger'
@@ -32,8 +33,8 @@ log('[index.ts] Chromium 版本:', process.versions.chrome)
 
 // IPC 事件注册
 
-// 网络请求域名白名单
-const ALLOWED_HOSTS = ['pocketapi.48.cn', 'live.48.cn', 'source.48.cn', 'cdns.48.cn', 'api.snh48.com']
+// 网络请求域名白名单：自动从 ApiUrls 的 URL 常量中提取，动态媒体域名由下方后缀规则兜底
+const ALLOWED_HOSTS = ApiUrls.hosts
 
 function isAllowedHost(url: string): boolean {
   try {
@@ -123,12 +124,16 @@ ipcMain.handle('check-ffmpeg-binaries', async (_event: IpcMainInvokeEvent, dir: 
   return true
 })
 
+// 保持对主窗口的引用，供自定义标题栏窗口控制使用
+let mainWindow: BrowserWindow | null = null
+
 function createWindow(): void {
   // 创建浏览器窗口。
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     show: false,
+    frame: false, // 纯自定义标题栏：去掉系统边框与默认按钮
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -138,8 +143,9 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
   })
+  wireWindowEvents(mainWindow)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -155,6 +161,29 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// 监听窗口最大化 / 还原状态变化并通知渲染进程
+function wireWindowEvents(win: BrowserWindow): void {
+  const send = () => {
+    if (!win.isDestroyed())
+      win.webContents.send('window-maximized-changed', win.isMaximized())
+  }
+  win.on('maximize', send)
+  win.on('unmaximize', send)
+}
+
+// 自定义标题栏窗口控制
+ipcMain.handle('window-minimize', () => mainWindow?.minimize())
+ipcMain.handle('window-toggle-maximize', () => {
+  if (!mainWindow)
+    return
+  if (mainWindow.isMaximized())
+    mainWindow.unmaximize()
+  else
+    mainWindow.maximize()
+})
+ipcMain.handle('window-close', () => mainWindow?.close())
+ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 
 // 当 Electron 完成初始化时会调用此方法，
 // 并准备好创建浏览器窗口。

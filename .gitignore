@@ -10,3 +10,4 @@ build/icons
 .eslintcache
 *.log*
 .trae/rules/git-commit-message.md
+tsconfig.web.tsbuildinfo

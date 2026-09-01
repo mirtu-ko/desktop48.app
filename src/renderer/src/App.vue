@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import AppTitleBar from './components/AppTitleBar.vue'
 import Index from './components/Index.vue'
 import Initialize from './components/Initialize.vue'
 
@@ -13,7 +14,37 @@ function onInitialized() {
 
 <template>
   <div id="app">
-    <Initialize v-if="!isInitialized" @initialized="onInitialized" />
-    <Index v-else />
+    <AppTitleBar />
+    <div class="app-body">
+      <Initialize v-if="!isInitialized" @initialized="onInitialized" />
+      <Index v-else />
+    </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  /* 整窗唯一的画布背景：柔和渐变底 + 两角淡彩光晕。
+   * 侧边栏与内容区都透明地叠在这层之上，因此两者之间不存在色差 */
+  background:
+    radial-gradient(1100px 480px at 90% -8%, rgba(109, 90, 224, 0.07), transparent 60%),
+    radial-gradient(900px 420px at -8% 108%, rgba(255, 143, 184, 0.06), transparent 55%),
+    linear-gradient(180deg, #f3f3fb, var(--el-bg-color-page));
+
+  > * {
+    flex: 1;
+    min-height: 0;
+  }
+}
+</style>

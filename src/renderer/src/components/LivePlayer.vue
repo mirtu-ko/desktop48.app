@@ -813,7 +813,7 @@ onUnmounted(() => {
 
 /* 电台模式下封面轮播铺满窗口且较亮，加载时叠加深色蒙层保证动画可读 */
 .loading-container.loading-masked {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 /* 用封面图作加载背景，0.1 透明度淡显，不遮挡居中内容 */
@@ -851,7 +851,7 @@ onUnmounted(() => {
   inset: 0;
   border: 3px solid rgba(255, 255, 255, 0.14);
   border-top-color: var(--brand-primary);
-  box-shadow: 0 0 18px rgba(108, 92, 231, 0.35);
+  box-shadow: 0 0 18px rgba(109, 90, 224, 0.35);
   animation: spin 1.1s linear infinite;
 }
 

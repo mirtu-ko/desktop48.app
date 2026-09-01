@@ -53,15 +53,15 @@ const liveBadge = computed(() => {
     </div>
 
     <div class="card-body">
-      <p class="live-title" :title="item.title">
+      <p class="live-title ellipsis" :title="item.title">
         {{ item.title }}
       </p>
       <div class="member-info">
-        <span class="nickname">{{ item.userInfo.nickname }}</span>
+        <span class="nickname ellipsis">{{ item.userInfo.nickname }}</span>
         <span
           v-if="item.member && item.member.teamName"
           class="team-badge"
-          :style="{ backgroundColor: `#${item.member.teamColor}` }"
+          :style="item.member.teamColor ? { '--tb-color': `#${item.member.teamColor}` } : undefined"
         >
           {{ item.member.teamName.replace('TEAM ', '') }}
         </span>
@@ -79,7 +79,8 @@ const liveBadge = computed(() => {
   margin: 0;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   cursor: pointer;
   transition:
@@ -88,7 +89,7 @@ const liveBadge = computed(() => {
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
 
     .cover {
       transform: scale(1.05);
@@ -162,9 +163,6 @@ const liveBadge = computed(() => {
     font-weight: 500;
     line-height: 1.5;
     color: var(--el-text-color-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     transition: color 0.25s ease;
   }
 
@@ -179,13 +177,6 @@ const liveBadge = computed(() => {
       min-width: 0;
       font-size: 12px;
       color: var(--el-text-color-regular);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .team-badge {
-      flex-shrink: 0;
     }
   }
 

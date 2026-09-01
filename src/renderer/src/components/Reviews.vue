@@ -169,7 +169,7 @@ watch(selectedFilter, () => {
         </div>
       </el-scrollbar>
 
-      <!-- 右下角浮动筛选/刷新工具条：不占行，内容滚过时呈现磨砂玻璃 -->
+      <!-- 右上角浮动筛选/刷新工具条：不占行，内容滚过时呈现磨砂玻璃 -->
       <FloatingDock>
         <el-cascader
           v-model="selectedFilter"
@@ -234,14 +234,9 @@ watch(selectedFilter, () => {
   }
 }
 
-.scrollbar-wrapper {
-  height: 100%;
-  overflow-x: hidden !important;
-}
-
 /* 给列表底部留出浮动工具条的空间 */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 88px;
+  padding-bottom: 120px;
 }
 
 .review-list {
