@@ -10,9 +10,12 @@ import useTasks from '../composables/use-tasks'
 import { useVideoRotation } from '../composables/use-video-rotation'
 import Apis from '../services/apis'
 import EventBus from '../services/event-bus'
+import { formatMediaTime } from '../utils/time-format'
 import Tools from '../utils/tools'
 
 import MiniControls from './MiniControls.vue'
+import PlayerLoading from './PlayerLoading.vue'
+import RadioStage from './RadioStage.vue'
 import RotationControls from './RotationControls.vue'
 
 interface LiveDetail {
@@ -45,16 +48,17 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close', 'avatar', 'orientation'])
+const emit = defineEmits(['close', 'avatar', 'aspect'])
 
 const realName = ref('')
 const userAvatar = ref('')
 const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
+// 电台模式的 audio 元素由 RadioStage 挂载/卸载时经 @audio 事件回传
 const nativeAudio = ref<HTMLAudioElement | null>(null)
 const streamId = ref('')
 const videoBoxRef = ref<HTMLElement | null>(null)
-const loading = ref(true)
+const mediaLoading = ref(true)
 const retryCount = ref(0)
 const maxRetries = 3
 const isManuallyUnmounted = ref(false)
@@ -83,6 +87,8 @@ const {
   onBoxDblClick,
   isFullscreen,
   toggleFullscreen,
+  isPip,
+  togglePip,
   playing,
   muted,
   togglePlay,
@@ -94,7 +100,7 @@ const {
   getMedia: () => (isRadio.value ? nativeAudio.value : nativeVideo.value),
   getVideo: () => nativeVideo.value,
   isRadio,
-  onOrientation: landscape => emit('orientation', landscape),
+  onAspect: aspect => emit('aspect', aspect),
 })
 
 const router = useRouter()
@@ -147,7 +153,7 @@ async function fetchLiveDetail(): Promise<LiveDetail> {
 
 // 首次进入直播页时，先拿最新直播地址，再创建本地 HTTP-FLV 播放入口。
 async function getOne() {
-  loading.value = true
+  mediaLoading.value = true
   retryCount.value = 0
   isRecoveringStream.value = false
   try {
@@ -161,7 +167,7 @@ async function getOne() {
   catch (error: any) {
     console.error('getOne()', error)
     ElMessage.error('获取直播信息失败')
-    loading.value = false
+    mediaLoading.value = false
     // 详情都取不到通常意味着直播已下架，广播通知列表页刷新
     EventBus.emit('live-unavailable', props.liveId)
     emit('close')
@@ -197,11 +203,7 @@ function stopElapsedTimer() {
 
 const liveElapsedText = computed(() => {
   const totalSeconds = Math.max(0, Math.floor(elapsedTime.value / 1000))
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  return formatMediaTime(totalSeconds)
 })
 
 function updateOnlineNum() {
@@ -216,7 +218,8 @@ function updateOnlineNum() {
   })
 }
 
-// 鼠标悬浮才响应快捷键：同屏可能有多个浮窗播放器，否则一次按键会把它们全部转一遍
+// 鼠标悬浮才响应快捷键：同屏可能有多个浮窗播放器，否则一次按键会把它们全部转一遍。
+// 注：ReviewPlayer 走的是另一套「根节点焦点 keydown」策略，两边改动请互相参照。
 const hovered = ref(false)
 
 function onKeyDown(event: KeyboardEvent) {
@@ -332,7 +335,7 @@ function scheduleStreamRetry() {
   if (retryCount.value < maxRetries) {
     retryCount.value++
     isRecoveringStream.value = true
-    loading.value = true
+    mediaLoading.value = true
     clearStreamRetryTimer()
     streamRetryTimer = setTimeout(async () => {
       try {
@@ -349,13 +352,13 @@ function scheduleStreamRetry() {
         return
       }
       finally {
-        if (loading.value)
+        if (mediaLoading.value)
           isRecoveringStream.value = false
       }
     }, 2000)
   }
   else {
-    loading.value = false
+    mediaLoading.value = false
     isRecoveringStream.value = false
     ElMessage.warning('直播已结束')
     if (streamId.value) {
@@ -372,7 +375,7 @@ function scheduleStreamRetry() {
 function handleStreamError(reason: string) {
   console.error('[LivePlayer.vue] 直播播放异常:', reason)
   destroyLivePlayer()
-  loading.value = false
+  mediaLoading.value = false
   scheduleStreamRetry()
 }
 
@@ -428,7 +431,7 @@ function setupPlayer(path: string) {
   destroyLivePlayer()
 
   if (!mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
-    loading.value = false
+    mediaLoading.value = false
     ElMessage.error('当前环境不支持 HTTP-FLV 直播播放')
     return
   }
@@ -461,7 +464,7 @@ function setupPlayer(path: string) {
   })
 
   mediaElement.oncanplay = () => {
-    loading.value = false
+    mediaLoading.value = false
     isRecoveringStream.value = false
     if (!isRadio.value) {
       updateVideoDimensions()
@@ -485,7 +488,7 @@ function setupPlayer(path: string) {
 
     console.error('[LivePlayer.vue] HTTP-FLV 错误:', errorType, errorDetail, errorInfo)
     if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
-      loading.value = true
+      mediaLoading.value = true
       scheduleStreamRetry()
       return
     }
@@ -567,36 +570,22 @@ onUnmounted(() => {
       @mouseenter="hovered = true"
       @mouseleave="hovered = false"
     >
-      <div v-if="isRadio" class="radio-box">
-        <div class="radio-carousel">
-          <el-carousel
-            v-if="carousels.length > 0"
-            :interval="carouselTime"
-            indicator-position="none"
-            arrow="never"
-            height="100%"
-          >
-            <el-carousel-item v-for="carousel in carousels" :key="carousel">
-              <img :src="carousel" class="radio-cover" alt="cover">
-            </el-carousel-item>
-          </el-carousel>
-        </div>
-        <!-- 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） -->
-        <audio
-          ref="nativeAudio"
-          autoplay
-          class="audio-player"
-          @play="playing = true"
-          @pause="playing = false"
-          @volumechange="onVolumeChange"
-        />
-      </div>
+      <RadioStage
+        v-if="isRadio"
+        :carousels="carousels"
+        :interval="carouselTime"
+        autoplay
+        @audio="nativeAudio = $event"
+        @play="playing = true"
+        @pause="playing = false"
+        @volumechange="onVolumeChange"
+      />
       <div v-else class="video-wrapper" :style="videoWrapperStyle">
         <video
           ref="nativeVideo"
           autoplay
           class="video-player"
-          :class="{ 'media-hidden': loading }"
+          :class="{ 'media-hidden': mediaLoading }"
           :style="videoStyle"
           :poster="coverImage"
           @play="playing = true"
@@ -604,29 +593,16 @@ onUnmounted(() => {
           @volumechange="onVolumeChange"
         />
       </div>
-      <div v-if="loading" class="loading-container" :class="{ 'loading-masked': isRadio }">
-        <div v-if="coverImage" class="loading-bg" :style="{ backgroundImage: `url(${coverImage})` }" />
-        <div class="loading-spinner" aria-hidden="true">
-          <div class="ring ring--outer" />
-          <div class="ring ring--inner" />
-        </div>
-        <div class="loading-text">
-          <span class="loading-text__label">正在加载直播</span>
-          <span class="loading-text__dots"><span>.</span><span>.</span><span>.</span></span>
-        </div>
-        <div class="loading-hint">
-          连接直播源中，请稍候
-        </div>
-      </div>
-      <div class="live-status">
-        <span class="live-dot" />
-        <span class="live-label">LIVE</span>
-        <span class="live-elapsed">{{ liveElapsedText }}</span>
-        <span v-if="!compact && onlineNum > 0" class="live-online">在线 {{ onlineNum }}</span>
-      </div>
+      <PlayerLoading
+        v-if="mediaLoading"
+        :masked="isRadio"
+        :background="coverImage"
+        label="正在加载直播"
+        hint="连接直播源中，请稍候"
+      />
       <div class="player-actions">
         <RotationControls
-          v-if="liveType === 1"
+          v-if="liveType === 1 && !mediaLoading"
           :angle="rotationAngle"
           @rotate-left="rotateLeft"
           @rotate-right="rotateRight"
@@ -634,8 +610,8 @@ onUnmounted(() => {
         />
         <el-tooltip :content="recording ? '录制中，点击结束' : '录制'" placement="bottom" :show-after="400">
           <button
-            class="action-btn action-record"
-            :class="{ 'is-recording': recording }"
+            class="action-btn action-btn--record"
+            :class="{ 'is-active': recording }"
             :aria-label="recording ? '结束录制' : '录制'"
             @click="onRecordClick"
           >
@@ -646,16 +622,29 @@ onUnmounted(() => {
         </el-tooltip>
       </div>
 
-      <!-- 全自绘控制条：直播无需进度条，电台/视频、旋转与否共用同一套交互 -->
+      <!-- 全自绘控制条：与录播同一条胶囊，LIVE 状态段走 #leading 插槽；
+           加载期间整条隐藏（连接中不显示 LIVE 状态），电台/视频、旋转与否共用同一套交互 -->
       <MiniControls
-        v-if="!loading"
+        v-if="!mediaLoading"
         :playing="playing"
         :muted="muted"
         :is-fullscreen="isFullscreen"
+        :show-pip="!isRadio"
+        :is-pip="isPip"
         @toggle-play="togglePlay"
         @toggle-mute="toggleMute"
         @toggle-fullscreen="toggleFullscreen"
-      />
+        @toggle-pip="togglePip"
+      >
+        <template #leading>
+          <span class="live-status">
+            <span class="live-dot" />
+            <span class="live-label">LIVE</span>
+            <span class="live-elapsed">{{ liveElapsedText }}</span>
+            <span v-if="!compact && onlineNum > 0" class="live-online">在线 {{ onlineNum }}</span>
+          </span>
+        </template>
+      </MiniControls>
 
       <div v-if="rotateHint" class="rotate-hint">
         {{ rotateHint }}
@@ -695,224 +684,33 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.radio-box {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-/* 轮播铺满整个窗口 */
-.radio-carousel {
-  position: absolute;
-  inset: 0;
-  display: flex;
-}
-
-:deep(.el-carousel) {
-  width: 100%;
-  height: 100%;
-}
-
-:deep(.el-carousel__container) {
-  height: 100%;
-}
-
-/* 电台封面铺满整个窗口：object-fit: cover 裁边填充 */
-.radio-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） */
-.audio-player {
-  display: none;
-}
-
-.loading-container {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  z-index: 10;
-  color: #fff;
-  text-align: center;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-/* 电台模式下封面轮播铺满窗口且较亮，加载时叠加深色蒙层保证动画可读 */
-.loading-container.loading-masked {
-  background: rgba(0, 0, 0, 0.9);
-}
-
-/* 用封面图作加载背景，0.1 透明度淡显，不遮挡居中内容 */
-.loading-bg {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.1;
-  z-index: 0;
-}
-
-.loading-spinner,
-.loading-text,
-.loading-hint {
-  position: relative;
-  z-index: 1;
-}
-
-.loading-spinner {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.loading-spinner .ring {
-  position: absolute;
-  border-radius: 50%;
-}
-
-.ring--outer {
-  inset: 0;
-  border: 3px solid rgba(255, 255, 255, 0.14);
-  border-top-color: var(--brand-primary);
-  box-shadow: 0 0 18px rgba(109, 90, 224, 0.35);
-  animation: spin 1.1s linear infinite;
-}
-
-.ring--inner {
-  inset: 11px;
-  border: 3px solid rgba(255, 255, 255, 0.12);
-  border-bottom-color: var(--brand-primary-light);
-  animation: spin 0.8s linear infinite reverse;
-}
-
-.loading-text {
-  display: flex;
-  align-items: baseline;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.94);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
-}
-
-.loading-text__dots {
-  display: inline-flex;
-  margin-left: 2px;
-  overflow: hidden;
-}
-
-.loading-text__dots span {
-  animation: dot-bounce 1.2s ease-in-out infinite;
-  color: var(--brand-primary-light);
-  font-weight: 700;
-}
-
-.loading-text__dots span:nth-child(2) {
-  animation-delay: 0.18s;
-}
-
-.loading-text__dots span:nth-child(3) {
-  animation-delay: 0.36s;
-}
-
-.loading-hint {
-  font-size: 12px;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
+/* LIVE 状态段：内嵌在 MiniControls 胶囊最左段的芯片（样式作用于插槽内容）。
+   可收缩：空间不足时从右往左裁掉在线人数/时长尾巴，保住圆点与 LIVE 标识，
+   绝不把右侧按钮挤出胶囊条 */
 .live-status {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 5px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
-  z-index: 10;
+  white-space: nowrap;
+  overflow: hidden;
   user-select: none;
 }
 
 .live-online {
-  margin-left: 2px;
-  font-size: 12px;
+  margin-left: 1px;
+  font-size: 11px;
   opacity: 0.85;
 }
 
-/* 悬浮功能按钮：横排置于右上角（原标签位置），避开左下 LIVE 徽标与底部原生控件 */
-.player-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  z-index: 30;
-}
-
-/* 悬浮操作按钮（录制 / 全屏）；旋转胶囊样式见 RotationControls.vue */
-.action-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  font-size: 12px;
-  font-family: inherit;
-  font-variant-numeric: tabular-nums;
-  color: #fff;
-  background: rgba(15, 17, 26, 0.55);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    transform 0.1s ease;
-
-  &:hover {
-    background: rgba(30, 33, 50, 0.85);
-  }
-
-  &:active {
-    transform: scale(0.92);
-  }
-}
-
-.action-record {
-  color: #ff8fa3;
-
-  &:hover {
-    color: #ff5c7a;
-  }
-
-  /* 录制中：常亮玫红底 + 呼吸光圈，切回播放器也能一眼看出在录 */
-  &.is-recording {
-    color: #fff;
-    background: #ff5c7a;
-    animation: record-pulse 1.4s ease-in-out infinite;
-  }
-}
+/* 悬浮按钮（录制）与右上角容器样式为全局 .player-actions / .action-btn，见 app.scss */
 
 .live-dot {
   width: 8px;
@@ -941,34 +739,6 @@ onUnmounted(() => {
   50% {
     opacity: 0.6;
     box-shadow: 0 0 0 4px rgba(245, 108, 108, 0);
-  }
-}
-
-@keyframes record-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 92, 122, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 7px rgba(255, 92, 122, 0);
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes dot-bounce {
-  0%,
-  100% {
-    opacity: 0.2;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-3px);
   }
 }
 </style>

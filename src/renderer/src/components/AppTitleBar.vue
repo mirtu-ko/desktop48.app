@@ -78,6 +78,8 @@ function close() {
 </template>
 
 <style scoped lang="scss">
+/* 高度与 utils/float-player-layout.ts 的 FP_BAR_HEIGHT 保持一致：
+   浮窗以 36px 为拖拽带上沿做 y 钳制 / 吸顶，改动需同步 */
 .app-title-bar {
   height: 36px;
   flex-shrink: 0;

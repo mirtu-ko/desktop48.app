@@ -2,7 +2,7 @@
 import { useFloatPlayers } from '../composables/use-float-players'
 import FloatPlayer from './FloatPlayer.vue'
 
-const { players, closePlayer } = useFloatPlayers()
+const { players, focusPlayer, closePlayer } = useFloatPlayers()
 </script>
 
 <template>
@@ -12,6 +12,7 @@ const { players, closePlayer } = useFloatPlayers()
     :key="item.id"
     :item="item"
     :index="index"
+    @focus="focusPlayer(item.id)"
     @close="closePlayer(item.id)"
   />
 </template>

@@ -8,10 +8,10 @@ interface UseVideoRotationOptions {
   getMedia: () => HTMLMediaElement | null
   /** 当前媒体 video 元素（仅监听其尺寸变化） */
   getVideo: () => HTMLVideoElement | null
-  /** 电台模式：旋转/缩放/orientation 上报均跳过 */
+  /** 电台模式：旋转/缩放/aspect 上报均跳过 */
   isRadio: Ref<boolean> | ComputedRef<boolean>
-  /** 旋转后画面横竖比变化时上报（浮窗据此调整窗口比例） */
-  onOrientation: (_landscape: boolean) => void
+  /** 画面实际显示宽高比变化时上报（含旋转后的宽高交换），浮窗据此自动定形 */
+  onAspect: (_aspect: number) => void
 }
 
 /**
@@ -19,7 +19,7 @@ interface UseVideoRotationOptions {
  * 旋转作用于 video wrapper，不参与旋转的浮层（弹幕等）由组件自己保证同级不旋转。
  */
 export function useVideoRotation(options: UseVideoRotationOptions) {
-  const { videoBoxRef, getMedia, getVideo, isRadio, onOrientation } = options
+  const { videoBoxRef, getMedia, getVideo, isRadio, onAspect } = options
 
   const rotationAngle = ref(0)
   // 渲染角度：与 rotationAngle 语义一致（0° = 原方向），但允许跨 0° 连续累加，
@@ -168,6 +168,45 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
     isFullscreen.value = document.fullscreenElement === videoBoxRef.value
   }
 
+  // 系统画中画（原生 PiP）：仅视频适用，电台下宿主隐藏按钮。
+  // 各版本 TS 的 DOM 库对 PiP 覆盖不一（有的已含 exitPictureInPicture），
+  // 用交叉类型统一补面型，避免与 lib 声明冲突
+  interface PipApi {
+    pictureInPictureElement?: Element | null
+    exitPictureInPicture?: () => Promise<unknown>
+    requestPictureInPicture?: () => Promise<unknown>
+  }
+
+  const isPip = ref(false)
+
+  async function togglePip() {
+    const video = getVideo() as (HTMLVideoElement & PipApi) | null
+    const doc = document as Document & PipApi
+    // 已在画中画的正是本播放器 → 退出；其他浮窗占用时直接请求，Chromium 会接管切换
+    if (doc.pictureInPictureElement && doc.pictureInPictureElement === video) {
+      void doc.exitPictureInPicture?.().catch((error: any) => {
+        console.error('[useVideoRotation] 退出画中画失败:', error)
+      })
+      return
+    }
+    if (!video?.requestPictureInPicture)
+      return
+    try {
+      // 容器全屏下把 video 摘进 PiP 会只剩黑底空容器：先退全屏再进
+      if (document.fullscreenElement)
+        await document.exitFullscreen().catch(() => undefined)
+      await video.requestPictureInPicture()
+    }
+    catch (error: any) {
+      console.error('[useVideoRotation] 切换画中画失败:', error)
+    }
+  }
+
+  function onPipStateChange() {
+    const doc = document as Document & PipApi
+    isPip.value = !!doc.pictureInPictureElement && doc.pictureInPictureElement === getVideo()
+  }
+
   // 旋转 90/270 时原生控制条会跟着画面侧躺，改用自绘迷你条（见 MiniControls）
   const playing = ref(false)
   const muted = ref(false)
@@ -193,15 +232,15 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
     muted.value = (event.target as HTMLMediaElement).muted
   }
 
-  // 计算旋转后画面实际呈现是否为横屏（90/270° 旋转会让源宽高交换），上报给浮窗决定窗口横竖比例
-  function reportOrientation() {
+  // 计算画面实际显示宽高比（90/270° 旋转会交换源宽高），上报给浮窗自动定形
+  function reportAspect() {
     if (isRadio.value)
       return
     const w = videoWidth.value
     const h = videoHeight.value
     if (!w || !h)
       return
-    onOrientation(isVerticalRotation.value ? h > w : w > h)
+    onAspect(isVerticalRotation.value ? h / w : w / h)
   }
 
   function updateVideoDimensions() {
@@ -210,15 +249,15 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
       videoWidth.value = video.videoWidth || 0
       videoHeight.value = video.videoHeight || 0
     }
-    reportOrientation()
+    reportAspect()
   }
 
   function handleNativeVideoResize() {
     updateVideoDimensions()
   }
 
-  // 旋转后画面横竖比例随之交换，重新上报给浮窗调整窗口比例
-  watch(rotationAngle, () => reportOrientation())
+  // 旋转后画面宽高比随之交换，重新上报给浮窗调整窗口形状
+  watch(rotationAngle, () => reportAspect())
 
   let resizeObserver: ResizeObserver | null = null
 
@@ -246,6 +285,9 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
       video.addEventListener('resize', handleNativeVideoResize)
 
     document.addEventListener('fullscreenchange', onFullscreenChange)
+    // PiP 事件会从媒体元素冒泡到 document，多浮窗共用同一组监听、各自比对元素
+    document.addEventListener('enterpictureinpicture', onPipStateChange)
+    document.addEventListener('leavepictureinpicture', onPipStateChange)
   })
 
   onUnmounted(() => {
@@ -257,6 +299,8 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
       resizeObserver = null
     }
     document.removeEventListener('fullscreenchange', onFullscreenChange)
+    document.removeEventListener('enterpictureinpicture', onPipStateChange)
+    document.removeEventListener('leavepictureinpicture', onPipStateChange)
     if (rotateHintTimer) {
       clearTimeout(rotateHintTimer)
       rotateHintTimer = null
@@ -275,6 +319,8 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
     onBoxDblClick,
     isFullscreen,
     toggleFullscreen,
+    isPip,
+    togglePip,
     playing,
     muted,
     togglePlay,

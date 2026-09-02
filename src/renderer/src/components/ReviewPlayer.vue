@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../services/task-payload'
 import type { BarrageListItem } from './Barrage.vue'
-import { ChatDotRound, Download, Loading, Setting } from '@element-plus/icons-vue'
+import { ChatDotRound, Download, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BarrageBox from '../components/BarrageBox.vue'
+import { findBarrageIndex, useDanmakuOverlay } from '../composables/use-danmaku-overlay'
 import useTasks from '../composables/use-tasks'
 import { useVideoRotation } from '../composables/use-video-rotation'
 
 import Apis from '../services/apis'
 import Tools from '../utils/tools'
 import MiniControls from './MiniControls.vue'
+import PlayerLoading from './PlayerLoading.vue'
+import RadioStage from './RadioStage.vue'
 import RotationControls from './RotationControls.vue'
 
 const props = defineProps({
@@ -27,12 +30,13 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['avatar', 'orientation'])
+const emit = defineEmits(['avatar', 'aspect', 'sidebar'])
 
 const playStreamPath = ref('')
 const isRadio = ref(false)
 const number = ref(0)
 const nativeVideo = ref<HTMLVideoElement | null>(null)
+// 电台模式的 audio 元素由 RadioStage 挂载/卸载时经 @audio 事件回传
 const nativeAudio = ref<HTMLAudioElement | null>(null)
 const currentTime = ref(0)
 const carousels = ref<string[]>([])
@@ -50,45 +54,25 @@ const mediaLoading = ref(true)
 const mediaBuffering = ref(false)
 const sidebarVisible = ref(true)
 
+// 侧栏实际占位（有弹幕数据且未收起）上报给浮窗：
+// 无弹幕或收起弹幕列表时，放大窗不预留侧栏宽，画面不留空白
+watch(
+  [hasBarrage, sidebarVisible],
+  ([has, visible]) => emit('sidebar', has && visible),
+  { immediate: true },
+)
+
 // 弹幕唯一数据源：解析时就把 [hh:mm:ss] 转成秒并排序，
 // 之后所有消费方（右侧列表 / 视频叠加层）都只持有指向它的游标，不再复制数组。
 interface BarrageEntry extends BarrageListItem {}
 const barrageEntries = shallowRef<BarrageEntry[]>([])
-// 右侧列表与叠加层的进度基准不同（列表滞后 1s），因此各自维护一个游标
+// 右侧列表与叠加层的进度基准不同（列表滞后 1s），各自维护一个游标；
+// 叠加层游标在 use-danmaku-overlay 内部，这里只留列表游标
 let listCursor = 0
-let overlayCursor = 0
 // 右侧列表当前展示的弹幕：从头累积到当前进度，超出上限时丢弃最早的
 const barrageListItems = shallowRef<BarrageListItem[]>([])
 const MAX_LIST_ITEMS = 500
 const LIST_DELAY_SECONDS = 1
-
-// 视频弹幕叠加层状态
-interface DanmakuOverlayItem {
-  id: number
-  content: string
-  track: number
-  // 该弹幕左边缘与容器右边缘重合的播放时刻，位置由 currentTime 反推
-  bornAt: number
-  width: number
-  // 本条弹幕完全离开屏幕的播放时刻，用于回收与轨道复用判定
-  leaveAt: number
-  // 出生时的容器宽度，即左边缘起点
-  startX: number
-  // 逐条记录速度，改设置时已在飞的弹幕仍按原速走完，不会突然错位
-  speed: number
-  trackHeight: number
-}
-const danmakuOverlayItems = shallowRef<DanmakuOverlayItem[]>([])
-let nextDanmakuId = 0
-let danmakuAnimFrameId: number | null = null
-// id -> DOM 节点，渲染循环直接改 transform，绕过响应式
-const danmakuNodes = new Map<number, HTMLElement>()
-// 每条轨道上最后一条弹幕，用于追尾判定
-const trackTails: (DanmakuOverlayItem | null)[] = []
-const DANMAKU_FONT_FAMILY = '"Microsoft YaHei", "PingFang SC", sans-serif'
-// 原生 controls 高度，轨道区域需要避开，否则底部弹幕会被控件遮挡
-const CONTROLS_RESERVED_HEIGHT = 60
-let textMeasureCtx: CanvasRenderingContext2D | null = null
 
 // 弹幕显示设置，持久化在 localStorage（主进程 config 只接受固定几个 key）
 const DANMAKU_SETTINGS_KEY = 'review-danmaku-settings'
@@ -127,8 +111,6 @@ function saveDanmakuSettings() {
 const router = useRouter()
 
 let hlsInstance: Hls | null = null
-
-const trackHeight = computed(() => Math.round(settings.fontSize * 1.6))
 
 // 录播页只做两类事情：
 // 1. 按播放地址选择 HLS 或原生 MP4 播放
@@ -184,6 +166,8 @@ const {
   onBoxDblClick,
   isFullscreen,
   toggleFullscreen,
+  isPip,
+  togglePip,
   playing,
   muted,
   togglePlay,
@@ -195,7 +179,7 @@ const {
   getMedia: () => (isRadio.value ? nativeAudio.value : nativeVideo.value),
   getVideo: () => nativeVideo.value,
   isRadio,
-  onOrientation: landscape => emit('orientation', landscape),
+  onAspect: aspect => emit('aspect', aspect),
 })
 
 // 迷你条拖进度：录播必须可 seek，弹幕游标由 onseeking 统一同步
@@ -208,138 +192,31 @@ function onMiniSeek(value: number) {
 }
 // =========== 画面旋转结束 ===========
 
-// =========== 视频弹幕叠加层 ===========
-// 位置不再逐帧累加，而是由播放进度反推：x = 容器宽度 - (currentTime - bornAt) * speed。
-// 这样暂停、缓冲、倍速、seek 都会自动同步，无需额外处理。
-function measureTextWidth(text: string): number {
-  if (!textMeasureCtx) {
-    const canvas = document.createElement('canvas')
-    textMeasureCtx = canvas.getContext('2d')
-  }
-  if (!textMeasureCtx)
-    return text.length * settings.fontSize
-
-  // 每次测量都同步字体，字号设置变化后宽度才准
-  textMeasureCtx.font = `${settings.fontSize}px ${DANMAKU_FONT_FAMILY}`
-  return textMeasureCtx.measureText(text).width
-}
-
-function getMaxTracks(): number {
-  const height = (videoBoxRef.value?.clientHeight || 0) - CONTROLS_RESERVED_HEIGHT
-  if (height <= 0)
-    return 0
-  return Math.max(0, Math.floor((height * settings.area - 10) / trackHeight.value))
-}
-
-// 给定播放时刻下弹幕左边缘的坐标
-function danmakuLeft(item: DanmakuOverlayItem, time: number): number {
-  return item.startX - (time - item.bornAt) * item.speed
-}
-
-// 轨道可复用的条件：尾部弹幕的右边缘已经越过新弹幕的左边缘，否则两者会重叠
-function findAvailableTrack(now: number, newLeft: number): number {
-  const maxTracks = getMaxTracks()
-  for (let i = 0; i < maxTracks; i++) {
-    const tail = trackTails[i]
-    if (!tail || tail.leaveAt <= now)
-      return i
-
-    if (danmakuLeft(tail, now) + tail.width <= newLeft)
-      return i
-  }
-  return -1
-}
-
-function addDanmakuToOverlay(entry: BarrageEntry, now: number) {
-  const containerWidth = videoBoxRef.value?.clientWidth || 0
-  if (containerWidth <= 0)
-    return
-
-  const text = entry.content || ''
-  if (!text)
-    return
-
-  const textWidth = measureTextWidth(text) + 20
-  const speed = settings.speed
-  // 以弹幕自身时间戳为起点，而非 timeupdate 的回调时刻，
-  // 这样同一个 250ms 回调窗口内的弹幕会按真实时间自然错开而不是挤在一起。
-  const bornAt = entry.seconds
-  const newLeft = containerWidth - (now - bornAt) * speed
-  const track = findAvailableTrack(now, newLeft)
-  if (track < 0)
-    return
-
-  const item: DanmakuOverlayItem = {
-    id: nextDanmakuId++,
-    content: text,
-    track,
-    bornAt,
-    width: textWidth,
-    leaveAt: bornAt + (containerWidth + textWidth) / speed,
-    startX: containerWidth,
-    speed,
-    trackHeight: trackHeight.value,
-  }
-  trackTails[track] = item
-  danmakuOverlayItems.value = [...danmakuOverlayItems.value, item]
-}
-
-// 二分查找第一条时间 >= target 的弹幕下标，seek 时用它重置游标
-function findFirstIndexAtOrAfter(target: number): number {
-  const list = barrageEntries.value
-  let low = 0
-  let high = list.length
-  while (low < high) {
-    const mid = (low + high) >> 1
-    if (list[mid].seconds < target) {
-      low = mid + 1
-    }
-    else {
-      high = mid
-    }
-  }
-  return low
-}
-
-function clearOverlay() {
-  danmakuOverlayItems.value = []
-  trackTails.length = 0
-  danmakuNodes.clear()
-}
-
-function setDanmakuNode(item: DanmakuOverlayItem, el: HTMLElement | null) {
-  if (!el) {
-    danmakuNodes.delete(item.id)
-    return
-  }
-  danmakuNodes.set(item.id, el)
-  // 挂载当帧先摆到正确位置，避免在左上角闪一下
-  el.style.transform = `translate(${danmakuLeft(item, currentTime.value)}px, ${item.track * item.trackHeight + 4}px)`
-}
+// =========== 视频弹幕叠加层（引擎已抽离至 composables/use-danmaku-overlay.ts） ===========
+const {
+  items: danmakuOverlayItems,
+  setNode: setDanmakuNode,
+  spawnUpTo: processOverlayDanmaku,
+  seekTo: seekOverlayTo,
+  clear: clearOverlay,
+  start: startDanmakuAnimation,
+  stop: stopDanmakuAnimation,
+} = useDanmakuOverlay({
+  videoBoxRef,
+  getMedia: getActiveMediaElement,
+  getEntries: () => barrageEntries.value,
+  settings,
+})
 
 // seek / 重播统一入口：叠加层游标二分定位，列表按“从头到当前”重建
 function seekBarragesTo(time: number) {
-  clearOverlay()
-  overlayCursor = findFirstIndexAtOrAfter(time)
-  listCursor = findFirstIndexAtOrAfter(time - LIST_DELAY_SECONDS)
+  seekOverlayTo(time)
+  listCursor = findBarrageIndex(barrageEntries.value, time - LIST_DELAY_SECONDS)
   // 保持原有体验：拖动进度后列表展示视频开始到当前时刻的全部弹幕
   barrageListItems.value = listCursor > MAX_LIST_ITEMS
     ? barrageEntries.value.slice(listCursor - MAX_LIST_ITEMS, listCursor)
     : barrageEntries.value.slice(0, listCursor)
   currentTime.value = time
-}
-
-function processOverlayDanmaku(time: number) {
-  const list = barrageEntries.value
-  if (!settings.enabled) {
-    // 关闭期间只推进游标，重新打开时不会一次性倒灌历史弹幕
-    overlayCursor = findFirstIndexAtOrAfter(time)
-    return
-  }
-  while (overlayCursor < list.length && list[overlayCursor].seconds <= time) {
-    addDanmakuToOverlay(list[overlayCursor], time)
-    overlayCursor++
-  }
 }
 
 function processListDanmaku(time: number) {
@@ -356,44 +233,6 @@ function processListDanmaku(time: number) {
   barrageListItems.value = merged.length > MAX_LIST_ITEMS
     ? merged.slice(merged.length - MAX_LIST_ITEMS)
     : merged
-}
-
-// 渲染循环只做两件事：按播放进度回收离屏弹幕、把位置写进 DOM。
-// 直接写 style 避免每帧触发全量响应式 patch。
-function startDanmakuAnimation() {
-  const loop = () => {
-    const media = getActiveMediaElement()
-    const now = media ? media.currentTime : currentTime.value
-    const items = danmakuOverlayItems.value
-
-    if (items.length > 0) {
-      const remaining: DanmakuOverlayItem[] = []
-      for (const item of items) {
-        if (item.leaveAt <= now) {
-          if (trackTails[item.track] === item)
-            trackTails[item.track] = null
-          danmakuNodes.delete(item.id)
-          continue
-        }
-        remaining.push(item)
-        const node = danmakuNodes.get(item.id)
-        if (node)
-          node.style.transform = `translate(${danmakuLeft(item, now)}px, ${item.track * item.trackHeight + 4}px)`
-      }
-      if (remaining.length !== items.length)
-        danmakuOverlayItems.value = remaining
-    }
-
-    danmakuAnimFrameId = requestAnimationFrame(loop)
-  }
-  danmakuAnimFrameId = requestAnimationFrame(loop)
-}
-
-function stopDanmakuAnimation() {
-  if (danmakuAnimFrameId !== null) {
-    cancelAnimationFrame(danmakuAnimFrameId)
-    danmakuAnimFrameId = null
-  }
 }
 // =========== 视频弹幕叠加层结束 ===========
 
@@ -644,6 +483,7 @@ function toggleDanmaku() {
 
 // 快捷键绑定在根节点而不是 window：回放页会以多标签形式同时存在多个实例，
 // 只有获得焦点的那个才应该响应按键。
+// 注：LivePlayer 走的是另一套「hover 检测」策略（无焦点概念），两边改动请互相参照。
 function onKeydown(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
@@ -803,29 +643,15 @@ onUnmounted(() => {
           :class="{ 'vertical-rotation': !isRadio && isVerticalRotation }"
           @dblclick="onBoxDblClick"
         >
-          <div v-if="isRadio" class="radio-player">
-            <div class="radio-carousel">
-              <el-carousel
-                v-if="carousels.length > 0"
-                :interval="carouselTime"
-                indicator-position="none"
-                arrow="never"
-                height="100%"
-              >
-                <el-carousel-item v-for="carousel in carousels" :key="carousel">
-                  <img :src="carousel" class="radio-cover" alt="cover">
-                </el-carousel-item>
-              </el-carousel>
-            </div>
-            <!-- 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） -->
-            <audio
-              ref="nativeAudio"
-              class="audio-player"
-              @play="playing = true"
-              @pause="playing = false"
-              @volumechange="onVolumeChange"
-            />
-          </div>
+          <RadioStage
+            v-if="isRadio"
+            :carousels="carousels"
+            :interval="carouselTime"
+            @audio="nativeAudio = $event"
+            @play="playing = true"
+            @pause="playing = false"
+            @volumechange="onVolumeChange"
+          />
           <div v-else class="video-wrapper" :style="videoWrapperStyle">
             <video
               ref="nativeVideo"
@@ -852,12 +678,11 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="mediaLoading && !lastPlaybackError" class="video-mask">
-            <el-icon class="is-loading mask-icon">
-              <Loading />
-            </el-icon>
-            <span>正在加载录播…</span>
-          </div>
+          <PlayerLoading
+            v-if="mediaLoading && !lastPlaybackError"
+            label="正在加载录播"
+            hint="连接回放源中，请稍候"
+          />
           <div v-else-if="mediaBuffering" class="video-mask buffering">
             <span>缓冲中…</span>
           </div>
@@ -876,24 +701,24 @@ onUnmounted(() => {
           <div class="player-actions">
             <!-- 旋转三件套：与 LivePlayer 一致的分段胶囊，中段显示当前角度，点击归零 -->
             <RotationControls
-              v-if="!isRadio"
+              v-if="!isRadio && !mediaLoading"
               :angle="rotationAngle"
               @rotate-left="rotateLeft"
               @rotate-right="rotateRight"
               @reset="resetRotation"
             />
-            <el-button
-              circle
-              class="action-btn action-download"
-              :class="{ 'is-downloading': downloading }"
-              :title="downloading ? '下载中，点击取消' : '下载'"
-              @click="onDownloadClick"
-            >
-              <el-icon :class="{ 'is-loading': downloading }">
-                <Loading v-if="downloading" />
-                <Download v-else />
-              </el-icon>
-            </el-button>
+            <el-tooltip :content="downloading ? '下载中，点击取消' : '下载'" placement="bottom" :show-after="400">
+              <button
+                class="action-btn action-btn--download"
+                :class="{ 'is-active': downloading }"
+                :aria-label="downloading ? '取消下载' : '下载'"
+                @click="onDownloadClick"
+              >
+                <el-icon :size="16">
+                  <Download />
+                </el-icon>
+              </button>
+            </el-tooltip>
           </div>
 
           <!-- 全自绘控制条：录播保留 seek，电台回放同样可拖进度 -->
@@ -902,12 +727,15 @@ onUnmounted(() => {
             :playing="playing"
             :muted="muted"
             :is-fullscreen="isFullscreen"
+            :show-pip="!isRadio"
+            :is-pip="isPip"
             :show-progress="true"
             :current-time="currentTime"
             :duration="mediaDuration"
             @toggle-play="togglePlay"
             @toggle-mute="toggleMute"
             @toggle-fullscreen="toggleFullscreen"
+            @toggle-pip="togglePip"
             @seek="onMiniSeek"
           />
 
@@ -998,62 +826,7 @@ onUnmounted(() => {
   outline: none;
 }
 
-/* 悬浮功能按钮：横排置于右上角（与直播播放器一致），避开顶部弹幕与底部原生控件 */
-.player-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  z-index: 30;
-}
-
-/* 统一按钮尺寸并水平居中，保证整列右缘对齐（下载按钮固定在底部） */
-.action-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  /* 覆盖 Element Plus 的 .el-button + .el-button { margin-left: 12px }（同级选择器且其样式表后加载） */
-  margin-left: 0 !important;
-  flex-shrink: 0;
-  --el-button-bg-color: rgba(15, 17, 26, 0.55);
-  --el-button-border-color: rgba(255, 255, 255, 0.16);
-  --el-button-hover-bg-color: rgba(30, 33, 50, 0.8);
-  --el-button-hover-border-color: rgba(255, 255, 255, 0.3);
-  --el-button-text-color: #fff;
-  --el-button-hover-text-color: #fff;
-  backdrop-filter: blur(8px);
-
-  &.is-active {
-    --el-button-bg-color: rgba(109, 90, 224, 0.85);
-    --el-button-border-color: rgba(109, 90, 224, 0.9);
-  }
-}
-
-.action-download {
-  --el-button-text-color: #7dd8a4;
-  --el-button-hover-text-color: #4fd187;
-
-  /* 下载中：常亮绿色底 + 呼吸光圈，与 LivePlayer 的录制中状态同构 */
-  &.is-downloading {
-    color: #fff;
-    background: #34c07c;
-    border-color: transparent;
-    animation: download-pulse 1.4s ease-in-out infinite;
-  }
-}
-
-@keyframes download-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(52, 192, 124, 0.45);
-  }
-  50% {
-    box-shadow: 0 0 0 6px transparent;
-  }
-}
+/* 悬浮按钮（下载）与右上角容器样式为全局 .player-actions / .action-btn，见 app.scss */
 
 /* 视频窗口右边缘的弹幕显隐竖条触发区：平时不可见，hover 到右缘才滑出 */
 .sidebar-toggle {
@@ -1083,7 +856,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   padding: 8px 2px;
   border-radius: 10px 0 0 10px;
-  background: rgba(109, 90, 224, 0.75);
+  background: color-mix(in srgb, var(--brand-primary) 75%, transparent);
   color: #fff;
   font-size: 11px;
   line-height: 1.2;
@@ -1096,7 +869,8 @@ onUnmounted(() => {
   transform: translateX(12px);
   transition:
     opacity 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    background 0.2s ease;
 }
 
 .sidebar-toggle:hover .sidebar-toggle-tab {
@@ -1104,8 +878,9 @@ onUnmounted(() => {
   transform: translateX(0);
 }
 
+/* hover 提亮一档，给出明确的可点击反馈 */
 .sidebar-toggle-tab:hover {
-  background: rgba(109, 90, 224, 0.75);
+  background: color-mix(in srgb, var(--brand-primary) 92%, #fff);
 }
 
 .toggle-icon {
@@ -1145,6 +920,7 @@ onUnmounted(() => {
 }
 
 .barrage-box {
+  /* 宽度与 utils/float-player-layout.ts 的 BARRAGE_SIDEBAR_WIDTH 同步（浮窗放大档按此预留侧栏位） */
   width: 360px;
   flex-shrink: 0;
   min-height: 0;
@@ -1217,10 +993,6 @@ onUnmounted(() => {
   background: transparent;
 }
 
-.mask-icon {
-  font-size: 28px;
-}
-
 .mask-actions {
   display: flex;
   gap: 8px;
@@ -1244,49 +1016,5 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: stretch;
   gap: 2px;
-}
-
-/* 电台轮播铺满整个窗口，音频控件悬浮底部居中 */
-.radio-player {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.radio-carousel {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-/* 轮播图铺满：object-fit: cover 裁边填充 */
-.radio-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） */
-.audio-player {
-  display: none;
-}
-
-:deep(.el-carousel__container) {
-  height: 100%;
-}
-
-:deep(.el-carousel) {
-  width: 100%;
-  height: 100%;
-}
-
-:deep(.el-carousel__item) {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
 }
 </style>

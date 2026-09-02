@@ -73,7 +73,7 @@ export function useFloatPlayers() {
       players.value.splice(idx, 1)
   }
 
-  return { players, openLive, openReview, closePlayer }
+  return { players, openLive, openReview, focusPlayer, closePlayer }
 }
 
 export default useFloatPlayers
