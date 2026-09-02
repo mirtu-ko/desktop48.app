@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import type { TaskPayload } from '../assets/js/task-payload'
+import type { TaskPayload } from '../services/task-payload'
 import type { BarrageListItem } from './Barrage.vue'
 import { ChatDotRound, Download, Loading, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import Apis from '../assets/js/apis'
-import Tools from '../assets/js/tools'
-import useTasks from '../assets/js/use-tasks'
-
 import BarrageBox from '../components/BarrageBox.vue'
+import useTasks from '../composables/use-tasks'
 import { useVideoRotation } from '../composables/use-video-rotation'
+
+import Apis from '../services/apis'
+import Tools from '../utils/tools'
 import MiniControls from './MiniControls.vue'
 import RotationControls from './RotationControls.vue'
 
@@ -817,17 +817,19 @@ onUnmounted(() => {
                 </el-carousel-item>
               </el-carousel>
             </div>
+            <!-- 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） -->
             <audio
               ref="nativeAudio"
-              controls
               class="audio-player"
+              @play="playing = true"
+              @pause="playing = false"
+              @volumechange="onVolumeChange"
             />
           </div>
           <div v-else class="video-wrapper" :style="videoWrapperStyle">
             <video
               ref="nativeVideo"
               class="video-player"
-              :controls="!isVerticalRotation"
               :style="videoStyle"
               @play="playing = true"
               @pause="playing = false"
@@ -894,10 +896,9 @@ onUnmounted(() => {
             </el-button>
           </div>
 
-          <!-- 旋转 90/270 时原生控制条会跟着侧躺，换成不参与旋转的自绘迷你条；
-               录播必须保留 seek 能力，因此相比 LivePlayer 额外开启进度条 -->
+          <!-- 全自绘控制条：录播保留 seek，电台回放同样可拖进度 -->
           <MiniControls
-            v-if="!isRadio && isVerticalRotation"
+            v-if="!mediaLoading"
             :playing="playing"
             :muted="muted"
             :is-fullscreen="isFullscreen"
@@ -1268,14 +1269,9 @@ onUnmounted(() => {
   display: block;
 }
 
+/* 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） */
 .audio-player {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(560px, 92%);
-  z-index: 5;
-  flex-shrink: 0;
+  display: none;
 }
 
 :deep(.el-carousel__container) {

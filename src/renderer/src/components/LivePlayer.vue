@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import type { TaskPayload } from '../assets/js/task-payload'
+import type { TaskPayload } from '../services/task-payload'
 import { VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import Apis from '../assets/js/apis'
+import useTasks from '../composables/use-tasks'
 
-import EventBus from '../assets/js/event-bus'
-import Tools from '../assets/js/tools'
-import useTasks from '../assets/js/use-tasks'
 import { useVideoRotation } from '../composables/use-video-rotation'
+import Apis from '../services/apis'
+import EventBus from '../services/event-bus'
+import Tools from '../utils/tools'
 
 import MiniControls from './MiniControls.vue'
 import RotationControls from './RotationControls.vue'
@@ -581,18 +581,19 @@ onUnmounted(() => {
             </el-carousel-item>
           </el-carousel>
         </div>
+        <!-- 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） -->
         <audio
           ref="nativeAudio"
-          controls
           autoplay
           class="audio-player"
-          :class="{ 'media-hidden': loading }"
+          @play="playing = true"
+          @pause="playing = false"
+          @volumechange="onVolumeChange"
         />
       </div>
       <div v-else class="video-wrapper" :style="videoWrapperStyle">
         <video
           ref="nativeVideo"
-          :controls="!isVerticalRotation"
           autoplay
           class="video-player"
           :class="{ 'media-hidden': loading }"
@@ -643,22 +644,11 @@ onUnmounted(() => {
             </el-icon>
           </button>
         </el-tooltip>
-        <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏'" placement="bottom" :show-after="400">
-          <button
-            class="action-btn"
-            :aria-label="isFullscreen ? '退出全屏' : '全屏'"
-            @click="toggleFullscreen"
-          >
-            <el-icon :size="16">
-              <FullScreen />
-            </el-icon>
-          </button>
-        </el-tooltip>
       </div>
 
-      <!-- 旋转 90/270 时原生控制条会跟着侧躺，换成不参与旋转的自绘迷你条（直播无需进度条） -->
+      <!-- 全自绘控制条：直播无需进度条，电台/视频、旋转与否共用同一套交互 -->
       <MiniControls
-        v-if="!isRadio && isVerticalRotation"
+        v-if="!loading"
         :playing="playing"
         :muted="muted"
         :is-fullscreen="isFullscreen"
@@ -735,14 +725,9 @@ onUnmounted(() => {
   display: block;
 }
 
-/* 音频控件悬浮在封面底部居中 */
+/* 音频仅作媒体源，不渲染原生控件（播控走 MiniControls） */
 .audio-player {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(600px, 90%);
-  z-index: 5;
+  display: none;
 }
 
 .loading-container {
@@ -845,11 +830,6 @@ onUnmounted(() => {
   font-size: 12px;
   letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.55);
-}
-
-/* 直播模式下原生时间轴无意义（不可拖动），隐藏之，保留播放/音量/全屏等控件 */
-.video-player::-webkit-media-controls-timeline {
-  display: none !important;
 }
 
 .live-status {

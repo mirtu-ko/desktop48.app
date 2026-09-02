@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { AudioTrack } from '../assets/js/use-audio-player'
+import type { AudioTrack } from '../composables/use-audio-player'
 import { Headset, Link, Plus, Refresh, ShoppingCart, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
-import Apis from '../assets/js/apis'
-import Tools from '../assets/js/tools'
-import useAudioPlayer from '../assets/js/use-audio-player'
+import useAudioPlayer from '../composables/use-audio-player'
+import Apis from '../services/apis'
+import Tools from '../utils/tools'
 import FloatingDock from './FloatingDock.vue'
 import FloatingTabBar from './FloatingTabBar.vue'
 

@@ -136,14 +136,16 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
     notifyRotation()
   }
 
-  /** 旋转态下双击画面回正；未旋转时保持浏览器原生双击全屏 */
+  /** 双击：旋转态回正，未旋转态切换容器全屏 */
   function onBoxDblClick(event: MouseEvent) {
-    if (rotationAngle.value === 0)
-      return
     if ((event.target as HTMLElement).closest('.player-actions, .mini-controls'))
       return
     event.preventDefault()
-    resetRotation()
+    if (rotationAngle.value !== 0) {
+      resetRotation()
+      return
+    }
+    void toggleFullscreen()
   }
 
   // 全屏作用在容器而非 media 元素：原生全屏只放大 video 本身，

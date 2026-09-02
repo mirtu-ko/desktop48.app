@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { OpenLive } from '../assets/js/apis'
-import Tools from '../assets/js/tools'
+import type { OpenLive } from '../services/apis'
+import Tools from '../utils/tools'
 
 defineProps<{
   show: OpenLive

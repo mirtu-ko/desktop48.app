@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import type { OpenLive } from '../assets/js/apis'
+import type { OpenLive } from '../services/apis'
 import { Refresh } from '@element-plus/icons-vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import Apis from '../assets/js/apis'
-import Constants from '../assets/js/constants'
-import EventBus from '../assets/js/event-bus'
-import Tools from '../assets/js/tools'
-import useFloatPlayers from '../assets/js/use-float-players'
-import useLoadMore from '../assets/js/use-load-more'
 import FloatingDock from '../components/FloatingDock.vue'
 import FloatingTabBar from '../components/FloatingTabBar.vue'
 import ShowCard from '../components/ShowCard.vue'
+import useFloatPlayers from '../composables/use-float-players'
+import useLoadMore from '../composables/use-load-more'
+import Apis from '../services/apis'
+import EventBus from '../services/event-bus'
+import Constants from '../utils/constants'
+import Tools from '../utils/tools'
 
 const router = useRouter()
 

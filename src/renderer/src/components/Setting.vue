@@ -3,8 +3,8 @@ import { Connection, Cpu, Document, Folder, Hide } from '@element-plus/icons-vue
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import Constants from '../assets/js/constants'
-import { useBlockedMembers } from '../assets/js/use-blocked-members'
+import { useBlockedMembers } from '../composables/use-blocked-members'
+import Constants from '../utils/constants'
 
 // 下载目录 / ffmpeg目录 / User-Agent
 const downloadDirectory = ref('')

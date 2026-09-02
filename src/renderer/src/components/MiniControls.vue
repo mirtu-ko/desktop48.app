@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { FullScreen, Mute, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { FullScreen } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { MEDIA_ICONS } from '../utils/media-icons'
 
-defineProps({
+const props = defineProps({
   playing: { type: Boolean, default: false },
   muted: { type: Boolean, default: false },
   isFullscreen: { type: Boolean, default: false },
@@ -12,6 +14,10 @@ defineProps({
 })
 
 const emit = defineEmits(['togglePlay', 'toggleMute', 'toggleFullscreen', 'seek'])
+
+// 图标随状态切换，几何数据统一在 utils/media-icons.ts
+const playIcon = computed(() => (props.playing ? MEDIA_ICONS.stroke.pause : MEDIA_ICONS.stroke.play))
+const volumeIcon = computed(() => (props.muted ? MEDIA_ICONS.stroke.volumeOff : MEDIA_ICONS.stroke.volumeOn))
 
 function formatMediaTime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds))
@@ -33,10 +39,9 @@ function onRangeInput(event: Event) {
 <template>
   <div class="mini-controls">
     <button class="mini-btn" :aria-label="playing ? '暂停' : '播放'" @click="emit('togglePlay')">
-      <el-icon :size="16">
-        <VideoPause v-if="playing" />
-        <VideoPlay v-else />
-      </el-icon>
+      <svg class="mini-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path :d="playIcon" />
+      </svg>
     </button>
 
     <template v-if="showProgress">
@@ -53,23 +58,8 @@ function onRangeInput(event: Event) {
     </template>
 
     <button class="mini-btn" :aria-label="muted ? '取消静音' : '静音'" @click="emit('toggleMute')">
-      <el-icon v-if="muted" :size="16">
-        <Mute />
-      </el-icon>
-      <svg
-        v-else
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M11 5 6 9H3v6h3l5 4z" />
-        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-        <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+      <svg class="mini-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path :d="volumeIcon" />
       </svg>
     </button>
     <button class="mini-btn" :aria-label="isFullscreen ? '退出全屏' : '全屏'" @click="emit('toggleFullscreen')">
@@ -81,12 +71,13 @@ function onRangeInput(event: Event) {
 </template>
 
 <style scoped lang="scss">
-/* 旋转态下替代原生控件：不参与旋转，恒定贴在容器底部 */
+/* 全自绘控制条：不参与旋转，恒定贴在容器底部；窄容器（迷你浮窗）下限宽自适应 */
 .mini-controls {
   position: absolute;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100% - 16px);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -122,14 +113,27 @@ function onRangeInput(event: Event) {
   }
 }
 
-/* 迷你进度条：录播必须可 seek，旋转态下也能拖进度 */
+/* 图标壳：几何数据在 utils/media-icons.ts，这里统一线性表现 */
+.mini-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 迷你进度条：录播必须可 seek；空间不足时优先收缩自身（时间串保持完整） */
 .mini-range {
-  width: 140px;
+  flex: 0 1 140px;
+  min-width: 48px;
   accent-color: var(--brand-primary);
   cursor: pointer;
 }
 
 .mini-time {
+  flex-shrink: 0;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.85);

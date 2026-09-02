@@ -6,8 +6,8 @@
 import { Film, Hide, Link, User, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import EventBus from '../assets/js/event-bus'
-import Tools from '../assets/js/tools'
+import EventBus from '../services/event-bus'
+import Tools from '../utils/tools'
 
 export interface MemberDetail {
   userId: number

@@ -54,7 +54,7 @@ interface FfmpegTaskConfig {
  * 注册一组由 ffmpeg 承担的任务 IPC 通道：
  * `${prefix}Start`(invoke) / `${prefix}Progress|End|Error`(send) / `${prefix}Stop:${liveId}`(once)
  */
-export function registerFfmpegTask(config: FfmpegTaskConfig): void {
+function registerFfmpegTask(config: FfmpegTaskConfig): void {
   const { channelPrefix, logTag, ffmpegArgs } = config
 
   // 每个 liveId 当前进程的退出 Promise：重启前必须等上一进程完全退出（含写 'q' 收尾），避免两个 ffmpeg 同时写同一文件
@@ -200,3 +200,23 @@ export function registerFfmpegTask(config: FfmpegTaskConfig): void {
     return startPromise
   })
 }
+
+// ===== 任务注册 =====
+
+// 下载任务：HLS TS → MP4
+// -bsf:a aac_adtstoasc: HLS TS 里的 AAC 是 ADTS 格式，MP4 容器需要 ASC 格式，必须转封装
+// -movflags +faststart: 正常结束时把 moov atom 移到文件头，播放器可立即打开
+registerFfmpegTask({
+  channelPrefix: 'downloadTask',
+  logTag: 'download.ts',
+  ffmpegArgs: ['-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart'],
+})
+
+// 录制任务：RTMP/HTTP 流 → FLV 文件
+// -f flv: 将 RTMP/HTTP 流封装为 FLV 容器
+// 如需断线重连，可追加 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2
+registerFfmpegTask({
+  channelPrefix: 'recordTask',
+  logTag: 'record.ts',
+  ffmpegArgs: ['-f', 'flv'],
+})

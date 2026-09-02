@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FloatPlayerItem } from '../assets/js/use-float-players'
+import type { FloatPlayerItem } from '../composables/use-float-players'
 import { Close, Minus, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import LivePlayer from './LivePlayer.vue'

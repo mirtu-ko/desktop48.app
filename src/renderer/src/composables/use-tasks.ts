@@ -1,16 +1,15 @@
 import type { Ref } from 'vue'
-import type TaskBase from './task-base'
-import type { TaskPayload, TaskSnapshot } from './task-payload'
+import type { TaskChannelAdapter } from '../services/task-base'
+import type { TaskPayload, TaskSnapshot } from '../services/task-payload'
 import { ElMessage } from 'element-plus'
 import { reactive, ref } from 'vue'
-import DownloadTask from './download-task'
-import EventBus from './event-bus'
-import RecordTask from './record-task'
+import EventBus from '../services/event-bus'
+import TaskBase from '../services/task-base'
 
 export type TaskKind = 'download' | 'record'
 
 interface TaskKindConfig {
-  newTask: (_taskData: TaskPayload) => TaskBase
+  channels: TaskChannelAdapter
   list: Ref<TaskBase[]>
   listApi: () => Promise<TaskSnapshot[]>
   removeApi: (_liveId: string) => Promise<void>
@@ -29,7 +28,13 @@ const recordTasks = ref([]) as Ref<TaskBase[]>
 // 下载/录制两类任务的差异配置：处理骨架完全一致
 const taskConfigs: Record<TaskKind, TaskKindConfig> = {
   download: {
-    newTask: taskData => new DownloadTask(taskData.url, taskData.filename, taskData.liveId),
+    channels: {
+      start: window.mainAPI.downloadTaskStart,
+      progress: window.mainAPI.downloadTaskProgress,
+      end: window.mainAPI.downloadTaskEnd,
+      error: window.mainAPI.downloadTaskError,
+      stop: window.mainAPI.downloadTaskStop,
+    },
     list: downloadTasks,
     listApi: () => window.mainAPI.downloadTaskList(),
     removeApi: liveId => window.mainAPI.downloadTaskRemove(liveId),
@@ -39,7 +44,13 @@ const taskConfigs: Record<TaskKind, TaskKindConfig> = {
     logTag: 'download',
   },
   record: {
-    newTask: taskData => new RecordTask(taskData.url, taskData.filename, taskData.liveId),
+    channels: {
+      start: window.mainAPI.recordTaskStart,
+      progress: window.mainAPI.recordTaskProgress,
+      end: window.mainAPI.recordTaskEnd,
+      error: window.mainAPI.recordTaskError,
+      stop: window.mainAPI.recordTaskStop,
+    },
     list: recordTasks,
     listApi: () => window.mainAPI.recordTaskList(),
     removeApi: liveId => window.mainAPI.recordTaskRemove(liveId),
@@ -48,6 +59,11 @@ const taskConfigs: Record<TaskKind, TaskKindConfig> = {
     restartMessage: '录制已重新开始，原任务将被覆盖',
     logTag: 'record',
   },
+}
+
+/** 由类型差异配置直接构造任务实例（替代原 DownloadTask/RecordTask 薄子类） */
+function createTask(kind: TaskKind, taskData: TaskPayload): TaskBase {
+  return new TaskBase(taskConfigs[kind].channels, taskData.url, taskData.filename, taskData.liveId, taskConfigs[kind].logTag)
 }
 
 async function startTask(task: TaskBase, config: TaskKindConfig, message: string) {
@@ -83,7 +99,7 @@ async function handleTask(taskData: TaskPayload, kind: TaskKind) {
     await startTask(exists, config, config.restartMessage)
     return
   }
-  await startTask(config.newTask(taskData), config, config.startMessage)
+  await startTask(createTask(kind, taskData), config, config.startMessage)
 }
 
 async function removeTask(task: TaskBase, kind: TaskKind) {
@@ -103,7 +119,7 @@ async function restoreTasks(kind: TaskKind) {
     // 已有同 liveId 任务则跳过，避免重复卡片
     if (config.list.value?.some(item => item.getLiveId() === snapshot.liveId))
       continue
-    const task = config.newTask({ url: snapshot.url, filename: snapshot.filename, liveId: snapshot.liveId })
+    const task = createTask(kind, { url: snapshot.url, filename: snapshot.filename, liveId: snapshot.liveId })
     task.restore(snapshot)
     // 与 startTask 同样用 reactive 包裹，保证 restore 后的状态变化也走 Proxy
     config.list.value?.push(reactive(task) as TaskBase)
@@ -117,16 +133,14 @@ function isTaskRunning(kind: TaskKind, liveId: string): boolean {
 
 /** 停止任务：优先走任务对象，让状态与下载页卡片共用同一份真相 */
 function stopTask(kind: TaskKind, liveId: string) {
-  const task = taskConfigs[kind].list.value.find(item => item.getLiveId() === liveId)
+  const config = taskConfigs[kind]
+  const task = config.list.value.find(item => item.getLiveId() === liveId)
   if (task) {
     task.stop()
     return
   }
   // 快照尚未恢复等情况下本地没有任务对象，退回 IPC，保证停止指令一定送达主进程
-  if (kind === 'record')
-    window.mainAPI.recordTaskStop(liveId)
-  else
-    window.mainAPI.downloadTaskStop(liveId)
+  config.channels.stop(liveId)
 }
 
 let restored = false

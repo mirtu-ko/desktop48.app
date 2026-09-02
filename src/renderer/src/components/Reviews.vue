@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Refresh } from '@element-plus/icons-vue'
 import { onMounted, ref, watch } from 'vue'
-import Apis from '../assets/js/apis'
-import Tools from '../assets/js/tools'
-import useFloatPlayers from '../assets/js/use-float-players'
-import usePagedLiveList from '../assets/js/use-paged-live-list'
 import FloatingDock from '../components/FloatingDock.vue'
 import LiveItem from '../components/LiveItem.vue'
+import useFloatPlayers from '../composables/use-float-players'
+import usePagedLiveList from '../composables/use-paged-live-list'
+import Apis from '../services/apis'
+import Tools from '../utils/tools'
 
 // 组件 props：成员详情「看 TA 的回放」跳转时预置的成员筛选；每次跳转都是新对象，保证 watch 必触发
 const props = withDefaults(defineProps<{ memberPreset?: { userId: string } | null }>(), {

@@ -9,12 +9,10 @@ import icon from '../../resources/icon.png?asset'
 
 import { isAllowedUrl } from './allowed-hosts'
 import { Database } from './database'
-import { stopAllFfmpegTasks } from './ffmpeg-task'
+import { stopAllFfmpegTasks } from './ffmpeg-task' // 含下载/录制任务通道注册（side effect）
 import { closeLog, getLogPathForDisplay, log } from './logger'
-import './download' // 下载功能主进程注册
-import './record' // 录制功能主进程注册
 import './stream' // 流媒体相关主进程注册
-import './http-server'
+import './http-server' // live中转服务器主进程注册
 
 // 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -258,6 +256,11 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   // 为 Windows 设置应用用户模型 ID。
   electronApp.setAppUserModelId('com.electron')
+
+  // macOS 下 BrowserWindow 的 icon 选项无效，dev 模式运行的是原生 Electron.app，
+  // 需要手动设置 Dock 图标；打包版由 build/icon.icns 提供，不受影响
+  if (process.platform === 'darwin' && app.dock)
+    app.dock.setIcon(icon)
 
   // 在开发环境中按 F12 默认打开或关闭 DevTools，
   // 在生产环境中忽略 CommandOrControl + R。

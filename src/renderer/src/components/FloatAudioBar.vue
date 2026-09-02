@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Close, Delete } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
-import useAudioPlayer from '../assets/js/use-audio-player'
+import useAudioPlayer from '../composables/use-audio-player'
+import { MEDIA_ICONS } from '../utils/media-icons'
 
 const {
   playlist,
@@ -115,16 +116,13 @@ function onClearAll() {
 
       <div class="bar-controls">
         <button class="ctrl-btn" title="上一首" :disabled="currentIndex <= 0" @click="prev">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-            <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+            <path :d="MEDIA_ICONS.fill.prev" />
           </svg>
         </button>
         <button class="ctrl-btn ctrl-main" :title="playing ? '暂停' : '播放'" @click="togglePlay">
-          <svg v-if="!playing" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+            <path :d="playing ? MEDIA_ICONS.fill.pause : MEDIA_ICONS.fill.play" />
           </svg>
         </button>
         <button
@@ -133,8 +131,8 @@ function onClearAll() {
           :disabled="currentIndex >= playlist.length - 1"
           @click="next"
         >
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z" />
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+            <path :d="MEDIA_ICONS.fill.next" />
           </svg>
         </button>
       </div>
@@ -145,8 +143,8 @@ function onClearAll() {
         title="播放列表"
         @click="panelVisible = !panelVisible"
       >
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-          <path d="M3 6h13v2H3zm0 5h13v2H3zm0 5h9v2H3zm15-3.5 5 3.5-5 3.5z" />
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+          <path :d="MEDIA_ICONS.fill.playlist" />
         </svg>
       </button>
     </div>

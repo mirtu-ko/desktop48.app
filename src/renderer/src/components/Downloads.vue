@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { TaskKind } from '../assets/js/use-tasks'
+import type { TaskKind } from '../composables/use-tasks'
 import { Check, Download, Loading, VideoCamera } from '@element-plus/icons-vue'
 import { computed, onMounted } from 'vue'
-import useTasks from '../assets/js/use-tasks'
+import useTasks from '../composables/use-tasks'
 
 // 任务状态由 useTasks 这个模块级单例持有：本页卸载后任务照常运行，
 // 从悬浮迷你窗等任意入口发起的任务也不会因为本页未挂载而丢失
@@ -211,7 +211,7 @@ const taskGroups = computed(() => [
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 80px 0;
+  min-height: 240px;
   border-style: dashed;
   opacity: 0.9;
 
@@ -230,6 +230,11 @@ const taskGroups = computed(() => [
     font-size: 13px;
     color: var(--el-text-color-placeholder);
   }
+}
+
+/* 任务列表：滚动条 */
+.task-list {
+  min-height: 240px;
 }
 
 /* 任务卡片：主题色磁贴 + 文件名/路径 + 状态 + 操作 */

@@ -188,7 +188,4 @@ app.on('before-quit', () => {
 
   streamSessions.clear()
   activeStreamProcesses.clear()
-
-  // 注意：这里不再删除日志文件——崩溃排查完全依赖 main.log。
-  // 日志流的关闭统一由 index.ts 的 will-quit 处理，保证所有清理阶段的日志都能落盘。
 })

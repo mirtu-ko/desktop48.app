@@ -2,8 +2,8 @@
 import type { BarrageListItem } from './Barrage.vue'
 import { Search } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
-import Tools from '../assets/js/tools'
 import Barrage from '../components/Barrage.vue'
+import Tools from '../utils/tools'
 
 const props = defineProps<{
   number: number

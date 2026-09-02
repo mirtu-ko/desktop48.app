@@ -1,5 +1,5 @@
 import type { TaskSnapshot } from './task-payload'
-import Constants from './constants'
+import Constants from '../utils/constants'
 
 /**
  * 任务通道适配器：收敛下载/录制两组 IPC API 的差异
@@ -26,10 +26,10 @@ export default class TaskBase {
   // 保存已注册的 IPC 监听器取消函数，任务结束时统一移除，避免监听器泄漏
   private _unsubscribers: Array<() => void> = []
 
-  protected readonly channels: TaskChannelAdapter
+  private readonly channels: TaskChannelAdapter
   private readonly _logTag: string
 
-  protected constructor(
+  constructor(
     channels: TaskChannelAdapter,
     url: string,
     filename: string,
