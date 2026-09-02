@@ -2,7 +2,7 @@
 import { formatMediaTime } from '../utils/time-format'
 import MediaIcon from './MediaIcon.vue'
 
-defineProps({
+const props = defineProps({
   playing: { type: Boolean, default: false },
   muted: { type: Boolean, default: false },
   isFullscreen: { type: Boolean, default: false },
@@ -13,12 +13,19 @@ defineProps({
   /** 系统画中画：仅视频轨适用，电台（纯音频）由宿主传 false 隐藏 */
   showPip: { type: Boolean, default: false },
   isPip: { type: Boolean, default: false },
+  /** 迷你浮窗：时间串只显示当前进度，总时长让位给进度条 */
+  compact: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['togglePlay', 'toggleMute', 'toggleFullscreen', 'togglePip', 'seek'])
 
 // PiP 能力探测（Chromium/Electron 常开，防御性判断环境）
 const pipSupported = (document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled === true
+
+function timeText(): string {
+  const current = formatMediaTime(props.currentTime)
+  return props.compact ? current : `${current} / ${formatMediaTime(props.duration)}`
+}
 
 function onRangeInput(event: Event) {
   const value = Number.parseFloat((event.target as HTMLInputElement).value)
@@ -49,7 +56,7 @@ function onRangeInput(event: Event) {
         :aria-label="`播放进度 ${formatMediaTime(currentTime)} / ${formatMediaTime(duration)}`"
         @input="onRangeInput"
       >
-      <span class="mini-time">{{ formatMediaTime(currentTime) }} / {{ formatMediaTime(duration) }}</span>
+      <span class="mini-time">{{ timeText() }}</span>
     </template>
 
     <button class="mini-btn" :aria-label="muted ? '取消静音' : '静音'" @click="emit('toggleMute')">

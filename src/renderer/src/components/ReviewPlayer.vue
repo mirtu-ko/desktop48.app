@@ -730,6 +730,7 @@ onUnmounted(() => {
             :show-progress="true"
             :current-time="currentTime"
             :duration="mediaDuration"
+            :compact="compact"
             @toggle-play="togglePlay"
             @toggle-mute="toggleMute"
             @toggle-fullscreen="toggleFullscreen"

@@ -214,7 +214,7 @@ async function setUserAgent() {
               FFmpeg 目录
             </div>
             <div class="row-desc">
-              下载 / 录制依赖的 ffmpeg 程序文件目录
+              录制功能依赖的 ffmpeg 程序所在位置
             </div>
           </div>
           <el-input
