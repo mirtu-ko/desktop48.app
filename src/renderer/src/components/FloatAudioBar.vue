@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Close, Delete } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 import useAudioPlayer from '../composables/use-audio-player'
 import { MEDIA_ICONS } from '../utils/media-icons'
+import MediaIcon from './MediaIcon.vue'
 
 const {
   playlist,
@@ -60,7 +60,7 @@ function onClearAll() {
           <span class="panel-title">播放列表</span>
           <span class="panel-count">{{ playlist.length }} 首</span>
           <button class="panel-clear" title="清空列表" @click="onClearAll">
-            <el-icon><Delete /></el-icon>
+            <MediaIcon name="trash" :size="15" />
           </button>
         </div>
         <el-scrollbar max-height="300px" class="panel-scroll">
@@ -88,7 +88,7 @@ function onClearAll() {
               </div>
             </div>
             <button class="row-remove" title="移除" @click.stop="removeAt(index)">
-              <el-icon><Close /></el-icon>
+              <MediaIcon name="close" :size="13" />
             </button>
           </div>
         </el-scrollbar>

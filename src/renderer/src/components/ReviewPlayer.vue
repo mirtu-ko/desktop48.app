@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../services/task-payload'
 import type { BarrageListItem } from './Barrage.vue'
-import { ChatDotRound, Download, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Hls from 'hls.js'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
@@ -13,6 +12,7 @@ import { useVideoRotation } from '../composables/use-video-rotation'
 
 import Apis from '../services/apis'
 import Tools from '../utils/tools'
+import MediaIcon from './MediaIcon.vue'
 import MiniControls from './MiniControls.vue'
 import PlayerLoading from './PlayerLoading.vue'
 import RadioStage from './RadioStage.vue'
@@ -714,9 +714,7 @@ onUnmounted(() => {
                 :aria-label="downloading ? '取消下载' : '下载'"
                 @click="onDownloadClick"
               >
-                <el-icon :size="16">
-                  <Download />
-                </el-icon>
+                <MediaIcon name="download" :size="16" />
               </button>
             </el-tooltip>
           </div>
@@ -750,9 +748,7 @@ onUnmounted(() => {
               :title="sidebarVisible ? '隐藏弹幕列表' : '显示弹幕列表'"
               @click="sidebarVisible = !sidebarVisible"
             >
-              <el-icon class="toggle-icon">
-                <ChatDotRound />
-              </el-icon>
+              <MediaIcon name="chat" :size="16" />
               <span class="toggle-label">{{ sidebarVisible ? '收起' : '弹幕' }}</span>
             </div>
           </div>
@@ -772,9 +768,7 @@ onUnmounted(() => {
             <el-popover trigger="click" placement="bottom-end" :width="260">
               <template #reference>
                 <el-button circle class="side-setting-btn" title="弹幕设置">
-                  <el-icon>
-                    <Setting />
-                  </el-icon>
+                  <MediaIcon name="settings" :size="15" />
                 </el-button>
               </template>
               <div class="danmaku-settings">
@@ -881,10 +875,6 @@ onUnmounted(() => {
 /* hover 提亮一档，给出明确的可点击反馈 */
 .sidebar-toggle-tab:hover {
   background: color-mix(in srgb, var(--brand-primary) 92%, #fff);
-}
-
-.toggle-icon {
-  font-size: 16px;
 }
 
 .toggle-label {

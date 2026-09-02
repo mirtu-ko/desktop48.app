@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { FullScreen } from '@element-plus/icons-vue'
-import { computed } from 'vue'
-import { MEDIA_ICONS } from '../utils/media-icons'
 import { formatMediaTime } from '../utils/time-format'
+import MediaIcon from './MediaIcon.vue'
 
-const props = defineProps({
+defineProps({
   playing: { type: Boolean, default: false },
   muted: { type: Boolean, default: false },
   isFullscreen: { type: Boolean, default: false },
@@ -19,9 +17,6 @@ const props = defineProps({
 
 const emit = defineEmits(['togglePlay', 'toggleMute', 'toggleFullscreen', 'togglePip', 'seek'])
 
-// 图标随状态切换，几何数据统一在 utils/media-icons.ts
-const playIcon = computed(() => (props.playing ? MEDIA_ICONS.stroke.pause : MEDIA_ICONS.stroke.play))
-const volumeIcon = computed(() => (props.muted ? MEDIA_ICONS.stroke.volumeOff : MEDIA_ICONS.stroke.volumeOn))
 // PiP 能力探测（Chromium/Electron 常开，防御性判断环境）
 const pipSupported = (document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled === true
 
@@ -41,9 +36,7 @@ function onRangeInput(event: Event) {
     <slot name="leading" />
 
     <button class="mini-btn" :aria-label="playing ? '暂停' : '播放'" @click="emit('togglePlay')">
-      <svg class="mini-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path :d="playIcon" />
-      </svg>
+      <MediaIcon :name="playing ? 'pause' : 'play'" :size="16" />
     </button>
 
     <template v-if="showProgress">
@@ -60,9 +53,7 @@ function onRangeInput(event: Event) {
     </template>
 
     <button class="mini-btn" :aria-label="muted ? '取消静音' : '静音'" @click="emit('toggleMute')">
-      <svg class="mini-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path :d="volumeIcon" />
-      </svg>
+      <MediaIcon :name="muted ? 'volumeOff' : 'volumeOn'" :size="16" />
     </button>
     <button
       v-if="showPip && pipSupported"
@@ -71,14 +62,14 @@ function onRangeInput(event: Event) {
       :title="isPip ? '退出画中画' : '画中画'"
       @click="emit('togglePip')"
     >
-      <svg class="mini-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path :d="MEDIA_ICONS.stroke.pip" />
-      </svg>
+      <MediaIcon name="pip" :size="16" />
     </button>
-    <button class="mini-btn" :aria-label="isFullscreen ? '退出全屏' : '全屏'" @click="emit('toggleFullscreen')">
-      <el-icon :size="16">
-        <FullScreen />
-      </el-icon>
+    <button
+      class="mini-btn"
+      :aria-label="isFullscreen ? '退出全屏' : '全屏'"
+      @click="emit('toggleFullscreen')"
+    >
+      <MediaIcon :name="isFullscreen ? 'minimize' : 'fullscreen'" :size="16" />
     </button>
   </div>
 </template>
@@ -90,11 +81,11 @@ function onRangeInput(event: Event) {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: calc(100% - 36px);
+  max-width: calc(100% - 24px);
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0px;
   padding: 3px 8px;
   border-radius: var(--radius-pill);
   background: rgba(15, 17, 26, 0.6);
@@ -129,25 +120,17 @@ function onRangeInput(event: Event) {
   }
 }
 
-/* 图标壳：几何数据在 utils/media-icons.ts，这里统一线性表现 */
-.mini-icon {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* 迷你进度条：录播必须可 seek；空间不足时最先收缩（可压到 0 也不溢出按钮） */
+/* 迷你进度条：录播必须可 seek。shrink 因子 1000：按 basis×factor 加权，
+ * 空间不足时进度条先收缩（可压到 0），时间串的份额小到亚像素（100 时仍漏 1px 出省略号），
+ * 进度条让尽后时间串才截断。实测 Chromium 并不会把 left:50% 绝对定位盒卡在 50% 宽，勿再依赖该假说 */
 .mini-range {
-  flex: 0 1 140px;
+  flex: 0 1000 140px;
   min-width: 0;
   accent-color: var(--brand-primary);
   cursor: pointer;
 }
 
+/* 时间串优先级高于进度条：只在进度条让尽后才截断 */
 .mini-time {
   flex: 0 1 auto;
   min-width: 0;

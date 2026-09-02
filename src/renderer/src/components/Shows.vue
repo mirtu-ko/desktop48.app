@@ -312,12 +312,7 @@ function openHistoryStream(show: OpenLive) {
 
 .shows-container {
   /* 顶部留出左上角浮动切换器的空间，避免遮挡内容 */
-  padding: 72px 10px 12px;
-}
-
-/* 给列表底部留出右上角浮动刷新按钮的空间 */
-:deep(.el-scrollbar__view) {
-  padding-bottom: 120px;
+  padding: 64px 16px 8px;
 }
 
 .shows-list {

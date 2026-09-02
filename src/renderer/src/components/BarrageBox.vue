@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { BarrageListItem } from './Barrage.vue'
-import { Search } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 import Barrage from '../components/Barrage.vue'
 import Tools from '../utils/tools'
+import MediaIcon from './MediaIcon.vue'
 
 const props = defineProps<{
   number: number
@@ -56,11 +56,14 @@ const emptyText = computed(() => {
       <div class="search-row">
         <el-input
           v-model="keyword"
-          :prefix-icon="Search"
           size="small"
           clearable
           placeholder="搜索弹幕内容或用户名"
-        />
+        >
+          <template #prefix>
+            <MediaIcon name="search" class="prefix-icon" />
+          </template>
+        </el-input>
         <!-- 弹幕设置等操作按钮，由父级注入到搜索框后面 -->
         <slot name="actions" />
       </div>
@@ -128,6 +131,11 @@ const emptyText = computed(() => {
   .el-input {
     flex: 1;
   }
+}
+
+/* 自绘搜索图标对齐 el-input 前缀图标的置灰色（currentColor 驱动描边） */
+.prefix-icon {
+  color: var(--el-input-icon-color, var(--el-text-color-placeholder));
 }
 
 /* min-height: 0 是必需的，否则 flex 子项会被内容撑开导致外层出现滚动条 */

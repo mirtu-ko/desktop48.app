@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
+import MediaIcon from './MediaIcon.vue'
 
 defineProps<{ angle: number }>()
 
@@ -15,9 +15,7 @@ const emit = defineEmits<{
   <div class="action-group">
     <el-tooltip content="逆时针旋转 90°（Shift + R）" placement="bottom" :show-after="400">
       <button class="rotate-btn" aria-label="逆时针旋转 90 度" @click="emit('rotateLeft')">
-        <el-icon :size="16">
-          <RefreshLeft />
-        </el-icon>
+        <MediaIcon name="rotateLeft" :size="16" />
       </button>
     </el-tooltip>
     <el-tooltip
@@ -37,9 +35,7 @@ const emit = defineEmits<{
     </el-tooltip>
     <el-tooltip content="顺时针旋转 90°（R）" placement="bottom" :show-after="400">
       <button class="rotate-btn" aria-label="顺时针旋转 90 度" @click="emit('rotateRight')">
-        <el-icon :size="16">
-          <RefreshRight />
-        </el-icon>
+        <MediaIcon name="rotateRight" :size="16" />
       </button>
     </el-tooltip>
   </div>
@@ -93,7 +89,7 @@ const emit = defineEmits<{
 
 /* 当前角度：0° 置灰并禁用，明确「现在没有可重置的东西」 */
 .rotate-angle {
-  min-width: 42px;
+  min-width: 36px;
   font-weight: 500;
 
   &.is-zero {

@@ -144,6 +144,8 @@ const sections = computed<MemberSection[]>(() => {
 const memberCount = computed(() =>
   sections.value.reduce((sum, section) => sum + section.members.length, 0),
 )
+const activeCount = computed(() => sections.value.filter(section => !section.muted).reduce((sum, section) => sum + section.members.length, 0))
+const inactiveCount = computed(() => sections.value.filter(section => section.muted).reduce((sum, section) => sum + section.members.length, 0))
 
 onMounted(() => {
   fetchGroups()
@@ -205,7 +207,7 @@ async function syncMembers() {
                 :class="{ 'section-title--muted': section.muted }"
                 :style="section.accent ? { '--st-accent': section.accent } : undefined"
               >
-                {{ section.title }}
+                {{ `${section.title} (${section.members.length})` }}
               </span>
             </h2>
             <div class="member-list">
@@ -279,6 +281,9 @@ async function syncMembers() {
             description="暂无成员信息，可在设置里同步成员数据"
           />
         </div>
+        <div class="list-end">
+          在团共 {{ activeCount }} 人，离团 {{ inactiveCount }} 人
+        </div>
       </el-scrollbar>
     </div>
 
@@ -316,13 +321,15 @@ async function syncMembers() {
 
 .members-container {
   /* 顶部留出左上角浮动切换器的空间；底部给右上角浮动按钮留空间 */
-  padding: 72px 10px 120px;
+  padding: 64px 16px 8px;
 }
 
-.group-section {
-  margin-bottom: 36px;
+/* 底部留出 Dock 空间 */
+:deep(.el-scrollbar__view) {
+  padding-bottom: 120px;
 }
 
+/* 分区标题 */
 .team-title {
   display: flex;
   flex-direction: column;

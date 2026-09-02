@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../services/task-payload'
-import { VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -13,6 +12,7 @@ import EventBus from '../services/event-bus'
 import { formatMediaTime } from '../utils/time-format'
 import Tools from '../utils/tools'
 
+import MediaIcon from './MediaIcon.vue'
 import MiniControls from './MiniControls.vue'
 import PlayerLoading from './PlayerLoading.vue'
 import RadioStage from './RadioStage.vue'
@@ -615,9 +615,7 @@ onUnmounted(() => {
             :aria-label="recording ? '结束录制' : '录制'"
             @click="onRecordClick"
           >
-            <el-icon :size="16">
-              <VideoCamera />
-            </el-icon>
+            <MediaIcon name="videoCamera" :size="16" />
           </button>
         </el-tooltip>
       </div>

@@ -217,7 +217,7 @@ watch(selectedFilter, () => {
 /* 筛选控件：圆角化、弱化生硬边框，与胶囊标签呼应 */
 :deep(.el-select__wrapper),
 :deep(.el-cascader .el-input__wrapper) {
-  border-radius: 10px;
+  border-radius: 16px;
   background-color: color-mix(in srgb, var(--el-bg-color) 72%, transparent);
   box-shadow: 0 0 0 1px var(--el-border-color) inset;
   transition:
@@ -232,11 +232,6 @@ watch(selectedFilter, () => {
   &.is-focus {
     box-shadow: 0 0 0 1.5px var(--el-color-primary) inset;
   }
-}
-
-/* 给列表底部留出浮动工具条的空间 */
-:deep(.el-scrollbar__view) {
-  padding-bottom: 120px;
 }
 
 .review-list {

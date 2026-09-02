@@ -182,9 +182,9 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 给列表底部留出浮动操作条的空间 */
+/* 底部留出 Dock 空间 */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 120px;
+  padding-bottom: 108px;
 }
 
 .live-empty {

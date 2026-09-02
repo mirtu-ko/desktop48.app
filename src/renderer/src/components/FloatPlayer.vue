@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { FloatPlayerItem } from '../composables/use-float-players'
 import type { WindowSize } from '../utils/float-player-layout'
-import { Close, Minus } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
   BARRAGE_SIDEBAR_WIDTH,
@@ -20,8 +19,8 @@ import {
   VIEWPORT_PADDING_BOTTOM,
   VIEWPORT_PADDING_X,
 } from '../utils/float-player-layout'
-import { MEDIA_ICONS } from '../utils/media-icons'
 import LivePlayer from './LivePlayer.vue'
+import MediaIcon from './MediaIcon.vue'
 import ReviewPlayer from './ReviewPlayer.vue'
 
 const props = defineProps<{
@@ -49,11 +48,6 @@ const barTitle = computed(() => {
 })
 const collapsed = ref(false)
 const expanded = ref(false)
-// 换档图标：与 AppTitleBar 最大化/还原同族窗口控件语言（单框放大 / 双叠框还原），
-// 放大镜 ZoomIn/Out 表意是「缩放内容」，与 MiniControls 的全屏语义冲突，故弃用
-const sizeIcon = computed(() =>
-  expanded.value ? MEDIA_ICONS.stroke.windowRestore : MEDIA_ICONS.stroke.windowMaximize,
-)
 // 弹幕侧栏是否实际占位（由 ReviewPlayer 上报：有弹幕且未收起）
 const sidebarActive = ref(false)
 function onSidebar(active: boolean) {
@@ -304,28 +298,24 @@ onUnmounted(() => {
           v-if="collapsed" circle size="small"
           title="还原窗口" @click.stop="toggleCollapse"
         >
-          <svg class="fp-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path :d="MEDIA_ICONS.stroke.windowMaximize" />
-          </svg>
+          <MediaIcon name="windowMaximize" :size="15" class="fp-icon" />
         </el-button>
         <template v-else>
-          <el-button
-            circle size="small" :icon="Minus"
-            title="折叠为迷你条" @click.stop="toggleCollapse"
-          />
+          <!-- 折叠为胶囊：用 minus 表达「收起」，避免误读为最小化到任务栏 -->
+          <el-button circle size="small" title="折叠为迷你条" @click.stop="toggleCollapse">
+            <MediaIcon name="minus" :size="15" class="fp-icon" />
+          </el-button>
+          <!-- 换档：与 AppTitleBar 最大化/还原同族窗口控件语言（单框放大 / 双叠框还原） -->
           <el-button
             circle size="small"
             :title="expanded ? '缩小还原' : '放大窗口'" @click.stop="toggleExpand"
           >
-            <svg class="fp-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path :d="sizeIcon" />
-            </svg>
+            <MediaIcon :name="expanded ? 'windowRestore' : 'windowMaximize'" :size="15" class="fp-icon" />
           </el-button>
         </template>
-        <el-button
-          circle size="small" :icon="Close"
-          title="关闭" @click.stop="onClose"
-        />
+        <el-button circle size="small" title="关闭" @click.stop="onClose">
+          <MediaIcon name="close" :size="15" class="fp-icon" />
+        </el-button>
       </div>
     </div>
 
@@ -392,18 +382,6 @@ onUnmounted(() => {
   }
 }
 
-/* 换档图标描边壳：与 MiniControls .mini-icon 同一套线性风格，几何在 utils/media-icons.ts */
-.fp-icon {
-  width: 15px;
-  height: 15px;
-  display: block;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .fp-window.is-collapsed .fp-bar {
   border-bottom: none;
 }
@@ -450,5 +428,9 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.fp-icon {
+  stroke-width: 1;
 }
 </style>

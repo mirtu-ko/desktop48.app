@@ -451,12 +451,12 @@ onMounted(fetchAlbums)
 
 /* 底部留出 Dock 空间 */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 120px;
+  padding-bottom: 108px;
 }
 
 .albums-container {
   /* 顶部留出左上角年份切换器空间 */
-  padding: 72px 14px 12px;
+  padding: 64px 16px 8px;
 }
 
 .albums-grid {
