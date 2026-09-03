@@ -54,9 +54,12 @@ interface FriendLink {
 
 const friendLinks: FriendLink[] = [
   { name: 'SNH48 官方网站', url: 'https://www.snh48.com/', abbr: 'SNH', color: Constants.GroupTabs[1].color },
-  { name: '官方直播', url: 'https://live.48.cn/', abbr: 'Live', color: Constants.Theme.LIVES },
+  { name: 'SNH48 官方直播', url: 'https://live.48.cn/', abbr: 'Live', color: Constants.Theme.SETTING },
   { name: '口袋48 APP', url: 'https://h5.48.cn/pocket48/index_pc.html', abbr: '48', color: Constants.Theme.MEMBERS, logo: 'https://h5.48.cn/pocket48/image/logo.png' },
   { name: '塞纳河48 APP', url: 'https://www.ckg48.cn/', abbr: 'CKG', color: Constants.Theme.SHOWS, logo: 'https://www.ckg48.cn/favicon.ico' },
+  { name: '新浪微博', url: 'https://weibo.com/u/2689280541', abbr: '微博', color: '#e6162d' },
+  { name: '哔哩哔哩', url: 'https://space.bilibili.com/2832224', abbr: 'B站', color: '#00a1d6' },
+  { name: 'YouTube', url: 'https://www.youtube.com/@SNH48Official', abbr: 'YT', color: '#ff0000' },
 ]
 
 /** 展示链接域名 */
@@ -534,6 +537,13 @@ async function setUserAgent() {
     border-radius: 10px;
     font-size: 11px;
     font-weight: 700;
+
+    /* 中英文短标识都居中且不换行 */
+    .link-abbr {
+      padding: 0 2px;
+      line-height: 1;
+      white-space: nowrap;
+    }
 
     img {
       position: absolute;

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import useAudioPlayer from '../composables/use-audio-player'
-import { MEDIA_ICONS } from '../utils/media-icons'
 import Tools from '../utils/tools'
 import MediaIcon from './MediaIcon.vue'
 
@@ -111,14 +110,10 @@ function onClearAll() {
 
       <div class="bar-controls">
         <button class="ctrl-btn" title="上一首" :disabled="currentIndex <= 0" @click="prev">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
-            <path :d="MEDIA_ICONS.fill.prev" />
-          </svg>
+          <MediaIcon name="prevFilled" :size="15" />
         </button>
         <button class="ctrl-btn ctrl-main" :title="playing ? '暂停' : '播放'" @click="togglePlay">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-            <path :d="playing ? MEDIA_ICONS.fill.pause : MEDIA_ICONS.fill.play" />
-          </svg>
+          <MediaIcon :name="playing ? 'pauseFilled' : 'playFilled'" :size="16" />
         </button>
         <button
           class="ctrl-btn"
@@ -126,9 +121,7 @@ function onClearAll() {
           :disabled="currentIndex >= playlist.length - 1"
           @click="next"
         >
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
-            <path :d="MEDIA_ICONS.fill.next" />
-          </svg>
+          <MediaIcon name="nextFilled" :size="15" />
         </button>
       </div>
 
@@ -138,9 +131,7 @@ function onClearAll() {
         title="播放列表"
         @click="panelVisible = !panelVisible"
       >
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
-          <path :d="MEDIA_ICONS.fill.playlist" />
-        </svg>
+        <MediaIcon name="playlistFilled" :size="15" />
       </button>
     </div>
   </div>

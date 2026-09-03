@@ -249,7 +249,7 @@ app.on('second-instance', () => {
 
 app.whenReady().then(() => {
   // 为 Windows 设置应用用户模型 ID。
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.electron.desktop48')
 
   // macOS 下 BrowserWindow 的 icon 选项无效，dev 模式运行的是原生 Electron.app，
   // 需要手动设置 Dock 图标；打包版由 build/icon.icns 提供，不受影响
