@@ -48,7 +48,7 @@ export const SNAP_TOP = 24
 export const CASCADE_STEP = 36
 export const CASCADE_MAX = 6
 /** 首个窗口的起始纵向偏移（主标题栏以下） */
-export const CASCADE_TOP_OFFSET = 60
+export const CASCADE_TOP_OFFSET = 30
 /** 首个窗口的右侧留白 */
 export const CASCADE_RIGHT_OFFSET = 24
 /** 尺寸收缩时保留的视口边距（左右合计 / 顶部标题栏以外） */

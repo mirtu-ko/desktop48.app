@@ -8,6 +8,8 @@ export interface DockItem {
   icon: any
   /** 主题色：悬浮/激活时图标渐变与光晕的颜色，缺省用品牌紫 */
   color?: string
+  /** 角标数字：>0 时显示，超过 99 显示 99+ */
+  badge?: number
 }
 
 defineProps<{
@@ -41,6 +43,11 @@ function change(index: string) {
       >
         <span class="dock-icon">
           <el-icon><component :is="item.icon" /></el-icon>
+          <!-- 角标：正在进行的任务数量，最多 2 位 -->
+          <span
+            v-if="item.badge"
+            class="dock-badge"
+          >{{ item.badge > 99 ? '99+' : item.badge }}</span>
         </span>
         <span class="dock-label">{{ item.label }}</span>
       </button>
@@ -129,6 +136,7 @@ function change(index: string) {
 
   /* 图标块：白色玻璃小磁贴，像一枚迷你 App 图标 */
   .dock-icon {
+    position: relative;
     width: 40px;
     height: 40px;
     border-radius: 13px;
@@ -148,6 +156,30 @@ function change(index: string) {
 
     .el-icon {
       font-size: 21px;
+    }
+
+    /* 角标：磁贴右上角的任务数胶囊，用该项主题色点亮 */
+    .dock-badge {
+      position: absolute;
+      top: -5px;
+      right: -7px;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 4px;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-pill);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      color: #fff;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--item-color) 80%, #000), var(--item-color));
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.85),
+        0 3px 8px -2px color-mix(in srgb, var(--item-color) 70%, transparent);
+      animation: badge-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
   }
 
@@ -229,6 +261,13 @@ function change(index: string) {
   from {
     opacity: 0;
     transform: translateY(16px) scale(0.9);
+  }
+}
+
+@keyframes badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
   }
 }
 
