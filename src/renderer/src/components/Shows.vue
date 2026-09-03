@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { OpenLive } from '../services/apis'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import FloatingRefreshDock from '../components/FloatingRefreshDock.vue'
 import FloatingTabBar from '../components/FloatingTabBar.vue'
 import ShowCard from '../components/ShowCard.vue'
@@ -9,11 +8,8 @@ import useFloatPlayers from '../composables/use-float-players'
 import useLoadMore from '../composables/use-load-more'
 import usePagedList from '../composables/use-paged-list'
 import Apis from '../services/apis'
-import EventBus from '../services/event-bus'
 import Constants from '../utils/constants'
 import Tools from '../utils/tools'
-
-const router = useRouter()
 
 // 画中画迷你窗：与直播/回放页共用全局播放挂载点
 const { openLive, openReview } = useFloatPlayers()
@@ -149,8 +145,6 @@ function openLiveStream(show: OpenLive) {
     liveType: 1,
     liveMode: 0,
   })
-  EventBus.emit('change-selected-menu', Constants.Menu.LIVES)
-  router.push('/lives')
 }
 
 /** 历史公演（已结束）：以画中画回放迷你窗打开 VOD 流，停留当前页继续浏览 */
