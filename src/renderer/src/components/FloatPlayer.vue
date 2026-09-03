@@ -313,7 +313,7 @@ onUnmounted(() => {
             <MediaIcon :name="expanded ? 'windowRestore' : 'windowMaximize'" :size="15" class="fp-icon" />
           </el-button>
         </template>
-        <el-button circle size="small" title="关闭" @click.stop="onClose">
+        <el-button circle size="small" title="关闭" class="fp-icon--close" @click.stop="onClose">
           <MediaIcon name="close" :size="15" class="fp-icon" />
         </el-button>
       </div>
@@ -432,5 +432,12 @@ onUnmounted(() => {
 
 .fp-icon {
   stroke-width: 1;
+}
+
+.fp-icon--close:hover {
+  background: linear-gradient(135deg, #e5484d, #e03d52);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px -2px rgba(224, 61, 82, 0.5);
 }
 </style>

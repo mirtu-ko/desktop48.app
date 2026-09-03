@@ -542,7 +542,7 @@ onMounted(fetchAlbums)
     box-shadow: var(--shadow-glow);
 
     &:hover {
-      background: linear-gradient(135deg, var(--brand-primary-dark), var(--brand-primary));
+      background: linear-gradient(135deg, var(--brand-primary-light), var(--brand-secondary));
       color: #fff;
     }
   }
