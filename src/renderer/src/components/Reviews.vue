@@ -71,11 +71,23 @@ function filterMethod(node: any, keyword: string) {
 
 // 初始化
 onMounted(async () => {
-  memberOption.value = await window.mainAPI.getMemberTree()
+  memberOption.value = sortMembersByStatus(await window.mainAPI.getMemberTree())
   // 先应用预置筛选再拉列表，避免挂载时重复请求
   if (!applyPreset())
     refresh()
 })
+
+/** 末级成员排序：在团成员（status=1）排在前，其余（暂休/退团）保持原有相对顺序排在后 */
+function sortMembersByStatus(tree: any[]): any[] {
+  for (const group of tree || []) {
+    for (const team of group.children || []) {
+      team.children?.sort(
+        (a: any, b: any) => Number(b.status === 1) - Number(a.status === 1),
+      )
+    }
+  }
+  return tree || []
+}
 
 /** 在成员树里按 userId 找到 [groupId, teamId, userId] 完整路径 */
 function findFilterPath(userId: string): any[] | null {

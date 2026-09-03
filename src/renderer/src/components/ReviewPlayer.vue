@@ -298,6 +298,15 @@ function toggleDanmaku() {
 // 快捷键绑定在根节点而不是 window：回放页会以多标签形式同时存在多个实例，
 // 只有获得焦点的那个才应该响应按键。
 // 注：LivePlayer 走的是另一套「hover 检测」策略（无焦点概念），两边改动请互相参照。
+
+/** 点击播放器即把焦点收回根节点，让快捷键随即生效（点在按钮/输入上时保留其原生焦点） */
+function onPointerDown(event: PointerEvent) {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('input, textarea, button, [contenteditable="true"]'))
+    return
+  rootRef.value?.focus({ preventScroll: true })
+}
+
 function onKeydown(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
@@ -430,7 +439,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="rootRef" class="review-player" tabindex="-1" @keydown="onKeydown">
+  <div ref="rootRef" class="review-player" tabindex="-1" @keydown="onKeydown" @pointerdown="onPointerDown">
     <div class="review-content">
       <div class="video-box">
         <div
