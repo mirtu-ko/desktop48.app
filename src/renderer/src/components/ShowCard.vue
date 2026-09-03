@@ -30,7 +30,7 @@ function formatTime(stime: string): string {
           class="team-badge"
           :style="team.teamColor ? { '--tb-color': `#${team.teamColor}` } : undefined"
         >
-          {{ team.teamName.replace('TEAM ', '') }}
+          {{ Tools.shortTeamName(team.teamName) }}
         </span>
       </div>
       <el-tag v-if="show.status === 2" class="show-tag" type="danger" size="small">

@@ -3,7 +3,8 @@ import type { TaskPayload } from '../services/task-payload'
 import { ElMessage } from 'element-plus'
 import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useDownloadGuard } from '../composables/use-download-guard'
+import { useSleepBlocker } from '../composables/use-sleep-blocker'
 import useTasks from '../composables/use-tasks'
 
 import { useVideoRotation } from '../composables/use-video-rotation'
@@ -66,7 +67,8 @@ const streamRestartToken = ref(0)
 const isRecoveringStream = ref(false)
 const coverImage = ref('')
 const onlineNum = ref(0)
-const powerSaveBlockerId = ref<number | null>(null)
+// 播放防休眠（use-sleep-blocker，与 ReviewPlayer 共用）
+const { acquire: acquireSleepBlocker, release: releaseSleepBlocker } = useSleepBlocker()
 const elapsedTime = ref(0)
 /** 电台轮播图与切换间隔（毫秒） */
 const carousels = ref<string[]>([])
@@ -103,7 +105,6 @@ const {
   onAspect: aspect => emit('aspect', aspect),
 })
 
-const router = useRouter()
 const onlineNumTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 let activeStreamRequestId = 0
@@ -380,25 +381,8 @@ function handleStreamError(reason: string) {
 }
 
 // 录制走原始 RTMP 地址直存文件，和页面播放的 HTTP-FLV 链路保持解耦。
-async function checkDownloadDirectory(): Promise<boolean> {
-  try {
-    const result = await window.mainAPI.getConfig('downloadDirectory')
-    if (!result) {
-      ElMessage({
-        message: '下载目录不存在，请先配置下载目录',
-        type: 'warning',
-      })
-      router.push('/setting')
-      return false
-    }
-    return true
-  }
-  catch (error: any) {
-    console.error(error)
-    ElMessage({ message: '检查下载目录失败', type: 'error' })
-    return false
-  }
-}
+// 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
+const { checkDownloadDirectory } = useDownloadGuard()
 
 async function record() {
   const valid = await checkDownloadDirectory()
@@ -406,8 +390,7 @@ async function record() {
     return
 
   fetchLiveDetail().then(async (detail) => {
-    const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-    const filename = `${realName.value} ${date}.flv`
+    const filename = Tools.taskFilename(realName.value, Number.parseInt(String(props.startTime)), 'flv', ' ')
     const recordTask: TaskPayload = {
       url: detail.playStreamPath,
       filename,
@@ -500,8 +483,7 @@ function setupPlayer(path: string) {
 async function resumeLive() {
   if (isManuallyUnmounted.value)
     return
-  if (powerSaveBlockerId.value === null)
-    powerSaveBlockerId.value = await window.mainAPI.preventSleep()
+  await acquireSleepBlocker()
   startElapsedTimer()
   startOnlineNumTimer()
   // 播放器仍在则直接续播，否则按缓存地址重建或全量拉流
@@ -553,8 +535,7 @@ onUnmounted(() => {
       console.error('停止直播流失败:', err)
     })
   }
-  if (powerSaveBlockerId.value !== null)
-    window.mainAPI.allowSleep(powerSaveBlockerId.value)
+  releaseSleepBlocker()
   stopOnlineNumTimer()
   window.removeEventListener('keydown', onKeyDown)
 })
@@ -620,8 +601,7 @@ onUnmounted(() => {
         </el-tooltip>
       </div>
 
-      <!-- 全自绘控制条：与录播同一条胶囊，LIVE 状态段走 #leading 插槽；
-           加载期间整条隐藏（连接中不显示 LIVE 状态），电台/视频、旋转与否共用同一套交互 -->
+      <!-- 控制条：LIVE 状态段走 #leading 插槽；加载期间整条隐藏（连接中不显示 LIVE 状态） -->
       <MiniControls
         v-if="!mediaLoading"
         :playing="playing"

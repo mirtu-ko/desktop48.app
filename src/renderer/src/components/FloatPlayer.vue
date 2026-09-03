@@ -39,7 +39,7 @@ const aspect = ref(DEFAULT_ASPECT)
 
 const kind = computed(() => props.item.kind)
 
-// 标题栏：有主播名时展示「主播名 · 标题」，否则回退到 title
+// 标题栏：有主播名时展示「主播名: 标题」，否则回退到 title
 const barTitle = computed(() => {
   const { nickname, title } = props.item.payload
   if (nickname)
@@ -248,7 +248,7 @@ function cycleSize() {
   clampPos()
 }
 
-// 双击标题栏快速折叠/还原
+// 双击入口：落在操作按钮区的不处理，其余交给 cycleSize 三态循环
 function onBarDblClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (target.closest('.fp-actions'))

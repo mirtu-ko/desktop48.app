@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 统一右上角磨砂玻璃浮层：直播/回放/公演三页共用
+// 统一右上角磨砂玻璃浮层容器：五个列表页经 FloatingRefreshDock 组合使用
 </script>
 
 <template>

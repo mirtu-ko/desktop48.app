@@ -10,7 +10,7 @@ import { error, log, warn } from './logger'
 
 const TIME_REGEX = /time=(\d+:\d+:\d+\.\d+)/
 
-/** 任务快照：主进程持有的任务状态源，供渲染端刷新后恢复列表 */
+/** 主进程侧任务状态（对应 renderer services/task-payload.ts 的同名接口） */
 interface TaskSnapshot {
   liveId: string
   url: string
@@ -52,7 +52,7 @@ interface FfmpegTaskConfig {
 
 /**
  * 注册一组由 ffmpeg 承担的任务 IPC 通道：
- * `${prefix}Start`(invoke) / `${prefix}Progress|End|Error`(send) / `${prefix}Stop:${liveId}`(once)
+ * `${prefix}Start`(invoke) / `${prefix}Progress|End|Error`(send) / `${prefix}Stop:${liveId}`(once) / `${prefix}List|Remove`(invoke)
  */
 function registerFfmpegTask(config: FfmpegTaskConfig): void {
   const { channelPrefix, logTag, ffmpegArgs } = config

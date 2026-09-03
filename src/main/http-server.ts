@@ -111,7 +111,7 @@ const server = http.createServer((req, res) => {
 let port = 8080
 const maxPort = 8090
 
-// 应用内可能同时存在多个实例竞争端口，所以按区间向后尝试即可。
+// 上次退出的残留监听或外部程序可能占用端口，按 8080-8090 区间向后退避尝试。
 function tryListen() {
   server.listen(port)
     .on('error', (err: any) => {

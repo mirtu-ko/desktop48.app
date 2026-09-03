@@ -1,17 +1,23 @@
 <script setup lang="ts">
+import type { DanmakuSettings } from '../composables/use-danmaku-settings'
 import type { TaskPayload } from '../services/task-payload'
-import type { BarrageListItem } from './Barrage.vue'
 import { ElMessage } from 'element-plus'
-import Hls from 'hls.js'
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BarrageBox from '../components/BarrageBox.vue'
-import { findBarrageIndex, useDanmakuOverlay } from '../composables/use-danmaku-overlay'
+import { useBarrageList } from '../composables/use-barrage-list'
+import { useDanmakuOverlay } from '../composables/use-danmaku-overlay'
+import { useDanmakuSettings } from '../composables/use-danmaku-settings'
+import { useDownloadGuard } from '../composables/use-download-guard'
+import { usePlaybackEngine } from '../composables/use-playback-engine'
+import { useSleepBlocker } from '../composables/use-sleep-blocker'
 import useTasks from '../composables/use-tasks'
 import { useVideoRotation } from '../composables/use-video-rotation'
 
 import Apis from '../services/apis'
 import Tools from '../utils/tools'
+import BarrageSidebarToggle from './BarrageSidebarToggle.vue'
+import DanmakuSettingsPopover from './DanmakuSettingsPopover.vue'
 import MediaIcon from './MediaIcon.vue'
 import MiniControls from './MiniControls.vue'
 import PlayerLoading from './PlayerLoading.vue'
@@ -42,16 +48,10 @@ const currentTime = ref(0)
 const carousels = ref<string[]>([])
 const carouselTime = ref(5000)
 const barrageUrl = ref('')
-const barrageLoaded = ref(false)
-const loadedBarrageUrl = ref('')
 // 是否有弹幕数据源：无弹幕时隐藏弹幕叠加层、右缘切换竖条与弹幕侧栏
 const hasBarrage = computed(() => !!barrageUrl.value)
 const realName = ref('')
 const userAvatar = ref('')
-const powerSaveBlockerId = ref<number | null>(null)
-const lastPlaybackError = ref('')
-const mediaLoading = ref(true)
-const mediaBuffering = ref(false)
 const sidebarVisible = ref(true)
 
 // 侧栏实际占位（有弹幕数据且未收起）上报给浮窗：
@@ -62,88 +62,37 @@ watch(
   { immediate: true },
 )
 
-// 弹幕唯一数据源：解析时就把 [hh:mm:ss] 转成秒并排序，
-// 之后所有消费方（右侧列表 / 视频叠加层）都只持有指向它的游标，不再复制数组。
-interface BarrageEntry extends BarrageListItem {}
-const barrageEntries = shallowRef<BarrageEntry[]>([])
-// 右侧列表与叠加层的进度基准不同（列表滞后 1s），各自维护一个游标；
-// 叠加层游标在 use-danmaku-overlay 内部，这里只留列表游标
-let listCursor = 0
-// 右侧列表当前展示的弹幕：从头累积到当前进度，超出上限时丢弃最早的
-const barrageListItems = shallowRef<BarrageListItem[]>([])
-const MAX_LIST_ITEMS = 500
-const LIST_DELAY_SECONDS = 1
+// 弹幕数据源与右侧列表游标（引擎见 composables/use-barrage-list.ts）
+const {
+  entries: barrageEntries,
+  items: barrageListItems,
+  loaded: barrageLoaded,
+  load: loadBarrages,
+  buildUpTo: buildListUpTo,
+  advanceTo: advanceListTo,
+  reset: resetBarrages,
+} = useBarrageList()
 
-// 弹幕显示设置，持久化在 localStorage（主进程 config 只接受固定几个 key）
-const DANMAKU_SETTINGS_KEY = 'review-danmaku-settings'
-interface DanmakuSettings {
-  enabled: boolean
-  opacity: number
-  fontSize: number
-  speed: number
-  // 弹幕可占用的高度比例，1 表示铺满
-  area: number
-}
-const settings = reactive<DanmakuSettings>({
-  enabled: true,
-  opacity: 1,
-  fontSize: 24,
-  speed: 200,
-  area: 1,
-})
+// 弹幕显示设置（localStorage 持久化见 composables/use-danmaku-settings.ts）
+const {
+  settings,
+  load: loadDanmakuSettings,
+  save: saveDanmakuSettings,
+} = useDanmakuSettings()
 
-function loadDanmakuSettings() {
-  try {
-    const raw = localStorage.getItem(DANMAKU_SETTINGS_KEY)
-    if (!raw)
-      return
-    Object.assign(settings, JSON.parse(raw) as Partial<DanmakuSettings>)
-  }
-  catch (error) {
-    console.error('[ReviewPlayer.vue] 弹幕设置读取失败:', error)
-  }
-}
-
-function saveDanmakuSettings() {
-  localStorage.setItem(DANMAKU_SETTINGS_KEY, JSON.stringify({ ...settings }))
+/** 设置弹层里改动的参数统一在这里落库 */
+function onDanmakuSettingsUpdate(patch: Partial<DanmakuSettings>) {
+  Object.assign(settings, patch)
+  saveDanmakuSettings()
 }
 
 const router = useRouter()
 
-let hlsInstance: Hls | null = null
-
 // 录播页只做两类事情：
-// 1. 按播放地址选择 HLS 或原生 MP4 播放
+// 1. 按播放地址选择 HLS 或原生 MP4 播放（use-playback-engine）
 // 2. 按录播资源加载弹幕，并在回退/重播时重置弹幕状态
 function getActiveMediaElement() {
   return isRadio.value ? nativeAudio.value : nativeVideo.value
-}
-
-function resetMediaElement(mediaElement: HTMLMediaElement | null) {
-  if (!mediaElement)
-    return
-
-  mediaElement.pause()
-  mediaElement.removeAttribute('src')
-  mediaElement.load()
-  mediaElement.ontimeupdate = null
-  mediaElement.onseeking = null
-  mediaElement.onloadedmetadata = null
-  mediaElement.onerror = null
-  mediaElement.onwaiting = null
-  mediaElement.onplaying = null
-  mediaElement.onpause = null
-  mediaElement.onended = null
-}
-
-function destroyPlayer() {
-  if (hlsInstance) {
-    hlsInstance.destroy()
-    hlsInstance = null
-  }
-
-  resetMediaElement(nativeVideo.value)
-  resetMediaElement(nativeAudio.value)
 }
 
 const videoBoxRef = ref<HTMLElement | null>(null)
@@ -211,175 +160,42 @@ const {
 // seek / 重播统一入口：叠加层游标二分定位，列表按“从头到当前”重建
 function seekBarragesTo(time: number) {
   seekOverlayTo(time)
-  listCursor = findBarrageIndex(barrageEntries.value, time - LIST_DELAY_SECONDS)
-  // 保持原有体验：拖动进度后列表展示视频开始到当前时刻的全部弹幕
-  barrageListItems.value = listCursor > MAX_LIST_ITEMS
-    ? barrageEntries.value.slice(listCursor - MAX_LIST_ITEMS, listCursor)
-    : barrageEntries.value.slice(0, listCursor)
+  buildListUpTo(time)
   currentTime.value = time
-}
-
-function processListDanmaku(time: number) {
-  const list = barrageEntries.value
-  const threshold = time - LIST_DELAY_SECONDS
-  const start = listCursor
-  while (listCursor < list.length && list[listCursor].seconds <= threshold)
-    listCursor++
-
-  if (listCursor === start)
-    return
-
-  const merged = barrageListItems.value.concat(list.slice(start, listCursor))
-  barrageListItems.value = merged.length > MAX_LIST_ITEMS
-    ? merged.slice(merged.length - MAX_LIST_ITEMS)
-    : merged
 }
 // =========== 视频弹幕叠加层结束 ===========
 
-function attemptAutoplay(mediaElement: HTMLMediaElement) {
-  void Promise.resolve(mediaElement.play()).catch((error) => {
-    console.error('[ReviewPlayer.vue] 自动播放失败:', error)
-  })
-}
-
-function notifyPlaybackError(message: string) {
-  if (lastPlaybackError.value === message)
-    return
-
-  lastPlaybackError.value = message
-  mediaLoading.value = false
-  mediaBuffering.value = false
-}
-
-async function acquireSleepBlocker() {
-  if (powerSaveBlockerId.value !== null)
-    return
-  powerSaveBlockerId.value = await window.mainAPI.preventSleep()
-}
-
-function releaseSleepBlocker() {
-  if (powerSaveBlockerId.value === null)
-    return
-  window.mainAPI.allowSleep(powerSaveBlockerId.value)
-  powerSaveBlockerId.value = null
-}
+// 播放防休眠（use-sleep-blocker，与 LivePlayer 共用）
+const { acquire: acquireSleepBlocker, release: releaseSleepBlocker } = useSleepBlocker()
 
 async function ensureBarragesLoaded() {
-  if (!barrageUrl.value || loadedBarrageUrl.value === barrageUrl.value)
-    return
-
-  try {
-    const response = await Apis.instance().barrage(barrageUrl.value)
-    loadedBarrageUrl.value = barrageUrl.value
-    // 预计算秒数并排序，之后游标推进与二分查找都不必再解析时间字符串
-    barrageEntries.value = Tools.lyricsParse(response)
-      .map((item: any, index: number) => ({
-        id: index,
-        seconds: Tools.timeToSecond(item.time),
-        time: item.time,
-        username: item.username,
-        content: item.content,
-      }))
-      .sort((a, b) => a.seconds - b.seconds)
-    barrageLoaded.value = true
-    // 弹幕晚于播放到达时，按当前进度补齐列表与叠加层
+  // 弹幕晚于播放到达时，按当前进度补齐列表与叠加层
+  if (await loadBarrages(barrageUrl.value))
     seekBarragesTo(getActiveMediaElement()?.currentTime ?? 0)
-  }
-  catch (error: any) {
-    console.error(error)
-    ElMessage({ message: '弹幕加载失败', type: 'error' })
-  }
 }
 
-function bindMediaEvents(mediaElement: HTMLMediaElement) {
-  mediaElement.ontimeupdate = () => {
-    onTimeUpdate(mediaElement.currentTime)
-  }
-
-  // 用原生 seeking 事件替代靠 currentTime 跳变幅度的猜测，小幅拖动也能识别
-  mediaElement.onseeking = () => {
-    seekBarragesTo(mediaElement.currentTime)
-  }
-
-  mediaElement.onloadedmetadata = async () => {
-    lastPlaybackError.value = ''
-    mediaLoading.value = false
+// 播放引擎：HLS/原生选择与三态由 use-playback-engine 维护，这里只做业务接线
+const {
+  loading: mediaLoading,
+  buffering: mediaBuffering,
+  error: lastPlaybackError,
+  attach: attachPlaybackSource,
+  destroy: destroyPlayer,
+} = usePlaybackEngine({
+  getMediaElement: getActiveMediaElement,
+  getManagedElements: () => [nativeVideo.value, nativeAudio.value],
+  onTimeUpdate,
+  onSeeking: time => seekBarragesTo(time),
+  onMetadataLoaded: async (mediaElement) => {
     // 记录源尺寸供旋转缩放计算，并按（可能旋转后的）画面比例上报浮窗
     if (!isRadio.value)
       updateVideoDimensions()
     mediaDuration.value = mediaElement.duration || 0
     await ensureBarragesLoaded()
-    attemptAutoplay(mediaElement)
-  }
-
-  mediaElement.onwaiting = () => {
-    mediaBuffering.value = true
-  }
-
-  mediaElement.onplaying = () => {
-    mediaBuffering.value = false
-    mediaLoading.value = false
-    void acquireSleepBlocker()
-  }
-
-  mediaElement.onpause = releaseSleepBlocker
-  mediaElement.onended = releaseSleepBlocker
-
-  mediaElement.onerror = () => {
-    console.error('[ReviewPlayer.vue] 录播播放失败:', playStreamPath.value)
-    notifyPlaybackError('录播播放失败，请稍后重试或检查播放地址是否有效')
-  }
-}
-
-// 录播是 VOD 场景，保留 HLS 最合适；如果是 MP4 则直接交给原生 video。
-function attachPlaybackSource(newPath: string) {
-  const mediaElement = getActiveMediaElement()
-  if (!mediaElement)
-    return
-
-  destroyPlayer()
-  lastPlaybackError.value = ''
-  mediaLoading.value = true
-
-  if (newPath.endsWith('.m3u8')) {
-    if (Hls.isSupported()) {
-      const hls = new Hls()
-      hlsInstance = hls
-      hls.loadSource(newPath)
-      hls.attachMedia(mediaElement)
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.error('[ReviewPlayer.vue] HLS 录播播放失败:', data)
-
-        if (!data.fatal)
-          return
-
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          notifyPlaybackError('录播加载失败，播放地址可能已失效或网络不可用')
-        }
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          notifyPlaybackError('录播播放失败，媒体内容可能已损坏或编码不受支持')
-        }
-        else {
-          notifyPlaybackError('录播播放失败，请稍后重试')
-        }
-      })
-    }
-    else if (mediaElement.canPlayType('application/vnd.apple.mpegurl')) {
-      mediaElement.src = newPath
-    }
-    else {
-      notifyPlaybackError('当前环境不支持录播 HLS 播放')
-      return
-    }
-  }
-  else {
-    mediaElement.src = newPath
-    mediaElement.load()
-  }
-
-  bindMediaEvents(mediaElement)
-  attemptAutoplay(mediaElement)
-}
+  },
+  onPlaying: () => void acquireSleepBlocker(),
+  onIdle: releaseSleepBlocker,
+})
 
 function retryPlayback() {
   if (!playStreamPath.value)
@@ -390,7 +206,7 @@ function retryPlayback() {
 async function getOne() {
   try {
     if (props.source === 'open') {
-      // 开放公演回放：getOpenLiveOne 返回 playStreams 数组（VOD m3u8），优先选高清（streamType 2），
+      // 开放公演回放：getOpenLiveOne 返回 playStreams 数组（VOD m3u8），优先选超清（streamType 3），回落高清 2 与任意可用流，
       // 详情里没有用户与在线人数信息，用公演标题与传入的队伍 logo 兜底
       const data = await Apis.instance().openLive(props.liveId)
       const streams: Array<{ streamPath: string, streamType: number }> = data.playStreams || []
@@ -442,9 +258,7 @@ async function getOne() {
     playStreamPath.value = nextPlayStreamPath
 
     if (barrageSourceChanged) {
-      barrageLoaded.value = false
-      loadedBarrageUrl.value = ''
-      barrageEntries.value = []
+      resetBarrages()
       seekBarragesTo(0)
     }
   }
@@ -457,7 +271,7 @@ async function getOne() {
 // seek 由 onseeking 处理，这里只负责按进度投放弹幕
 function onTimeUpdate(newTime: number) {
   currentTime.value = newTime
-  processListDanmaku(newTime)
+  advanceListTo(newTime)
   processOverlayDanmaku(newTime)
 }
 
@@ -548,32 +362,14 @@ function onKeydown(event: KeyboardEvent) {
   event.preventDefault()
 }
 
-async function checkDownloadDirectory(): Promise<boolean> {
-  try {
-    const result = await window.mainAPI.getConfig('downloadDirectory')
-    if (!result) {
-      ElMessage({
-        message: '下载目录不存在，请先配置下载目录',
-        type: 'warning',
-      })
-      router.push('/setting')
-      return false
-    }
-    return true
-  }
-  catch (error: any) {
-    console.error(error)
-    ElMessage({ message: '检查下载目录失败', type: 'error' })
-    return false
-  }
-}
+// 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
+const { checkDownloadDirectory } = useDownloadGuard()
 
 function getReviewDownloadFilename() {
-  const date = Tools.dateFormat(Number.parseInt(String(props.startTime)), 'yyyyMMddhhmm')
-  return `${realName.value}${date}.mp4`
+  return Tools.taskFilename(realName.value, Number.parseInt(String(props.startTime)), 'mp4')
 }
 
-// 任务通过共享 store 直接下发，不再绕 EventBus 中转
+// 任务由 useTasks 共享 store 直接接住并下发
 const { handleTask, isTaskRunning, stopTask } = useTasks()
 const downloading = computed(() => isTaskRunning('download', props.liveId))
 
@@ -699,7 +495,7 @@ onUnmounted(() => {
           </div>
 
           <div class="player-actions">
-            <!-- 旋转三件套：与 LivePlayer 一致的分段胶囊，中段显示当前角度，点击归零 -->
+            <!-- 旋转控制（分段胶囊交互见 RotationControls.vue 头部注释） -->
             <RotationControls
               v-if="!isRadio && !mediaLoading"
               :angle="rotationAngle"
@@ -719,7 +515,7 @@ onUnmounted(() => {
             </el-tooltip>
           </div>
 
-          <!-- 全自绘控制条：录播保留 seek，电台回放同样可拖进度 -->
+          <!-- 控制条：录播与电台回放都保留拖动进度 seek -->
           <MiniControls
             v-if="!mediaLoading"
             :playing="playing"
@@ -742,17 +538,12 @@ onUnmounted(() => {
             {{ rotateHint }}
           </div>
 
-          <!-- 视频窗口右边缘：hover 时才浮出的弹幕列表显隐竖条（B站式边缘吸附） -->
-          <div v-if="!compact && hasBarrage" class="sidebar-toggle">
-            <div
-              class="sidebar-toggle-tab"
-              :title="sidebarVisible ? '隐藏弹幕列表' : '显示弹幕列表'"
-              @click="sidebarVisible = !sidebarVisible"
-            >
-              <MediaIcon name="chat" :size="16" />
-              <span class="toggle-label">{{ sidebarVisible ? '收起' : '弹幕' }}</span>
-            </div>
-          </div>
+          <!-- 视频窗口右边缘：hover 时才浮出的弹幕列表显隐竖条 -->
+          <BarrageSidebarToggle
+            v-if="!compact && hasBarrage"
+            :visible="sidebarVisible"
+            @toggle="sidebarVisible = !sidebarVisible"
+          />
         </div>
       </div>
 
@@ -766,45 +557,11 @@ onUnmounted(() => {
           @seek="seekTo"
         >
           <template #actions>
-            <el-popover trigger="click" placement="bottom-end" :width="260">
-              <template #reference>
-                <el-button circle class="side-setting-btn" title="弹幕设置">
-                  <MediaIcon name="settings" :size="15" />
-                </el-button>
-              </template>
-              <div class="danmaku-settings">
-                <div class="setting-row">
-                  <span>显示弹幕</span>
-                  <el-switch :model-value="settings.enabled" @change="toggleDanmaku" />
-                </div>
-                <div class="setting-row column">
-                  <span>不透明度</span>
-                  <el-slider v-model="settings.opacity" :min="0.2" :max="1" :step="0.1" @change="saveDanmakuSettings" />
-                </div>
-                <div class="setting-row column">
-                  <span>字号</span>
-                  <el-slider v-model="settings.fontSize" :min="14" :max="40" :step="2" @change="saveDanmakuSettings" />
-                </div>
-                <div class="setting-row column">
-                  <span>速度</span>
-                  <el-slider v-model="settings.speed" :min="80" :max="400" :step="20" @change="saveDanmakuSettings" />
-                </div>
-                <div class="setting-row column">
-                  <span>显示区域</span>
-                  <el-radio-group v-model="settings.area" size="small" @change="saveDanmakuSettings">
-                    <el-radio-button :value="0.25">
-                      顶部
-                    </el-radio-button>
-                    <el-radio-button :value="0.5">
-                      半屏
-                    </el-radio-button>
-                    <el-radio-button :value="1">
-                      全屏
-                    </el-radio-button>
-                  </el-radio-group>
-                </div>
-              </div>
-            </el-popover>
+            <DanmakuSettingsPopover
+              :settings="settings"
+              @update="onDanmakuSettingsUpdate"
+              @toggle="toggleDanmaku"
+            />
           </template>
         </BarrageBox>
       </div>
@@ -822,77 +579,6 @@ onUnmounted(() => {
 }
 
 /* 悬浮按钮（下载）与右上角容器样式为全局 .player-actions / .action-btn，见 app.scss */
-
-/* 视频窗口右边缘的弹幕显隐竖条触发区：平时不可见，hover 到右缘才滑出 */
-.sidebar-toggle {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  width: 72px;
-  box-sizing: border-box;
-  padding-top: 96px;
-  padding-bottom: 96px;
-  z-index: 30;
-}
-
-/* B站式边缘吸附竖条：贴在右缘，仅左侧圆角，hover 时从边缘滑出 */
-.sidebar-toggle-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 26px;
-  height: 76px;
-  box-sizing: border-box;
-  padding: 8px 2px;
-  border-radius: 10px 0 0 10px;
-  background: color-mix(in srgb, var(--brand-primary) 75%, transparent);
-  color: #fff;
-  font-size: 11px;
-  line-height: 1.2;
-  cursor: pointer;
-  user-select: none;
-  backdrop-filter: blur(6px);
-  border-left: 1px solid rgba(255, 255, 255, 0.32);
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  transform: translateX(12px);
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease,
-    background 0.2s ease;
-}
-
-.sidebar-toggle:hover .sidebar-toggle-tab {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* hover 提亮一档，给出明确的可点击反馈 */
-.sidebar-toggle-tab:hover {
-  background: color-mix(in srgb, var(--brand-primary) 92%, #fff);
-}
-
-.toggle-label {
-  writing-mode: vertical-rl;
-  letter-spacing: 2px;
-  font-weight: 500;
-}
-
-/* 弹幕列表面板搜索框右侧的设置按钮：小而圆，与右栏配色一致 */
-.side-setting-btn {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  margin-left: 0 !important;
-  color: var(--el-text-color-secondary);
-}
 
 /* 视频占主区域，弹幕列表定宽侧栏；min-height/min-width 为 0 让高度链正确收缩 */
 .review-content {
@@ -987,25 +673,5 @@ onUnmounted(() => {
 .mask-actions {
   display: flex;
   gap: 8px;
-}
-
-.danmaku-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 13px;
-}
-
-.setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.setting-row.column {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
 }
 </style>

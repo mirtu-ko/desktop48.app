@@ -14,11 +14,9 @@ import { closeLog, getLogPathForDisplay, log } from './logger'
 import './stream' // 流媒体相关主进程注册
 import './http-server' // live中转服务器主进程注册
 
-// 打印 __dirname
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// 打印日志
 log('[app.ts] Electron app.ts __filename:', __filename)
 log('[app.ts] Electron app.ts __dirname:', __dirname)
 log('[app.ts] 日志目录:', getLogPathForDisplay())
@@ -73,7 +71,6 @@ ipcMain.handle('select-directory', async () => {
   return result.filePaths[0]
 })
 
-// path处理
 ipcMain.handle('path-join', (_event: IpcMainInvokeEvent, ...paths: string[]) => path.join(...paths))
 
 // 网络请求 - 域名白名单校验
@@ -175,7 +172,7 @@ function createWindow(): void {
     show: false,
     frame: false, // 纯自定义标题栏：去掉系统边框与默认按钮
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -250,9 +247,6 @@ app.on('second-instance', () => {
   win.focus()
 })
 
-// 当 Electron 完成初始化时会调用此方法，
-// 并准备好创建浏览器窗口。
-// 某些 API 只有在此事件发生后才能使用。
 app.whenReady().then(() => {
   // 为 Windows 设置应用用户模型 ID。
   electronApp.setAppUserModelId('com.electron')
@@ -262,27 +256,20 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock)
     app.dock.setIcon(icon)
 
-  // 在开发环境中按 F12 默认打开或关闭 DevTools，
-  // 在生产环境中忽略 CommandOrControl + R。
-  // 详情请参阅 https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+  // dev 按 F12 开 DevTools、prod 屏蔽 Ctrl+R（electron-toolkit optimizer）
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // 创建窗口
   createWindow()
 
   app.on('activate', () => {
-    // 在 macOS 上，当 Dock 图标被点击且没有其他窗口打开时，
-    // 通常会重新创建一个窗口。
     if (BrowserWindow.getAllWindows().length === 0)
       createWindow()
   })
 })
 
-// 当所有窗口关闭时退出应用（macOS 除外），
-// 在 macOS 上，应用及其菜单栏通常会保持活动状态，
-// 直到用户使用 Cmd + Q 显式退出。
+// 所有窗口关闭时退出（macOS 除外）
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()

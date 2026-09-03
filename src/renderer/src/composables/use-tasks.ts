@@ -80,7 +80,7 @@ async function startTask(task: TaskBase, config: TaskKindConfig, message: string
       config.list.value.push(reactiveTask)
   }
   catch (error) {
-    console.error(`[useTasks] ${config.logTag} task start failed`, error)
+    console.error(`[use-tasks] ${config.logTag} task start failed`, error)
     ElMessage({ message: String(error), type: 'error' })
   }
 }
@@ -161,7 +161,7 @@ EventBus.on('record-task', payload => handleTask(payload, 'record'))
 // 应用启动即恢复一次：播放器可能在下载页从未挂载过的情况下进入，
 // 此时也要能正确显示「录制中」并能停止
 void ensureRestored().catch((error: any) => {
-  console.error('[useTasks] 恢复任务列表失败:', error)
+  console.error('[use-tasks] 恢复任务列表失败:', error)
 })
 
 export function useTasks() {

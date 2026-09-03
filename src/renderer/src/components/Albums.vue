@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { AudioTrack } from '../composables/use-audio-player'
-import { Headset, Link, Plus, Refresh, ShoppingCart, VideoPlay } from '@element-plus/icons-vue'
+import { Headset, Link, Plus, ShoppingCart, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import useAudioPlayer from '../composables/use-audio-player'
 import Apis from '../services/apis'
 import Tools from '../utils/tools'
-import FloatingDock from './FloatingDock.vue'
+import FloatingRefreshDock from './FloatingRefreshDock.vue'
 import FloatingTabBar from './FloatingTabBar.vue'
 
 /** CDN JSON 中的歌曲条目 */
@@ -87,7 +87,7 @@ function totalTime(album: MusicAlbum): string {
   if (!total) {
     return ''
   }
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+  return Tools.formatDuration(total)
 }
 
 /** 拉取 CDN 音乐 JSON 并按发行时间倒序 */
@@ -227,7 +227,10 @@ onMounted(fetchAlbums)
 </script>
 
 <template>
-  <div v-loading="loading" class="container">
+  <div
+    v-loading="loading"
+    class="container page-root"
+  >
     <!-- 左上角浮动年份切换：磨砂玻璃，双击当前年份刷新 -->
     <FloatingTabBar
       :tabs="yearTabs"
@@ -322,7 +325,7 @@ onMounted(fetchAlbums)
 
         <el-empty
           v-if="!filteredAlbums.length && !loading"
-          class="albums-empty"
+          class="page-empty"
           :image-size="120"
           description="暂无专辑数据，点击右上角刷新试试"
         />
@@ -333,16 +336,10 @@ onMounted(fetchAlbums)
     </el-scrollbar>
 
     <!-- 右上角浮动刷新按钮 -->
-    <FloatingDock>
-      <el-button
-        circle
-        type="primary"
-        :icon="Refresh"
-        :loading="loading"
-        title="刷新"
-        @click="refresh"
-      />
-    </FloatingDock>
+    <FloatingRefreshDock
+      :loading="loading"
+      @refresh="refresh"
+    />
 
     <!-- 专辑详情抽屉：氛围底 + 旋转黑胶 + 曲目列表 -->
     <el-drawer v-model="detailVisible" size="440px" :with-header="false" destroy-on-close>
@@ -442,21 +439,16 @@ onMounted(fetchAlbums)
 </template>
 
 <style scoped lang="scss">
-/* ===== 页面骨架：与直播/公演页同构 ===== */
-.container {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-}
+/* ===== 页面骨架：与直播/公演页同构（相对定位 + 裁剪见全局 .page-root） ===== */
 
-/* 底部留出 Dock 空间 */
+/* 底部留出 Dock 空间（--dock-reserve） */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 108px;
+  padding-bottom: var(--dock-reserve);
 }
 
 .albums-container {
-  /* 顶部留出左上角年份切换器空间 */
-  padding: 64px 16px 8px;
+  /* 顶部留出左上角年份切换器空间（--tabbar-offset-top） */
+  padding: var(--tabbar-offset-top) 16px 8px;
 }
 
 .albums-grid {
@@ -465,9 +457,7 @@ onMounted(fetchAlbums)
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
-.albums-empty {
-  padding: 80px 0 0;
-}
+/* 空态：样式见全局 .page-empty */
 
 /* ===== 专辑卡片：唱片套 + 探出的黑胶 ===== */
 .album-card {
@@ -616,7 +606,8 @@ onMounted(fetchAlbums)
   background-size: cover;
   background-position: center;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
-  animation: vinyl-spin 7s linear infinite;
+  /* 旋转动画见全局 @keyframes spin */
+  animation: spin 7s linear infinite;
   animation-play-state: paused;
   overflow: hidden;
 
@@ -701,7 +692,7 @@ onMounted(fetchAlbums)
   color: var(--el-text-color-secondary);
 }
 
-/* EP / 专辑 / 单曲 小徽章：不同类型不同配色 */
+/* EP / 专辑 / 单曲 小徽章：不同类型不同配色（语义色见 app.scss 的 --color-* 变量） */
 .album-tag {
   flex: none;
   padding: 1px 8px;
@@ -714,9 +705,9 @@ onMounted(fetchAlbums)
   box-shadow: 0 3px 8px -3px rgba(144, 147, 153, 0.55);
 
   &.album-tag--ep {
-    /* EP：玫粉 */
-    background: linear-gradient(135deg, #ff5e7e, #ff8fb0);
-    box-shadow: 0 3px 8px -3px rgba(255, 94, 126, 0.55);
+    /* EP：玫粉（与直播语义色同源） */
+    background: linear-gradient(135deg, var(--color-lives), #ff8fb0);
+    box-shadow: 0 3px 8px -3px color-mix(in srgb, var(--color-lives) 55%, transparent);
   }
 
   &.album-tag--zj {
@@ -726,9 +717,9 @@ onMounted(fetchAlbums)
   }
 
   &.album-tag--sg {
-    /* 单曲：青绿 */
-    background: linear-gradient(135deg, #10b981, #34d399);
-    box-shadow: 0 3px 8px -3px rgba(16, 185, 129, 0.55);
+    /* 单曲：青绿（与下载语义色同源） */
+    background: linear-gradient(135deg, var(--color-downloads), #34d399);
+    box-shadow: 0 3px 8px -3px color-mix(in srgb, var(--color-downloads) 55%, transparent);
   }
 }
 
@@ -960,15 +951,6 @@ onMounted(fetchAlbums)
   font-size: 12px;
   color: var(--el-text-color-placeholder);
   font-variant-numeric: tabular-nums;
-}
-
-@keyframes vinyl-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes cover-fade {

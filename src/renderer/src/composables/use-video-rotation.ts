@@ -160,7 +160,7 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
         await videoBoxRef.value?.requestFullscreen()
     }
     catch (error: any) {
-      console.error('[useVideoRotation] 切换全屏失败:', error)
+      console.error('[use-video-rotation] 切换全屏失败:', error)
     }
   }
 
@@ -185,7 +185,7 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
     // 已在画中画的正是本播放器 → 退出；其他浮窗占用时直接请求，Chromium 会接管切换
     if (doc.pictureInPictureElement && doc.pictureInPictureElement === video) {
       void doc.exitPictureInPicture?.().catch((error: any) => {
-        console.error('[useVideoRotation] 退出画中画失败:', error)
+        console.error('[use-video-rotation] 退出画中画失败:', error)
       })
       return
     }
@@ -198,7 +198,7 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
       await video.requestPictureInPicture()
     }
     catch (error: any) {
-      console.error('[useVideoRotation] 切换画中画失败:', error)
+      console.error('[use-video-rotation] 切换画中画失败:', error)
     }
   }
 
@@ -216,7 +216,7 @@ export function useVideoRotation(options: UseVideoRotationOptions) {
     if (!el)
       return
     if (el.paused)
-      void Promise.resolve(el.play()).catch((error: any) => console.error('[useVideoRotation] 播放失败:', error))
+      void Promise.resolve(el.play()).catch((error: any) => console.error('[use-video-rotation.ts] 播放失败:', error))
     else
       el.pause()
   }

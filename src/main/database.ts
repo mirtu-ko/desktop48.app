@@ -176,7 +176,6 @@ class Database {
   }
 
   public saveMemberData(content: any) {
-    // 写入 starInfo 数据
     log('[database.ts] save-member-data 开始写入:', content.starInfo?.length, content.teamInfo?.length, content.groupInfo?.length)
     if (content.starInfo)
       this.db.starInfo = content.starInfo
@@ -192,17 +191,15 @@ class Database {
     })
     // 同步缓存引用：starInfo 是整组替换，不刷新的话 hasMembers 等会读到旧数据直到重启
     this.membersDB = this.db.starInfo
-    // 统一顺序：先补颜色（粘性留存）→ 再清洗（解散队伍移除）→ 再建树（最后建才能带上 teamColor）
+    // 顺序与 init 一致：补颜色 → 清洗 → 建树
     this.memberTeamUpdate()
     this.pruneTeamsAndGroups()
     this.buildMemberTree()
-    // 写入数据库
     this.lowdb.write()
     return { ok: true }
   }
 
   public getMember(userId: number) {
-    // 通过 userId 查找成员
     return this.db.starInfo.find((m: any) => Number(m.userId) === Number(userId))
   }
 
@@ -226,7 +223,7 @@ class Database {
       this.lowdb.write()
     }
 
-    // 确保 starInfo 存在
+    // 成员数据未初始化时视为无屏蔽
     if (!this.db.starInfo) {
       return []
     }
@@ -234,8 +231,6 @@ class Database {
     const blockedMembers = this.db.blockedMemberIds.map(id =>
       this.db.starInfo.find((m: any) => Number(m.userId) === Number(id)),
     )
-
-    // 过滤掉可能的 undefined 结果
     return blockedMembers.filter(member => member !== undefined)
   }
 

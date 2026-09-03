@@ -1,6 +1,7 @@
-import type { Ref } from 'vue'
-import { computed, ref } from 'vue'
-import useLoadMore from './use-load-more'
+import type { UsePagedListOptions } from './use-paged-list'
+import { ref } from 'vue'
+import Tools from '../utils/tools'
+import { usePagedList } from './use-paged-list'
 
 /** 直播 / 回放列表条目的最小结构 */
 export interface PagedLive {
@@ -33,12 +34,8 @@ export interface UsePagedLiveListOptions<T> {
 }
 
 /**
- * 直播 / 回放列表共用的分页加载逻辑，抽取自 Lives.vue 与 Reviews.vue：
- * - 列表 / 游标 / loading / noMore 四件套
- * - 请求序号丢弃过期响应，避免刷新与滚动并发导致数据错乱
- * - 拉取被屏蔽成员并过滤
- * - 去重追加 + 触底加载（useLoadMore）
- * - 刷新重置
+ * 直播 / 回放列表共用的分页加载逻辑：在通用 usePagedList（use-paged-list.ts）
+ * 之上叠加「拉取被屏蔽成员并过滤」的领域行为，并适配 { next, liveList } 响应结构。
  */
 export function usePagedLiveList<T extends PagedLive = PagedLive>({
   loadPage,
@@ -46,98 +43,55 @@ export function usePagedLiveList<T extends PagedLive = PagedLive>({
   filterBlocked = true,
   stopOnError = false,
 }: UsePagedLiveListOptions<T>) {
-  const list = ref<T[]>([]) as Ref<T[]>
-  const listNext = ref('0')
-  const loading = ref(false)
-  const noMore = ref(false)
-
-  const disabled = computed(() => loading.value || noMore.value)
-
   const blockedMemberIds = ref<number[]>([])
   async function updateBlockedMemberIds() {
     const blockedMembers = await window.mainAPI.getBlockedMembers()
     blockedMemberIds.value = blockedMembers.map(member => member.userId)
   }
 
-  // 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
-  let listRequestId = 0
+  const options: UsePagedListOptions<T> = {
+    itemKey: item => item.liveId,
+    stopOnError,
+    loadPage: async (next) => {
+      const content = await loadPage(next)
+      return { next: content.next, items: content.liveList || [] }
+    },
+    processItem,
+  }
 
-  async function getList() {
-    const requestId = ++listRequestId
-    loading.value = true
+  if (filterBlocked) {
+    options.filterItems = async (items) => {
+      await updateBlockedMemberIds()
+      return items.filter(
+        (item: any) => !blockedMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
+      )
+    }
+  }
+
+  return usePagedList(options)
+}
+
+/**
+ * 直播 / 回放列表条目的展示信息补全：封面 / 队伍 Logo 归一化、日期格式化、关联成员。
+ * Lives 与 Reviews 的 processItem 共用；memberError 决定成员查询失败时的行为：
+ * - 'fallback'：成员置 null 并打错误日志（直播页逐条容错）
+ * - 'throw'：向上抛出，交由 usePagedList 的 stopOnError 接管（回放页整批停止）
+ */
+export async function enrichLiveItem(item: any, memberError: 'fallback' | 'throw' = 'throw'): Promise<void> {
+  item.cover = Tools.pictureUrls(item.coverPath)
+  item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
+  item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
+  if (memberError === 'fallback') {
     try {
-      if (filterBlocked) {
-        await updateBlockedMemberIds()
-        if (requestId !== listRequestId)
-          return
-      }
-      const content = await loadPage(listNext.value)
-      if (requestId !== listRequestId)
-        return
-      if (!content || !Array.isArray(content.liveList)) {
-        console.warn('liveList 不是数组或无内容', content?.liveList)
-        noMore.value = true
-        return
-      }
-      if (content.next === '0' || content.liveList.length === 0)
-        noMore.value = true
-      listNext.value = content.next
-
-      // 先过滤被屏蔽成员，再并行补全展示信息，避免逐条串行 await 拖慢列表加载
-      let visibleItems = content.liveList as T[]
-      if (filterBlocked) {
-        visibleItems = (content.liveList as T[]).filter(
-          (item: any) => !blockedMemberIds.value.includes(Number.parseInt(item.userInfo.userId)),
-        )
-      }
-      if (processItem)
-        await Promise.all(visibleItems.map((item, index) => processItem(item, index)))
-      if (requestId !== listRequestId)
-        return
-      // 兜底去重，避免接口分页边界返回重复项导致列表出现重复卡片
-      const existedIds = new Set(list.value.map((item: any) => item.liveId))
-      list.value.push(...visibleItems.filter((item: any) => !existedIds.has(item.liveId)))
+      item.member = await window.mainAPI.getMember(item.userInfo.userId)
     }
-    catch (error) {
-      if (requestId !== listRequestId)
-        return
-      console.info(error)
-      if (stopOnError)
-        noMore.value = true
+    catch (e) {
+      item.member = null
+      console.error('获取成员信息失败:', e)
     }
-    finally {
-      loading.value = false
-    }
+    return
   }
-
-  // 统一的触底加载：直播 / 回放 / 公演共用同一套交互逻辑
-  const scrollbarRef = ref<any>(null)
-  const { onInfiniteScroll } = useLoadMore({
-    load: getList,
-    disabled,
-    scrollbarRef,
-  })
-
-  function refresh() {
-    list.value = []
-    listNext.value = '0'
-    noMore.value = false
-    getList()
-  }
-
-  return {
-    list,
-    listNext,
-    loading,
-    noMore,
-    disabled,
-    blockedMemberIds,
-    updateBlockedMemberIds,
-    scrollbarRef,
-    onInfiniteScroll,
-    getList,
-    refresh,
-  }
+  item.member = await window.mainAPI.getMember(item.userInfo.userId)
 }
 
 export default usePagedLiveList

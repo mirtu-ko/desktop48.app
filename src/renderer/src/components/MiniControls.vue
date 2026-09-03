@@ -39,10 +39,10 @@ function onRangeInput(event: Event) {
   <!-- 全自绘控制条：直播与录播共用同一条胶囊。
        直播在 #leading 插槽放状态段（LIVE 徽标/时长），录播用内置进度段；
        加载期间整条随宿主 v-if 隐藏，连接中不显示 LIVE 状态。 -->
-  <div class="mini-controls">
+  <div class="mini-controls player-capsule" :class="{ 'mini-controls--progress': showProgress }">
     <slot name="leading" />
 
-    <button class="mini-btn" :aria-label="playing ? '暂停' : '播放'" @click="emit('togglePlay')">
+    <button class="mini-btn player-capsule__btn" :aria-label="playing ? '暂停' : '播放'" @click="emit('togglePlay')">
       <MediaIcon :name="playing ? 'pause' : 'play'" :size="16" />
     </button>
 
@@ -59,12 +59,12 @@ function onRangeInput(event: Event) {
       <span class="mini-time">{{ timeText() }}</span>
     </template>
 
-    <button class="mini-btn" :aria-label="muted ? '取消静音' : '静音'" @click="emit('toggleMute')">
+    <button class="mini-btn player-capsule__btn" :aria-label="muted ? '取消静音' : '静音'" @click="emit('toggleMute')">
       <MediaIcon :name="muted ? 'volumeOff' : 'volumeOn'" :size="16" />
     </button>
     <button
       v-if="showPip && pipSupported"
-      class="mini-btn"
+      class="mini-btn player-capsule__btn"
       :aria-label="isPip ? '退出画中画' : '画中画'"
       :title="isPip ? '退出画中画' : '画中画'"
       @click="emit('togglePip')"
@@ -72,7 +72,7 @@ function onRangeInput(event: Event) {
       <MediaIcon name="pip" :size="16" />
     </button>
     <button
-      class="mini-btn"
+      class="mini-btn player-capsule__btn"
       :aria-label="isFullscreen ? '退出全屏' : '全屏'"
       @click="emit('toggleFullscreen')"
     >
@@ -82,7 +82,8 @@ function onRangeInput(event: Event) {
 </template>
 
 <style scoped lang="scss">
-/* 全自绘控制条：不参与旋转，恒定贴在容器底部；窄容器（迷你浮窗）下限宽自适应 */
+/* 全自绘控制条：不参与旋转，恒定贴在容器底部；窄容器（迷你浮窗）下限宽自适应。
+ * 深色玻璃胶囊骨架见全局 .player-capsule */
 .mini-controls {
   position: absolute;
   bottom: 12px;
@@ -90,48 +91,30 @@ function onRangeInput(event: Event) {
   transform: translateX(-50%);
   max-width: calc(100% - 24px);
   min-width: 0;
-  display: flex;
-  align-items: center;
   gap: 0px;
   padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(15, 17, 26, 0.6);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(8px);
   z-index: 20;
 }
 
-/* 按钮永不收缩：拥挤时让位给进度条 / 时间 / leading 插槽内容 */
-.mini-btn {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  color: #fff;
-  background: transparent;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    transform 0.1s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.16);
-  }
-
-  &:active {
-    transform: scale(0.92);
-  }
+/* 有进度段（录播/回放）：容器足够宽时胶囊随容器拉伸，520px 封顶，富余空间由进度条吸收；
+ * 直播（无进度段）与窄容器仍走 shrink-to-fit + max-width 兜底 */
+.mini-controls--progress {
+  width: min(calc(100% - 24px), 520px);
 }
 
-/* 迷你进度条：录播必须可 seek。shrink 因子 1000：按 basis×factor 加权，
- * 空间不足时进度条先收缩（可压到 0），时间串的份额小到亚像素（100 时仍漏 1px 出省略号），
- * 进度条让尽后时间串才截断。实测 Chromium 并不会把 left:50% 绝对定位盒卡在 50% 宽，勿再依赖该假说 */
+/* 按钮永不收缩：拥挤时让位给进度条 / 时间 / leading 插槽内容。
+ * 透明圆钮（hover 白纱 / 按下缩放）见全局 .player-capsule__btn */
+.mini-btn {
+  width: 28px;
+  height: 28px;
+}
+
+/* 迷你进度条：录播必须可 seek。grow 因子 1：容器富余空间全部归进度条（时间串被推到右端）；
+ * shrink 因子 1000：按 basis×factor 加权，空间不足时进度条先收缩（可压到 0），
+ * 时间串的份额小到亚像素（100 时仍漏 1px 出省略号），进度条让尽后时间串才截断。
+ * 实测 Chromium 并不会把 left:50% 绝对定位盒卡在 50% 宽，勿再依赖该假说 */
 .mini-range {
-  flex: 0 1000 140px;
+  flex: 1 1000 140px;
   min-width: 0;
   accent-color: var(--brand-primary);
   cursor: pointer;

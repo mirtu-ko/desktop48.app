@@ -3,6 +3,7 @@ import type { TaskKind } from '../composables/use-tasks'
 import { Check, Download, Loading, VideoCamera } from '@element-plus/icons-vue'
 import { computed, onMounted } from 'vue'
 import useTasks from '../composables/use-tasks'
+import Constants from '../utils/constants'
 
 // 任务状态由 useTasks 这个模块级单例持有：本页卸载后任务照常运行，
 // 从悬浮迷你窗等任意入口发起的任务也不会因为本页未挂载而丢失
@@ -13,10 +14,10 @@ onMounted(() => {
   restoreTasks('record')
 })
 
-// 分区展示配置：图标与主题色与底部 Dock 的语义保持一致（下载-绿 / 直播-玫红）
+// 分区展示配置：图标与主题色与底部 Dock 的语义保持一致（直播-玫红 / 下载-绿，取自 Constants.Theme）
 const taskGroups = computed(() => [
-  { kind: 'record' as TaskKind, title: '直播录制', icon: VideoCamera, color: '#ff5e7e', emptyText: '暂无录制任务', tasks: recordTasks.value },
-  { kind: 'download' as TaskKind, title: '回放下载', icon: Download, color: '#10b981', emptyText: '暂无下载任务', tasks: downloadTasks.value },
+  { kind: 'record' as TaskKind, title: '直播录制', icon: VideoCamera, color: Constants.Theme.LIVES, emptyText: '暂无录制任务', tasks: recordTasks.value },
+  { kind: 'download' as TaskKind, title: '回放下载', icon: Download, color: Constants.Theme.DOWNLOADS, emptyText: '暂无下载任务', tasks: downloadTasks.value },
 ])
 </script>
 
@@ -34,14 +35,13 @@ const taskGroups = computed(() => [
       >
         <!-- 分区头：主题色图标 + 标题 + 任务数 -->
         <header class="section-head">
-          <span class="section-icon">
+          <span class="section-icon icon-tile">
             <el-icon><component :is="group.icon" /></el-icon>
           </span>
           <span class="section-title">{{ group.title }}</span>
           <span class="section-count">{{ group.tasks.length }}</span>
         </header>
 
-        <!-- 空态 -->
         <div
           v-if="group.tasks.length === 0"
           class="empty-card glass-card"
@@ -147,8 +147,8 @@ const taskGroups = computed(() => [
 .downloads-root {
   max-width: 880px;
   margin: 0 auto;
-  /* 底部留出悬浮 Dock 的高度，避免最后一张卡片被遮挡 */
-  padding: 20px 24px 120px;
+  /* 底部留出悬浮 Dock 的高度（--dock-reserve），避免最后一张卡片被遮挡 */
+  padding: 20px 24px var(--dock-reserve);
 }
 
 .task-section + .task-section {
@@ -163,15 +163,13 @@ const taskGroups = computed(() => [
   margin-bottom: 12px;
 
   .section-icon {
+    /* 渐变磁贴骨架见全局 .icon-tile，--tile-color 跟随分组主题色 */
+    --tile-color: var(--group-color);
+
     width: 28px;
     height: 28px;
     border-radius: 9px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     background: linear-gradient(135deg, color-mix(in srgb, var(--group-color) 75%, #fff), var(--group-color));
-    color: #fff;
-    box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--group-color) 65%, transparent);
 
     .el-icon {
       font-size: 15px;
@@ -232,7 +230,7 @@ const taskGroups = computed(() => [
   }
 }
 
-/* 任务列表：滚动条 */
+/* 任务列表 */
 .task-list {
   min-height: 240px;
 }

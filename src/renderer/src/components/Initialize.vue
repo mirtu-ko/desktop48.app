@@ -4,7 +4,6 @@ import { onMounted, ref } from 'vue'
 
 const emit = defineEmits(['initialized'])
 
-// 初始化
 const initText = ref('正在初始化')
 const checking = ref(false)
 

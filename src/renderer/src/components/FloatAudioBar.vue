@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import useAudioPlayer from '../composables/use-audio-player'
 import { MEDIA_ICONS } from '../utils/media-icons'
+import Tools from '../utils/tools'
 import MediaIcon from './MediaIcon.vue'
 
 const {
@@ -31,12 +32,6 @@ const coverStyle = computed(() => ({
   '--cover': currentTrack.value?.cover ? `url(${currentTrack.value.cover})` : 'none',
 }))
 
-/** 秒数 → m:ss */
-function fmt(seconds: number): string {
-  const s = Math.floor(seconds || 0)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
 /** 点击进度条跳转 */
 function onSeek(event: MouseEvent) {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -51,7 +46,7 @@ function onClearAll() {
 </script>
 
 <template>
-  <!-- 播放列表为空且未播放时整体隐藏 -->
+  <!-- 播放列表为空时整体隐藏（清空队列必已停止播放） -->
   <div v-if="playlist.length" class="float-audio">
     <!-- 队列面板：向上展开 -->
     <transition name="panel-pop">
@@ -112,7 +107,7 @@ function onClearAll() {
         </div>
       </div>
 
-      <span class="bar-time">{{ fmt(currentTime) }} / {{ fmt(duration) }}</span>
+      <span class="bar-time">{{ Tools.formatDuration(currentTime) }} / {{ Tools.formatDuration(duration) }}</span>
 
       <div class="bar-controls">
         <button class="ctrl-btn" title="上一首" :disabled="currentIndex <= 0" @click="prev">
@@ -388,7 +383,8 @@ function onClearAll() {
     background-size: cover;
     background-position: center;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
-    animation: bar-vinyl-spin 8s linear infinite;
+    /* 旋转动画见全局 @keyframes spin */
+    animation: spin 8s linear infinite;
     animation-play-state: paused;
   }
 
@@ -490,14 +486,5 @@ function onClearAll() {
 .panel-pop-leave-to {
   opacity: 0;
   transform: translateY(10px) scale(0.96);
-}
-
-@keyframes bar-vinyl-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

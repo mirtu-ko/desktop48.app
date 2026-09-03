@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { Film, Refresh, VideoCamera } from '@element-plus/icons-vue'
+import { Film, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref } from 'vue'
 import LiveItem from '../components/LiveItem.vue'
 import useFloatPlayers from '../composables/use-float-players'
-import usePagedLiveList from '../composables/use-paged-live-list'
+import { enrichLiveItem, usePagedLiveList } from '../composables/use-paged-live-list'
 import Apis from '../services/apis'
 import EventBus from '../services/event-bus'
-import Tools from '../utils/tools'
-import FloatingDock from './FloatingDock.vue'
+import FloatingRefreshDock from './FloatingRefreshDock.vue'
 import FloatingTabBar from './FloatingTabBar.vue'
 import Reviews from './Reviews.vue'
 
@@ -48,7 +47,7 @@ function onTabsRefresh() {
     refreshList()
 }
 
-// 分页列表状态/逻辑/触底加载统一由组合式函数管理，直播与回放共用同一套
+// 分页状态与触底加载：见 composables/use-paged-live-list.ts（直播/回放共用）
 const {
   list: liveList,
   loading,
@@ -59,18 +58,8 @@ const {
   refresh,
 } = usePagedLiveList({
   loadPage: next => Apis.instance().lives(next),
-  processItem: async (item: any) => {
-    item.cover = Tools.pictureUrls(item.coverPath)
-    item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
-    item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
-    try {
-      item.member = await window.mainAPI.getMember(item.userInfo.userId)
-    }
-    catch (e) {
-      item.member = null
-      console.error('获取成员信息失败:', e)
-    }
-  },
+  // 封面/队伍Logo/日期/成员信息补全：与回放页共用 enrichLiveItem，成员查询失败逐条容错
+  processItem: (item: any) => enrichLiveItem(item, 'fallback'),
   stopOnError: false,
 })
 
@@ -112,17 +101,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="lives-root">
+  <div class="lives-root page-root">
     <!-- 左上角浮层 tab：在直播与回放之间切换，悬浮于列表之上；双击当前 tab 刷新 -->
     <FloatingTabBar :tabs="viewTabs" :active="activeTab" @change="switchTab" @refresh="onTabsRefresh" />
 
     <div v-show="activeTab === 'live'" v-loading="loading" class="live-main">
-      <!-- 无直播时显示 -->
       <div v-if="!loading && liveList.length === 0" class="live-empty">
         <el-empty description="当前没有直播" />
       </div>
 
-      <!-- 有直播时显示 -->
       <el-scrollbar
         v-if="liveList.length > 0"
         ref="liveScrollRef"
@@ -141,13 +128,13 @@ onUnmounted(() => {
       </el-scrollbar>
 
       <!-- 右上角浮动操作条：不占行，内容从下方滚过呈现磨砂玻璃 -->
-      <FloatingDock>
+      <FloatingRefreshDock
+        :loading="loading"
+        title="刷新"
+        @refresh="refreshList"
+      >
         <span class="live-count">已加载 {{ liveList.length }} 个直播</span>
-        <el-button
-          circle type="primary" :icon="Refresh" :loading="loading" title="刷新"
-          @click="refreshList"
-        />
-      </FloatingDock>
+      </FloatingRefreshDock>
     </div>
 
     <!-- 回放面板：复用回放组件，首次切换时才渲染并保持状态 -->
@@ -158,11 +145,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-.lives-root {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-}
+/* 页面骨架（相对定位 + 裁剪）由模板上的全局 .page-root 提供 */
 
 /* 回放面板与直播共用整页高度 */
 .review-main {
@@ -182,9 +165,9 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 底部留出 Dock 空间 */
+/* 底部留出 Dock 空间（--dock-reserve） */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 108px;
+  padding-bottom: var(--dock-reserve);
 }
 
 .live-empty {
@@ -198,8 +181,8 @@ onUnmounted(() => {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  /* 顶部留出左上角 tab 栏，底留卡片悬停上浮与阴影的空间 */
-  padding: 64px 16px 8px;
+  /* 顶部留出左上角 tab 栏（--tabbar-offset-top），底留卡片悬停上浮与阴影的空间 */
+  padding: var(--tabbar-offset-top) 16px 8px;
 }
 
 .live-item {

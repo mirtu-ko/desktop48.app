@@ -13,7 +13,7 @@ const userAgent = ref('')
 
 const router = useRouter()
 
-/** 屏蔽名单为模块级共享状态（与成员页同源），任一页面操作后另一页面自动同步 */
+/** 屏蔽名单：模块级共享状态，机制见 use-blocked-members.ts */
 const { blockedMembers, refreshBlockedMembers, unblockMember, clearBlockedMembers } = useBlockedMembers()
 
 onMounted(async () => {
@@ -43,7 +43,7 @@ function goMembers() {
   router.push('/members')
 }
 
-/** 友情链接（logo 加载失败时回退为首字磁贴） */
+/** 友情链接（logo 加载失败时回退为首字磁贴）；主题色复用 Constants 的语义色 */
 interface FriendLink {
   name: string
   url: string
@@ -53,10 +53,10 @@ interface FriendLink {
 }
 
 const friendLinks: FriendLink[] = [
-  { name: 'SNH48 官方网站', url: 'https://www.snh48.com/', abbr: 'SNH', color: '#8FD3F6' },
-  { name: '官方直播', url: 'https://live.48.cn/', abbr: 'Live', color: '#ff5e7e' },
-  { name: '口袋48 APP', url: 'https://h5.48.cn/pocket48/index_pc.html', abbr: '48', color: '#3b82f6', logo: 'https://h5.48.cn/pocket48/image/logo.png' },
-  { name: '塞纳河48 APP', url: 'https://www.ckg48.cn/', abbr: 'CKG', color: '#f59e0b', logo: 'https://www.ckg48.cn/favicon.ico' },
+  { name: 'SNH48 官方网站', url: 'https://www.snh48.com/', abbr: 'SNH', color: Constants.GroupTabs[1].color },
+  { name: '官方直播', url: 'https://live.48.cn/', abbr: 'Live', color: Constants.Theme.LIVES },
+  { name: '口袋48 APP', url: 'https://h5.48.cn/pocket48/index_pc.html', abbr: '48', color: Constants.Theme.MEMBERS, logo: 'https://h5.48.cn/pocket48/image/logo.png' },
+  { name: '塞纳河48 APP', url: 'https://www.ckg48.cn/', abbr: 'CKG', color: Constants.Theme.SHOWS, logo: 'https://www.ckg48.cn/favicon.ico' },
 ]
 
 /** 展示链接域名 */
@@ -103,7 +103,7 @@ async function setFfmpegDirectory() {
       })
     }
     catch (e) {
-      console.error(e)
+      console.error('[Setting] 设置ffmpeg目录失败:', e)
       confirmFfmpegDir()
     }
   }
@@ -142,7 +142,10 @@ async function setUserAgent() {
       <!-- User-Agent -->
       <section class="setting-card glass-card">
         <div class="setting-row">
-          <span class="row-icon" style="--row-color: #6d5ae0">
+          <span
+            class="row-icon icon-tile"
+            :style="{ '--tile-color': Constants.Theme.SETTING }"
+          >
             <el-icon><Connection /></el-icon>
           </span>
           <div class="row-text">
@@ -171,7 +174,10 @@ async function setUserAgent() {
       <!-- 默认下载目录 -->
       <section class="setting-card glass-card">
         <div class="setting-row">
-          <span class="row-icon" style="--row-color: #10b981">
+          <span
+            class="row-icon icon-tile"
+            :style="{ '--tile-color': Constants.Theme.DOWNLOADS }"
+          >
             <el-icon><Folder /></el-icon>
           </span>
           <div class="row-text">
@@ -206,7 +212,10 @@ async function setUserAgent() {
       <!-- ffmpeg 目录 -->
       <section class="setting-card glass-card">
         <div class="setting-row">
-          <span class="row-icon" style="--row-color: #f59e0b">
+          <span
+            class="row-icon icon-tile"
+            :style="{ '--tile-color': Constants.Theme.SHOWS }"
+          >
             <el-icon><Cpu /></el-icon>
           </span>
           <div class="row-text">
@@ -241,7 +250,10 @@ async function setUserAgent() {
       <!-- 屏蔽成员 -->
       <section class="setting-card glass-card">
         <div class="setting-row">
-          <span class="row-icon" style="--row-color: #ff5e7e">
+          <span
+            class="row-icon icon-tile"
+            :style="{ '--tile-color': Constants.Theme.LIVES }"
+          >
             <el-icon><Hide /></el-icon>
           </span>
           <div class="row-text">
@@ -315,7 +327,7 @@ async function setUserAgent() {
                 target="_blank"
                 rel="noopener"
               >
-                <span class="link-logo" :style="{ '--logo-color': link.color }">
+                <span class="link-logo icon-tile" :style="{ '--tile-color': link.color }">
                   <span class="link-abbr">{{ link.abbr }}</span>
                   <img v-if="link.logo" :src="link.logo" alt="" @error="hideLogo">
                 </span>
@@ -358,8 +370,8 @@ async function setUserAgent() {
 .setting-root {
   max-width: 880px;
   margin: 0 auto;
-  /* 底部留出悬浮 Dock 的高度，避免最后一张卡片被遮挡 */
-  padding: 20px 24px 120px;
+  /* 底部留出悬浮 Dock 的高度（--dock-reserve），避免最后一张卡片被遮挡 */
+  padding: 20px 24px var(--dock-reserve);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -378,18 +390,10 @@ async function setUserAgent() {
   flex-wrap: wrap;
 }
 
-/* 渐变主题图标磁贴，与底部 Dock 的视觉语言一致 */
+/* 渐变主题图标磁贴：骨架见全局 .icon-tile（与底部 Dock 的视觉语言一致），此处仅定尺寸 */
 .row-icon {
-  flex-shrink: 0;
   width: 44px;
   height: 44px;
-  border-radius: 13px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--row-color) 72%, #fff), var(--row-color));
-  color: #fff;
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--row-color) 65%, transparent);
 
   .el-icon {
     font-size: 21px;
@@ -427,7 +431,7 @@ async function setUserAgent() {
   display: flex;
 }
 
-/* 屏蔽成员：名单与标题行之间用虚线分隔 */
+/* 卡片正文：与标题行之间用虚线分隔 */
 .row-body {
   margin-top: 14px;
   padding-top: 14px;
@@ -455,10 +459,7 @@ async function setUserAgent() {
   }
 }
 
-.empty-hint {
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
-}
+/* 屏蔽名单空态：样式见全局 .empty-hint */
 
 /* 权利声明：小字号次要色，低调呈现 */
 .legal-block + .legal-block,
@@ -523,21 +524,16 @@ async function setUserAgent() {
     }
   }
 
-  /* 主题色首字磁贴：logo 加载失败 / 无 logo 时兜底展示 */
+  /* 主题色首字磁贴：渐变骨架见全局 .icon-tile；logo 加载失败 / 无 logo 时兜底展示 */
   .link-logo {
     position: relative;
-    flex: none;
     display: flex;
-    align-items: center;
-    justify-content: center;
     width: 38px;
     height: 38px;
     overflow: hidden;
     border-radius: 10px;
     font-size: 11px;
     font-weight: 700;
-    color: #fff;
-    background: linear-gradient(135deg, color-mix(in srgb, var(--logo-color) 72%, #fff), var(--logo-color));
 
     img {
       position: absolute;

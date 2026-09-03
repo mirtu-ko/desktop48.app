@@ -31,14 +31,14 @@ const { downloadTasks } = useTasks()
 // Dock「下载」角标：正在下载中的任务数量
 const downloadingCount = computed(() => downloadTasks.value.filter(task => task.isRunning()).length)
 
-// 底部 Dock 菜单项（每项带专属主题色，用于激活/悬浮的图标渐变）
+// 底部 Dock 菜单项（语义色统一取自 Constants.Theme；每项专属色用于激活/悬浮的图标渐变）
 const dockItems = computed(() => [
-  { index: Constants.Menu.LIVES, label: '直播', icon: VideoCamera, color: '#ff5e7e' },
-  { index: Constants.Menu.Shows, label: '公演', icon: Microphone, color: '#f59e0b' },
-  { index: Constants.Menu.Albums, label: '专辑', icon: Headset, color: '#d946ef' },
-  { index: Constants.Menu.Members, label: '成员', icon: User, color: '#3b82f6' },
-  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: '#10b981', badge: downloadingCount.value },
-  { index: Constants.Menu.SETTING, label: '设置', icon: Setting, color: '#6d5ae0' },
+  { index: Constants.Menu.LIVES, label: '直播', icon: VideoCamera, color: Constants.Theme.LIVES },
+  { index: Constants.Menu.Shows, label: '公演', icon: Microphone, color: Constants.Theme.SHOWS },
+  { index: Constants.Menu.Albums, label: '专辑', icon: Headset, color: Constants.Theme.ALBUMS },
+  { index: Constants.Menu.Members, label: '成员', icon: User, color: Constants.Theme.MEMBERS },
+  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: Constants.Theme.DOWNLOADS, badge: downloadingCount.value },
+  { index: Constants.Menu.SETTING, label: '设置', icon: Setting, color: Constants.Theme.SETTING },
 ])
 
 function changeMenu(menu: string) {

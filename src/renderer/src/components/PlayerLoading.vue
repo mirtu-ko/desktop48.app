@@ -94,14 +94,15 @@ withDefaults(defineProps<{
   border: 3px solid rgba(255, 255, 255, 0.14);
   border-top-color: var(--brand-primary);
   box-shadow: 0 0 18px color-mix(in srgb, var(--brand-primary) 35%, transparent);
-  animation: player-loading-spin 1.1s linear infinite;
+  /* 旋转动画见全局 @keyframes spin */
+  animation: spin 1.1s linear infinite;
 }
 
 .ring--inner {
   inset: 11px;
   border: 3px solid rgba(255, 255, 255, 0.12);
   border-bottom-color: var(--brand-primary-light);
-  animation: player-loading-spin 0.8s linear infinite reverse;
+  animation: spin 0.8s linear infinite reverse;
 }
 
 .loading-text {
@@ -138,12 +139,6 @@ withDefaults(defineProps<{
   font-size: 12px;
   letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.55);
-}
-
-@keyframes player-loading-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes player-loading-dot-bounce {

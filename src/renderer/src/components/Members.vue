@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { MemberDetail } from './MemberDetailDrawer.vue'
-import { Hide, Refresh, User, View } from '@element-plus/icons-vue'
+import { Hide, User, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import { useBlockedMembers } from '../composables/use-blocked-members'
 import Apis from '../services/apis'
+import Constants from '../utils/constants'
 import Tools from '../utils/tools'
-import FloatingDock from './FloatingDock.vue'
+import FloatingRefreshDock from './FloatingRefreshDock.vue'
 import FloatingTabBar from './FloatingTabBar.vue'
 import MemberDetailDrawer from './MemberDetailDrawer.vue'
 
@@ -27,25 +28,17 @@ interface GroupNode {
 const loading = ref(true)
 const groups = ref<GroupNode[]>([])
 
-/** 当前分团 groupId：0=全部 10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT */
+/** 当前分团 groupId：取值见 Constants.GroupTabs（'0'=全部） */
 const groupId = ref('0')
 
-/** 左上角分团切换 tab 选项（与公演页一致的主题色） */
-const groupTabs = [
-  { label: '全部', key: '0', color: '' },
-  { label: 'SNH48', key: '10', color: '#8FD3F6' },
-  { label: 'BEJ48', key: '11', color: '#FE2472' },
-  { label: 'GNZ48', key: '12', color: '#ABCA14' },
-  { label: 'CKG48', key: '14', color: '#FFBA07' },
-  { label: 'CGT48', key: '21', color: '#D21217' },
-]
+/** 左上角分团切换 tab 选项（与公演页共用同一份分团配置 Constants.GroupTabs） */
+const groupTabs = Constants.GroupTabs
 
 /** 成员状态（starInfo.status）：1 正常 2 暂休 3 退团 */
 const STATUS_ACTIVE = 1
 const STATUS_HIATUS = 2
 const STATUS_LEFT = 3
 
-/** 展示分节 */
 interface MemberSection {
   title: string
   teamBadge: string
@@ -68,10 +61,10 @@ function hideBadge(event: Event) {
 /** 当前查看详情的成员（null = 抽屉关闭） */
 const selectedMember = ref<MemberDetail | null>(null)
 
-/** 屏蔽名单为模块级共享状态（与设置页同源），任一页面操作后另一页面自动同步 */
+/** 屏蔽名单：模块级共享状态，机制见 use-blocked-members.ts */
 const { refreshBlockedMembers, isBlocked, toggleBlock } = useBlockedMembers()
 
-/** API 把“明星殿堂”建模成独立分团（groupId 19），展示上并入 SNH48 的同名队伍（teamId 1008） */
+/** API 把“明星殿堂”建模成独立分团（groupId 19），展示上并入 SNH48 的同名队伍 */
 const HALL_GROUP_NAME = '明星殿堂'
 const HALL_HOST_GROUP_NAME = 'SNH48'
 
@@ -187,10 +180,13 @@ async function syncMembers() {
 </script>
 
 <template>
-  <div v-loading="loading" class="container">
+  <div
+    v-loading="loading"
+    class="page-root"
+  >
     <!-- 左上角浮动分团切换：与公演页同一套交互；双击当前分团刷新成员数据 -->
     <FloatingTabBar :tabs="groupTabs" :active="groupId" @change="groupId = $event" @refresh="fetchGroups" />
-    <div class="members-main">
+    <div class="page-root">
       <el-scrollbar class="scrollbar-wrapper">
         <div class="members-container">
           <section v-for="section in sections" :key="section.title" class="group-section">
@@ -214,7 +210,7 @@ async function syncMembers() {
               <div
                 v-for="member in section.members"
                 :key="member.userId"
-                class="member-card clickable"
+                class="member-card lift-card clickable"
                 :class="{ 'is-blocked': isBlocked(member.userId) }"
                 @click="selectedMember = member"
               >
@@ -240,7 +236,7 @@ async function syncMembers() {
                   class="team-badge team-badge--overlay"
                   :style="member.teamColor ? { '--tb-color': `#${member.teamColor}` } : undefined"
                 >
-                  {{ member.teamName.replace('TEAM ', '') }}
+                  {{ Tools.shortTeamName(member.teamName) }}
                 </span>
 
                 <!-- 未屏蔽：悬浮卡片时右上角快捷屏蔽 -->
@@ -276,7 +272,7 @@ async function syncMembers() {
 
           <el-empty
             v-if="!loading && memberCount === 0"
-            class="members-empty"
+            class="page-empty"
             :image-size="120"
             description="暂无成员信息，可在设置里同步成员数据"
           />
@@ -288,13 +284,13 @@ async function syncMembers() {
     </div>
 
     <!-- 右上角浮动操作条：更新成员数据库 -->
-    <FloatingDock>
+    <FloatingRefreshDock
+      :loading="isSyncing"
+      title="更新成员数据库"
+      @refresh="syncMembers"
+    >
       <span class="member-count">更新成员数据库</span>
-      <el-button
-        circle type="primary" :icon="Refresh" :loading="isSyncing"
-        title="更新成员数据库" @click="syncMembers"
-      />
-    </FloatingDock>
+    </FloatingRefreshDock>
 
     <!-- 成员详情抽屉 -->
     <MemberDetailDrawer
@@ -307,26 +303,16 @@ async function syncMembers() {
 </template>
 
 <style scoped lang="scss">
-.container {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-}
-
-.members-main {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-}
+/* 页面骨架（相对定位 + 裁剪）见全局 .page-root */
 
 .members-container {
-  /* 顶部留出左上角浮动切换器的空间；底部给右上角浮动按钮留空间 */
-  padding: 64px 16px 8px;
+  /* 顶部留出左上角浮动切换器的空间（--tabbar-offset-top）；底留卡片悬停上浮与阴影的空间 */
+  padding: var(--tabbar-offset-top) 16px 8px;
 }
 
-/* 底部留出 Dock 空间 */
+/* 底部留出 Dock 空间（--dock-reserve） */
 :deep(.el-scrollbar__view) {
-  padding-bottom: 120px;
+  padding-bottom: var(--dock-reserve);
 }
 
 /* 分区标题 */
@@ -370,19 +356,6 @@ async function syncMembers() {
 
 .member-card {
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--radius-md);
-  background: var(--el-bg-color);
-  box-shadow: var(--shadow-sm);
-  transition:
-    transform 0.2s ease-in-out,
-    box-shadow 0.2s ease-in-out;
-
-  &:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-  }
 
   .avatar {
     display: block;
@@ -509,12 +482,5 @@ async function syncMembers() {
   }
 }
 
-/* 空态：竖直居中，视觉上与浮动切换器保持对称 */
-.members-empty {
-  padding: 80px 0 0;
-}
-
-.members-empty :deep(.el-empty__description p) {
-  color: var(--el-text-color-secondary);
-}
+/* 空态：样式见全局 .page-empty（竖直留白，视觉上与浮动切换器保持对称） */
 </style>
