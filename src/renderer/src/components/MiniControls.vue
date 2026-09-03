@@ -128,7 +128,7 @@ function onRangeInput(event: Event) {
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
   text-overflow: ellipsis;
 }
 </style>
