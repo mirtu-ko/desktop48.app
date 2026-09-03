@@ -8,7 +8,7 @@ interface Events {
   'record-task': TaskPayload
   'change-selected-menu': string
   [key: string]: unknown
-  [key: symbol]: unknown // 添加 symbol 类型索引签名
+  [key: symbol]: unknown
 }
 
 const emitter: Emitter<Events> = mitt<Events>()

@@ -21,6 +21,23 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
 
+  /* ===== 语义主题色：与 utils/constants.ts 的 Constants.Theme 保持一致 ===== */
+  --color-lives: #ff5e7e; // 直播 / 录制：玫红
+  --color-shows: #f59e0b; // 公演：琥珀
+  --color-albums: #d946ef; // 专辑：品红
+  --color-members: #3b82f6; // 成员：蓝
+  --color-downloads: #10b981; // 下载：绿
+  --color-setting: #6d5ae0; // 设置：品牌紫
+
+  /* ===== 浮层让位：页面内容为悬浮控件预留的空间 ===== */
+  --tabbar-offset-top: 64px; // 左上角 FloatingTabBar 的高度 + 间距
+  --dock-reserve: 120px; // 底部悬浮 AppDock 预留的滚动留白
+
+  /* ===== 播放器深色玻璃 token：.action-btn / .player-capsule 体系共用 ===== */
+  --player-glass-bg: rgba(15, 17, 26, 0.55);
+  --player-glass-ring: rgba(255, 255, 255, 0.16);
+  --player-glass-hover: rgba(255, 255, 255, 0.12);
+
   /* Element Plus 主题色覆写（浅色） */
   --el-color-primary: #6d5ae0;
   --el-color-primary-light-3: #8f82ee;
@@ -129,6 +146,28 @@ body,
   color: var(--el-text-color-placeholder);
 }
 
+/* ===== 空态 =====
+ * .page-empty：el-empty 列表页定制（留白 + 描述文字提亮）；
+ * .empty-hint：行内占位提示；.empty-block：页面级居中占位文案 */
+.page-empty {
+  padding: 80px 0 0;
+
+  .el-empty__description p {
+    color: var(--el-text-color-secondary);
+  }
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+.empty-block {
+  padding: 120px 0;
+  text-align: center;
+  color: var(--el-text-color-placeholder);
+}
+
 /* ===== 列表分区标题（公演 / 成员页共用） =====
  * 结构：主题色小药丸 + 标题文字 + 右侧渐隐细线；
  * 主题色由 --st-accent 注入，默认品牌紫 */
@@ -201,6 +240,50 @@ body,
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
   }
+}
+
+/* ===== 实底列表卡片皮肤（直播 / 回放 / 公演 / 成员列表卡共用） =====
+ * 与 .glass-card（磨砂半透明）语义不同，二者并存；
+ * hover 上浮仅在 .clickable 时启用，非可点击卡片保持静止 */
+.lift-card {
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--radius-md);
+  background: var(--el-bg-color);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+  }
+}
+
+/* ===== 页面根容器骨架（列表页最外层共用） =====
+ * 浮层 tab / dock 均为 absolute 定位，由根容器负责占满整窗并裁剪溢出 */
+.page-root {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ===== 主题色渐变图标磁贴（设置行 / 下载分组头等共用） =====
+ * 深色底白字款：颜色由 --tile-color 注入，尺寸/圆角/图标字号按需覆写 */
+.icon-tile {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tile-color) 72%, #fff), var(--tile-color));
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tile-color) 65%, transparent);
 }
 
 /* ===== 队伍徽章（直播/回放卡片、成员卡片、成员详情、公演卡片共用） =====
@@ -282,5 +365,210 @@ body,
   }
   50% {
     height: 12px;
+  }
+}
+
+/* ===== 播放器共用（LivePlayer / ReviewPlayer） ===== */
+
+/* 原生 video：铺满容器、等比留边 */
+.video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 旋转载体：视频居中包裹层，旋转/缩放 transform 由组件内联样式注入；
+ * 旋转只作用于这层，弹幕、迷你条等兄弟浮层不参与旋转 */
+.video-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.3s ease;
+  transform-origin: center center;
+}
+
+/* 悬浮操作容器：横排置于画面右上角（直播 / 回放共用） */
+.player-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 30;
+}
+
+/* hover 白纱叠加层注册为可动画颜色，保证渐入渐出手感 */
+@property --ab-tint {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+/* ===== 播放器深色玻璃胶囊容器（RotationControls / MiniControls 共用） =====
+ * 消费 :root 的 --player-glass-* token，与 .action-btn 同一设计语言 */
+.player-capsule {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--player-glass-bg);
+  box-shadow: inset 0 0 0 1px var(--player-glass-ring);
+  backdrop-filter: blur(8px);
+}
+
+/* 胶囊内透明圆钮：hover 白纱、按下缩放 */
+.player-capsule__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.1s ease;
+
+  &:hover {
+    background: var(--player-glass-hover);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+}
+
+/* 悬浮圆形操作按钮（录制 / 下载）：与 RotationControls 胶囊同一套视觉语言。
+ * 底色为两层合成：background-color 固定深色底，background-image 是 hover 上色的
+ * 白纱叠加层——与 .rotate-btn（透明按钮叠在深色胶囊上）同一合成模型，
+ * hover 时深色底不会被替换，半透明白直接压到视频画面上导致泛白。
+ * is-active = 任务进行中，实底色用 --ab-active-bg、呼吸光圈用 --ab-pulse */
+.action-btn {
+  --ab-active-bg: rgba(255, 255, 255, 0.18);
+  --ab-pulse: rgba(255, 255, 255, 0.45);
+  --ab-tint: transparent;
+
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  font-size: 12px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background-color: var(--player-glass-bg);
+  background-image: linear-gradient(var(--ab-tint), var(--ab-tint));
+  box-shadow: inset 0 0 0 1px var(--player-glass-ring);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition:
+    --ab-tint 0.2s ease,
+    color 0.2s ease,
+    transform 0.1s ease;
+
+  /* 与 .rotate-btn:hover 同值：12% 白叠加在同一个深色底上 */
+  &:hover {
+    --ab-tint: var(--player-glass-hover);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  /* 任务进行中：常亮实色底 + 呼吸光圈，切回播放器也能一眼看出状态。
+     只换 background-color，白纱层保留 */
+  &.is-active {
+    color: #fff;
+    background-color: var(--ab-active-bg);
+    animation: action-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes action-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+      0 0 0 0 var(--ab-pulse);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+      0 0 0 7px transparent;
+  }
+}
+
+.action-btn--record {
+  --ab-active-bg: #ff5c7a;
+  --ab-pulse: rgba(255, 92, 122, 0.55);
+
+  color: #ff8fa3;
+
+  &:hover {
+    color: #ff5c7a;
+  }
+}
+
+.action-btn--download {
+  --ab-active-bg: #34c07c;
+  --ab-pulse: rgba(52, 192, 124, 0.45);
+
+  color: #7dd8a4;
+
+  &:hover {
+    color: #4fd187;
+  }
+}
+
+/* 旋转提示：短暂居中浮现，1.4s 后自行消失 */
+.rotate-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 7px 16px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  z-index: 25;
+  pointer-events: none;
+  animation: hint-fade 0.18s ease;
+}
+
+@keyframes hint-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 全局 360° 旋转：黑胶盘标（Albums / FloatAudioBar）与加载环（PlayerLoading）共用 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }

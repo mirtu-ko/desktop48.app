@@ -1,14 +1,11 @@
-<script lang="ts">
-/** 成员详情（树节点为 starInfo 全量字段的 spread，这里声明展示用到的字段） */
-</script>
-
 <script setup lang="ts">
 import { Film, Hide, Link, User, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import EventBus from '../assets/js/event-bus'
-import Tools from '../assets/js/tools'
+import EventBus from '../services/event-bus'
+import Tools from '../utils/tools'
 
+/** 成员详情（树节点为 starInfo 全量字段的 spread，这里声明展示用到的字段） */
 export interface MemberDetail {
   userId: number
   realName: string
@@ -137,7 +134,7 @@ function openReviews() {
                 class="team-badge"
                 :style="member.teamColor ? { '--tb-color': `#${member.teamColor}` } : undefined"
               >
-                {{ member.teamName.replace('TEAM ', '') }}
+                {{ Tools.shortTeamName(member.teamName) }}
               </span>
             </div>
           </div>

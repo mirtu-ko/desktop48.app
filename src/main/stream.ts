@@ -4,7 +4,7 @@ import path from 'node:path'
 import { app, ipcMain } from 'electron'
 import { Database } from './database'
 import { serverPort } from './http-server'
-import { closeLog, error, log } from './logger'
+import { error, log } from './logger'
 
 // 直播播放只在这里维护“会话”和“活跃转流进程”的状态。
 // IPC 负责注册直播地址，HTTP 端点真正触发 FFmpeg 拉流并输出 HTTP-FLV。
@@ -188,8 +188,4 @@ app.on('before-quit', () => {
 
   streamSessions.clear()
   activeStreamProcesses.clear()
-
-  // 注意：这里不再删除日志文件——崩溃排查完全依赖 main.log。
-  // 清理完子进程后最后刷盘，保证退出过程的日志也落盘。
-  closeLog()
 })

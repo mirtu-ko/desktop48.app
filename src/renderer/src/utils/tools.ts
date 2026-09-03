@@ -69,7 +69,6 @@ class Tools {
   public static streamPathHandle(streamPath: string, timestamp: number) {
     const date = new Date(timestamp)
     const liveDate = `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`
-    // window.mainAPI?.openPath?.(this.getFilePath())
     return streamPath.replace(Tools.STREAM_PATH_REGEX, (pathPrefix, protocol, host) => {
       if (host.toLowerCase() !== YI_ZHI_BO_HOST) {
         return pathPrefix
@@ -79,24 +78,47 @@ class Tools {
     })
   }
 
+  /**
+   * 秒数 → m:ss（分钟不补零，如 6:05）；曲目总时长 / 迷你播放条进度共用
+   */
+  public static formatDuration(seconds: number): string {
+    const total = Math.max(0, Math.floor(seconds || 0))
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+  }
+
+  /**
+   * 下载/录制任务文件名：成员名 + 任务开始时间（yyyyMMddhhmm）+ 扩展名。
+   * separator 为成员名与时间戳之间的分隔符（录制为空格、回放下载紧连，保持既有命名）
+   */
+  public static taskFilename(realName: string, startTime: number, ext: string, separator = ''): string {
+    return `${realName}${separator}${Tools.dateFormat(startTime, 'yyyyMMddhhmm')}.${ext}`
+  }
+
+  /**
+   * 队伍名展示名：剥掉 TEAM 前缀（TEAM SII → SII）
+   */
+  public static shortTeamName(teamName: string): string {
+    return (teamName || '').replace('TEAM ', '')
+  }
+
   public static dateFormat(timestamp: number, fmt: string): string {
     const date = new Date(timestamp)
     const o: any = {
-      'M+': date.getMonth() + 1, // 月份
-      'd+': date.getDate(), // 日
-      'h+': date.getHours(), // 小时
-      'm+': date.getMinutes(), // 分
-      's+': date.getSeconds(), // 秒
-      'q+': Math.floor((date.getMonth() + 3) / 3), // 季度
-      'S': date.getMilliseconds(), // 毫秒
+      'M+': date.getMonth() + 1,
+      'd+': date.getDate(),
+      'h+': date.getHours(),
+      'm+': date.getMinutes(),
+      's+': date.getSeconds(),
+      'q+': Math.floor((date.getMonth() + 3) / 3),
+      'S': date.getMilliseconds(),
     }
-    // Replace year token (e.g., 'yyyy', 'yy')
+    // 年份占位符（如 'yyyy'、'yy'）单独按长度截取
     const yearMatch = Tools.YEAR_REGEX.exec(fmt)
     if (yearMatch) {
       const yStr = yearMatch[1]
       fmt = fmt.replace(yStr, `${date.getFullYear()}`.substring(4 - yStr.length))
     }
-    // Replace other tokens
+    // 其余占位符按 o 表逐项替换
     for (const k in o) {
       const regex = Tools.DATE_FORMAT_REGEXES[k]
       const match = regex.exec(fmt)

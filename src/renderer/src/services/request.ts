@@ -1,4 +1,4 @@
-import Constants from './constants'
+import Constants from '../utils/constants'
 
 export default class Request {
   /**

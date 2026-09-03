@@ -24,6 +24,7 @@ export interface OpenLive {
 }
 
 export default class Apis {
+  /** 单例入口 */
   public static instance() {
     return this.apis
   }
@@ -85,6 +86,7 @@ export default class Apis {
     return this.list(data)
   }
 
+  /** 直播列表通用请求：参数原样透传（next 游标翻页 + 筛选） */
   public list(data: any) {
     return this.request(ApiUrls.LIVE_LIST_URL, data, {})
   }
@@ -142,7 +144,7 @@ export default class Apis {
   }
 
   private async request(url: string, data: any, headers: any): Promise<any> {
-    console.log('[apis.ts]request:', url, data)
+    // console.log('[apis.ts]request:', url, data)
     let responseBody = await Request.post(url, data, headers)
     if (typeof responseBody === 'string') {
       try {
@@ -165,7 +167,7 @@ export default class Apis {
 
   /**
    * 开放公演列表
-   * @param groupId 团体 id：10=SNH 11=BEJ 12=GNZ 13=CKG 14=CGT，0=全部
+   * @param groupId 团体 id，取值见 Constants.GroupTabs，0=全部
    * @param next 翻页游标，首页传 '0'
    * @param record true=可回放的已结束公演，false=排期/进行中
    */

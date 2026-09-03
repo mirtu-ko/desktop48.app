@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { OpenLive } from '../assets/js/apis'
-import Tools from '../assets/js/tools'
+import type { OpenLive } from '../services/apis'
+import Tools from '../utils/tools'
 
 defineProps<{
   show: OpenLive
@@ -30,7 +30,7 @@ function formatTime(stime: string): string {
           class="team-badge"
           :style="team.teamColor ? { '--tb-color': `#${team.teamColor}` } : undefined"
         >
-          {{ team.teamName.replace('TEAM ', '') }}
+          {{ Tools.shortTeamName(team.teamName) }}
         </span>
       </div>
       <el-tag v-if="show.status === 2" class="show-tag" type="danger" size="small">

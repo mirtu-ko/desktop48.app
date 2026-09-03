@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { Refresh } from '@element-plus/icons-vue'
 import { onMounted, ref, watch } from 'vue'
-import Apis from '../assets/js/apis'
-import Tools from '../assets/js/tools'
-import useFloatPlayers from '../assets/js/use-float-players'
-import usePagedLiveList from '../assets/js/use-paged-live-list'
-import FloatingDock from '../components/FloatingDock.vue'
 import LiveItem from '../components/LiveItem.vue'
+import useFloatPlayers from '../composables/use-float-players'
+import { enrichLiveItem, usePagedLiveList } from '../composables/use-paged-live-list'
+import Apis from '../services/apis'
+import FloatingRefreshDock from './FloatingRefreshDock.vue'
 
 // 组件 props：成员详情「看 TA 的回放」跳转时预置的成员筛选；每次跳转都是新对象，保证 watch 必触发
 const props = withDefaults(defineProps<{ memberPreset?: { userId: string } | null }>(), {
@@ -20,7 +18,7 @@ const memberOption = ref<any[]>([])
 // 级联筛选选中的路径：[groupId] / [groupId, teamId] / [groupId, teamId, userId]
 const selectedFilter = ref<any[]>([])
 
-// 分页列表状态/逻辑/触底加载统一由组合式函数管理，直播与回放共用同一套
+// 分页状态与触底加载：见 composables/use-paged-live-list.ts（直播/回放共用）
 const {
   list: reviewList,
   loading,
@@ -29,7 +27,7 @@ const {
   onInfiniteScroll,
   refresh,
 } = usePagedLiveList({
-  // 与旧版“成员/队伍/分团”单维度筛选一致：只发送被选中层级的对应参数，其余保持 '0'
+  // 只发送被选中层级的对应参数，未选中层级保持 '0'
   loadPage: (next) => {
     const params: {
       userId: string
@@ -51,12 +49,9 @@ const {
       params.groupId = String(groupId)
     return Apis.instance().reviews(params)
   },
-  processItem: async (item: any) => {
-    item.cover = Tools.pictureUrls(item.coverPath)
-    item.userInfo.teamLogo = Tools.pictureUrls(item.userInfo.teamLogo)
-    item.member = await window.mainAPI.getMember(item.userInfo.userId)
-    item.date = Tools.dateFormat(Number.parseFloat(item.ctime), 'yyyy-MM-dd hh:mm:ss')
-  },
+  // 封面/队伍Logo/日期/成员信息补全：与直播页共用 enrichLiveItem；
+  // 成员查询失败直接抛出，由 stopOnError 接管整批停止
+  processItem: (item: any) => enrichLiveItem(item),
   stopOnError: true,
 })
 
@@ -76,11 +71,23 @@ function filterMethod(node: any, keyword: string) {
 
 // 初始化
 onMounted(async () => {
-  memberOption.value = await window.mainAPI.getMemberTree()
+  memberOption.value = sortMembersByStatus(await window.mainAPI.getMemberTree())
   // 先应用预置筛选再拉列表，避免挂载时重复请求
   if (!applyPreset())
     refresh()
 })
+
+/** 末级成员排序：在团成员（status=1）排在前，其余（暂休/退团）保持原有相对顺序排在后 */
+function sortMembersByStatus(tree: any[]): any[] {
+  for (const group of tree || []) {
+    for (const team of group.children || []) {
+      team.children?.sort(
+        (a: any, b: any) => Number(b.status === 1) - Number(a.status === 1),
+      )
+    }
+  }
+  return tree || []
+}
 
 /** 在成员树里按 userId 找到 [groupId, teamId, userId] 完整路径 */
 function findFilterPath(userId: string): any[] | null {
@@ -144,8 +151,8 @@ watch(selectedFilter, () => {
 </script>
 
 <template>
-  <div class="reviews-root">
-    <div class="review-container">
+  <div class="reviews-root page-root">
+    <div class="review-container page-root">
       <el-scrollbar
         ref="reviewScrollRef"
         v-loading="loading"
@@ -153,7 +160,7 @@ watch(selectedFilter, () => {
         :distance="10"
         @end-reached="onInfiniteScroll"
       >
-        <div v-if="reviewList.length === 0 && !loading" class="review-empty">
+        <div v-if="reviewList.length === 0 && !loading" class="empty-block">
           暂无回放
         </div>
         <div v-if="reviewList.length > 0" class="review-list">
@@ -170,7 +177,7 @@ watch(selectedFilter, () => {
       </el-scrollbar>
 
       <!-- 右上角浮动筛选/刷新工具条：不占行，内容滚过时呈现磨砂玻璃 -->
-      <FloatingDock>
+      <FloatingRefreshDock @refresh="refresh">
         <el-cascader
           v-model="selectedFilter"
           style="width: 240px" transfer
@@ -187,25 +194,13 @@ watch(selectedFilter, () => {
             lazy: false,
           }"
         />
-        <el-button
-          circle type="primary" :icon="Refresh" title="刷新"
-          @click="refresh"
-        />
-      </FloatingDock>
+      </FloatingRefreshDock>
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
-.reviews-root,
-.review-container {
-  height: 100%;
-  overflow: hidden;
-}
-
-.review-container {
-  position: relative;
-}
+/* 页面骨架（相对定位 + 裁剪）见模板上的全局 .page-root */
 
 /* 筛选控件不压缩，避免窄窗口下按钮被挤掉文案 */
 :deep(.el-select),
@@ -217,7 +212,7 @@ watch(selectedFilter, () => {
 /* 筛选控件：圆角化、弱化生硬边框，与胶囊标签呼应 */
 :deep(.el-select__wrapper),
 :deep(.el-cascader .el-input__wrapper) {
-  border-radius: 10px;
+  border-radius: 16px;
   background-color: color-mix(in srgb, var(--el-bg-color) 72%, transparent);
   box-shadow: 0 0 0 1px var(--el-border-color) inset;
   transition:
@@ -234,17 +229,12 @@ watch(selectedFilter, () => {
   }
 }
 
-/* 给列表底部留出浮动工具条的空间 */
-:deep(.el-scrollbar__view) {
-  padding-bottom: 120px;
-}
-
 .review-list {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  /* 顶部留出左上角 tab 栏，底留卡片悬停上浮与阴影的空间 */
-  padding: 64px 16px 8px;
+  /* 顶部留出左上角 tab 栏（--tabbar-offset-top），底留卡片悬停上浮与阴影的空间 */
+  padding: var(--tabbar-offset-top) 16px 8px;
 }
 
 .review-item {
@@ -252,9 +242,5 @@ watch(selectedFilter, () => {
   min-width: 0;
 }
 
-.review-empty {
-  padding: 120px 0;
-  text-align: center;
-  color: var(--el-text-color-placeholder);
-}
+/* 空态：样式见全局 .empty-block */
 </style>

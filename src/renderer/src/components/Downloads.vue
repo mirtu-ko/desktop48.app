@@ -1,136 +1,24 @@
 <script setup lang="ts">
-import type { Ref } from 'vue'
-import type TaskBase from '../assets/js/task-base'
-import type { TaskPayload, TaskSnapshot } from '../assets/js/task-payload'
+import type { TaskKind } from '../composables/use-tasks'
 import { Check, Download, Loading, VideoCamera } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import DownloadTask from '../assets/js/download-task'
-import EventBus from '../assets/js/event-bus'
-import RecordTask from '../assets/js/record-task'
+import { computed, onMounted } from 'vue'
+import useTasks from '../composables/use-tasks'
+import Constants from '../utils/constants'
 
-type TaskKind = 'download' | 'record'
-
-const downloadTasks = ref([]) as Ref<TaskBase[]>
-const recordTasks = ref([]) as Ref<TaskBase[]>
-
-interface TaskKindConfig {
-  newTask: (_taskData: TaskPayload) => TaskBase
-  list: Ref<TaskBase[]>
-  listApi: () => Promise<TaskSnapshot[]>
-  removeApi: (_liveId: string) => Promise<void>
-  runningMessage: string
-  startMessage: string
-  restartMessage: string
-  logTag: string
-}
-
-// 下载/录制两类任务的差异配置：处理骨架完全一致
-const taskConfigs: Record<TaskKind, TaskKindConfig> = {
-  download: {
-    newTask: taskData => new DownloadTask(taskData.url, taskData.filename, taskData.liveId),
-    list: downloadTasks,
-    listApi: () => window.mainAPI.downloadTaskList(),
-    removeApi: liveId => window.mainAPI.downloadTaskRemove(liveId),
-    runningMessage: '该回放正在下载',
-    startMessage: '下载开始',
-    restartMessage: '下载已重新开始，原任务将被覆盖',
-    logTag: 'download',
-  },
-  record: {
-    newTask: taskData => new RecordTask(taskData.url, taskData.filename, taskData.liveId),
-    list: recordTasks,
-    listApi: () => window.mainAPI.recordTaskList(),
-    removeApi: liveId => window.mainAPI.recordTaskRemove(liveId),
-    runningMessage: '该直播正在录制',
-    startMessage: '录制开始',
-    restartMessage: '录制已重新开始，原任务将被覆盖',
-    logTag: 'record',
-  },
-}
-
-async function startTask(task: TaskBase, config: TaskKindConfig, message: string) {
-  // reactive() 的类型会剥掉类的私有字段，运行时返回的是同一代理，断言回 TaskBase
-  const reactiveTask = reactive(task) as TaskBase
-  try {
-    await reactiveTask.start(() => {
-      ElMessage({ message, type: 'info' })
-    })
-    // 重启路径下任务已在列表中，避免重复 push 导致卡片重复
-    if (!config.list.value.includes(reactiveTask))
-      config.list.value.push(reactiveTask)
-  }
-  catch (error) {
-    console.error(`[Downloads.vue] ${config.logTag} task start failed`, error)
-    ElMessage({ message: String(error), type: 'error' })
-  }
-}
-
-async function handleTask(taskData: TaskPayload, kind: TaskKind) {
-  const config = taskConfigs[kind]
-  const exists = config.list.value.find(item => item.getLiveId() === taskData.liveId)
-  if (exists) {
-    if (exists.isRunning()) {
-      ElMessage({ message: config.runningMessage, type: 'warning' })
-      return
-    }
-    // 任务已结束：按最新参数重启（覆盖原文件）
-    exists.setUrl(taskData.url)
-    exists.setFilename(taskData.filename)
-    await startTask(exists, config, config.restartMessage)
-    return
-  }
-  await startTask(config.newTask(taskData), config, config.startMessage)
-}
-
-async function removeTask(task: TaskBase, kind: TaskKind) {
-  const config = taskConfigs[kind]
-  const index = config.list.value.findIndex(item => item.getLiveId() === task.getLiveId())
-  if (index !== -1)
-    config.list.value.splice(index, 1)
-  // 同步删除主进程快照，否则刷新后该任务会再次出现
-  await config.removeApi(task.getLiveId())
-}
-
-// 页面加载后从主进程恢复任务列表（刷新不会清空主进程实际运行的 ffmpeg，任务状态仍以主进程为准）
-async function restoreTasks(kind: TaskKind) {
-  const config = taskConfigs[kind]
-  const snapshots = await config.listApi()
-  for (const snapshot of snapshots) {
-    // 已有同 liveId 任务则跳过，避免重复卡片
-    if (config.list.value?.some(item => item.getLiveId() === snapshot.liveId))
-      continue
-    const task = config.newTask({ url: snapshot.url, filename: snapshot.filename, liveId: snapshot.liveId })
-    task.restore(snapshot)
-    const reactiveTask = reactive(task) as TaskBase
-    config.list.value?.push(reactiveTask)
-  }
-}
+// 任务状态由 useTasks 这个模块级单例持有：本页卸载后任务照常运行，
+// 从悬浮迷你窗等任意入口发起的任务也不会因为本页未挂载而丢失
+const { downloadTasks, recordTasks, removeTask, restoreTasks } = useTasks()
 
 onMounted(() => {
   restoreTasks('download')
   restoreTasks('record')
 })
 
-// 分区展示配置：图标与主题色与底部 Dock 的语义保持一致（下载-绿 / 直播-玫红）
+// 分区展示配置：图标与主题色与底部 Dock 的语义保持一致（直播-玫红 / 下载-绿，取自 Constants.Theme）
 const taskGroups = computed(() => [
-  { kind: 'record' as TaskKind, title: '直播录制', icon: VideoCamera, color: '#ff5e7e', emptyText: '暂无录制任务', tasks: recordTasks.value },
-  { kind: 'download' as TaskKind, title: '回放下载', icon: Download, color: '#10b981', emptyText: '暂无下载任务', tasks: downloadTasks.value },
+  { kind: 'record' as TaskKind, title: '直播录制', icon: VideoCamera, color: Constants.Theme.LIVES, emptyText: '暂无录制任务', tasks: recordTasks.value },
+  { kind: 'download' as TaskKind, title: '回放下载', icon: Download, color: Constants.Theme.DOWNLOADS, emptyText: '暂无下载任务', tasks: downloadTasks.value },
 ])
-
-// 在 setup 阶段就订阅（早于 onMounted）：播放页跳转后立即 emit 事件，
-// 若等 mounted 再订阅，事件可能在订阅前发出而静默丢失。
-// 保持函数引用一致，确保 EventBus.off 能正确移除监听器
-const onDownloadTask = (payload: TaskPayload) => handleTask(payload, 'download')
-const onRecordTask = (payload: TaskPayload) => handleTask(payload, 'record')
-
-EventBus.on('download-task', onDownloadTask)
-EventBus.on('record-task', onRecordTask)
-
-onUnmounted(() => {
-  EventBus.off('download-task', onDownloadTask)
-  EventBus.off('record-task', onRecordTask)
-})
 </script>
 
 <template>
@@ -147,14 +35,13 @@ onUnmounted(() => {
       >
         <!-- 分区头：主题色图标 + 标题 + 任务数 -->
         <header class="section-head">
-          <span class="section-icon">
+          <span class="section-icon icon-tile">
             <el-icon><component :is="group.icon" /></el-icon>
           </span>
           <span class="section-title">{{ group.title }}</span>
           <span class="section-count">{{ group.tasks.length }}</span>
         </header>
 
-        <!-- 空态 -->
         <div
           v-if="group.tasks.length === 0"
           class="empty-card glass-card"
@@ -260,8 +147,8 @@ onUnmounted(() => {
 .downloads-root {
   max-width: 880px;
   margin: 0 auto;
-  /* 底部留出悬浮 Dock 的高度，避免最后一张卡片被遮挡 */
-  padding: 20px 24px 120px;
+  /* 底部留出悬浮 Dock 的高度（--dock-reserve），避免最后一张卡片被遮挡 */
+  padding: 20px 24px var(--dock-reserve);
 }
 
 .task-section + .task-section {
@@ -276,15 +163,13 @@ onUnmounted(() => {
   margin-bottom: 12px;
 
   .section-icon {
+    /* 渐变磁贴骨架见全局 .icon-tile，--tile-color 跟随分组主题色 */
+    --tile-color: var(--group-color);
+
     width: 28px;
     height: 28px;
     border-radius: 9px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     background: linear-gradient(135deg, color-mix(in srgb, var(--group-color) 75%, #fff), var(--group-color));
-    color: #fff;
-    box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--group-color) 65%, transparent);
 
     .el-icon {
       font-size: 15px;
@@ -324,7 +209,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 80px 0;
+  min-height: 240px;
   border-style: dashed;
   opacity: 0.9;
 
@@ -343,6 +228,11 @@ onUnmounted(() => {
     font-size: 13px;
     color: var(--el-text-color-placeholder);
   }
+}
+
+/* 任务列表 */
+.task-list {
+  min-height: 240px;
 }
 
 /* 任务卡片：主题色磁贴 + 文件名/路径 + 状态 + 操作 */

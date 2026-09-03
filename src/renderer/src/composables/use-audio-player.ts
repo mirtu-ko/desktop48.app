@@ -87,7 +87,7 @@ function playAt(index: number) {
   currentTime.value = 0
   duration.value = 0
   el.src = track.url
-  void el.play().catch(error => console.warn('[use-audio-player]播放失败:', error))
+  void el.play().catch(error => console.warn('[use-audio-player] 播放失败:', error))
 }
 
 /** 播放/暂停切换 */
@@ -96,7 +96,7 @@ function togglePlay() {
     return
   }
   if (audio.paused) {
-    void audio.play().catch(error => console.warn('[use-audio-player]播放失败:', error))
+    void audio.play().catch(error => console.warn('[use-audio-player] 播放失败:', error))
   }
   else {
     audio.pause()
@@ -215,10 +215,12 @@ function clearAll() {
   playlist.value = []
 }
 
+/** 该 key 是否为当前播放条目 */
 function isCurrent(key: string): boolean {
   return currentTrack.value?.key === key
 }
 
+/** 地址为空或已被标记为失效 */
 function isBroken(url: string): boolean {
   return !url || brokenUrls.value.has(url)
 }

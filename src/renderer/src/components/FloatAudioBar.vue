@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Close, Delete } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
-import useAudioPlayer from '../assets/js/use-audio-player'
+import useAudioPlayer from '../composables/use-audio-player'
+import Tools from '../utils/tools'
+import MediaIcon from './MediaIcon.vue'
 
 const {
   playlist,
@@ -30,12 +31,6 @@ const coverStyle = computed(() => ({
   '--cover': currentTrack.value?.cover ? `url(${currentTrack.value.cover})` : 'none',
 }))
 
-/** 秒数 → m:ss */
-function fmt(seconds: number): string {
-  const s = Math.floor(seconds || 0)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
 /** 点击进度条跳转 */
 function onSeek(event: MouseEvent) {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -50,7 +45,7 @@ function onClearAll() {
 </script>
 
 <template>
-  <!-- 播放列表为空且未播放时整体隐藏 -->
+  <!-- 播放列表为空时整体隐藏（清空队列必已停止播放） -->
   <div v-if="playlist.length" class="float-audio">
     <!-- 队列面板：向上展开 -->
     <transition name="panel-pop">
@@ -59,7 +54,7 @@ function onClearAll() {
           <span class="panel-title">播放列表</span>
           <span class="panel-count">{{ playlist.length }} 首</span>
           <button class="panel-clear" title="清空列表" @click="onClearAll">
-            <el-icon><Delete /></el-icon>
+            <MediaIcon name="trash" :size="15" />
           </button>
         </div>
         <el-scrollbar max-height="300px" class="panel-scroll">
@@ -87,7 +82,7 @@ function onClearAll() {
               </div>
             </div>
             <button class="row-remove" title="移除" @click.stop="removeAt(index)">
-              <el-icon><Close /></el-icon>
+              <MediaIcon name="close" :size="13" />
             </button>
           </div>
         </el-scrollbar>
@@ -111,21 +106,14 @@ function onClearAll() {
         </div>
       </div>
 
-      <span class="bar-time">{{ fmt(currentTime) }} / {{ fmt(duration) }}</span>
+      <span class="bar-time">{{ Tools.formatDuration(currentTime) }} / {{ Tools.formatDuration(duration) }}</span>
 
       <div class="bar-controls">
         <button class="ctrl-btn" title="上一首" :disabled="currentIndex <= 0" @click="prev">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-            <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
-          </svg>
+          <MediaIcon name="prevFilled" :size="15" />
         </button>
         <button class="ctrl-btn ctrl-main" :title="playing ? '暂停' : '播放'" @click="togglePlay">
-          <svg v-if="!playing" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
+          <MediaIcon :name="playing ? 'pauseFilled' : 'playFilled'" :size="16" />
         </button>
         <button
           class="ctrl-btn"
@@ -133,9 +121,7 @@ function onClearAll() {
           :disabled="currentIndex >= playlist.length - 1"
           @click="next"
         >
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z" />
-          </svg>
+          <MediaIcon name="nextFilled" :size="15" />
         </button>
       </div>
 
@@ -145,9 +131,7 @@ function onClearAll() {
         title="播放列表"
         @click="panelVisible = !panelVisible"
       >
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-          <path d="M3 6h13v2H3zm0 5h13v2H3zm0 5h9v2H3zm15-3.5 5 3.5-5 3.5z" />
-        </svg>
+        <MediaIcon name="playlistFilled" :size="15" />
       </button>
     </div>
   </div>
@@ -390,7 +374,8 @@ function onClearAll() {
     background-size: cover;
     background-position: center;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
-    animation: bar-vinyl-spin 8s linear infinite;
+    /* 旋转动画见全局 @keyframes spin */
+    animation: spin 8s linear infinite;
     animation-play-state: paused;
   }
 
@@ -492,14 +477,5 @@ function onClearAll() {
 .panel-pop-leave-to {
   opacity: 0;
   transform: translateY(10px) scale(0.96);
-}
-
-@keyframes bar-vinyl-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

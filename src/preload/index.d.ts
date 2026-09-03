@@ -18,7 +18,7 @@ export interface electronAPI {
   }
 }
 
-// 被屏蔽成员：主进程从 starInfo 中按 userId 挑出的成员对象
+// 与 renderer composables/use-blocked-members.ts 的 BlockedMember 同构（跨进程镜像）
 export interface BlockedMember {
   userId: number
   realName: string
@@ -86,8 +86,6 @@ export interface mainAPI {
   windowClose: () => Promise<any>
   windowIsMaximized: () => Promise<boolean>
   windowOnMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
-
-  // 可继续扩展更多API
 }
 
 declare global {

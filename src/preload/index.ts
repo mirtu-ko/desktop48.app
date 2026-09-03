@@ -97,8 +97,6 @@ const api = {
   allowSleep: (id: number) => ipcRenderer.invoke('allow-sleep', id),
 }
 
-// 使用 `contextBridge` API 将 Electron API 暴露给
-// 渲染进程（启用上下文隔离时），否则
-// 直接添加到全局 window。
+// 经 contextBridge 暴露给渲染进程（上下文隔离已启用）
 contextBridge.exposeInMainWorld('electron', electronAPI)
 contextBridge.exposeInMainWorld('mainAPI', api)

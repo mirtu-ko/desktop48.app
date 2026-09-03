@@ -5,15 +5,27 @@ import appIcon from '../assets/icon.png'
 const isMaximized = ref(false)
 let disposeChange: (() => void) | undefined
 
+// HTML5 全屏（播放器容器 requestFullscreen）会把标题栏视觉盖住，但
+// -webkit-app-region: drag 仍在原生层拦截点击，顶部浮层会点不中；
+// 全屏期间标题栏本来就不可见也不可拖，直接停用拖拽区
+const htmlFullscreen = ref(false)
+
+function onFullscreenChange() {
+  htmlFullscreen.value = !!document.fullscreenElement
+}
+
 onMounted(async () => {
   isMaximized.value = await window.mainAPI.windowIsMaximized()
   disposeChange = window.mainAPI.windowOnMaximizeChange((value) => {
     isMaximized.value = value
   })
+  onFullscreenChange()
+  document.addEventListener('fullscreenchange', onFullscreenChange)
 })
 
 onUnmounted(() => {
   disposeChange?.()
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
 })
 
 function minimize() {
@@ -31,7 +43,7 @@ function close() {
 </script>
 
 <template>
-  <div class="app-title-bar" @dblclick="onDoubleClick">
+  <div class="app-title-bar" :class="{ 'is-html-fullscreen': htmlFullscreen }" @dblclick="onDoubleClick">
     <div class="title-bar-brand">
       <img class="tb-logo" :src="appIcon" alt="logo" draggable="false">
       <span class="tb-name">Desktop48</span>
@@ -66,6 +78,8 @@ function close() {
 </template>
 
 <style scoped lang="scss">
+/* 高度与 utils/float-player-layout.ts 的 FP_BAR_HEIGHT 保持一致：
+   浮窗以 36px 为拖拽带上沿做 y 钳制 / 吸顶，改动需同步 */
 .app-title-bar {
   height: 36px;
   flex-shrink: 0;
@@ -82,6 +96,13 @@ function close() {
   /* 整条背景区域可拖拽移动窗口 */
   -webkit-app-region: drag;
   user-select: none;
+}
+
+/* 全屏（top layer）盖住了标题栏，拖拽区却照常在原生层吞点击：
+   落进这条 36px 带的浮层按钮（如旋转胶囊最左侧）会点不中。
+   全屏期间标题栏不可见也无拖拽需求，整条转为 no-drag */
+.app-title-bar.is-html-fullscreen {
+  -webkit-app-region: no-drag;
 }
 
 .title-bar-brand {

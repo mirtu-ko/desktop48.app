@@ -78,7 +78,7 @@ watch(
   },
 )
 
-// 搜索关键词变化时列表内容整体替换，回到顶部方便从头看结果
+// 搜索态切换时列表内容整体替换，回到顶部
 watch(isSearching, async (searching) => {
   await nextTick()
   const wrap = scrollbarRef.value?.wrapRef
@@ -118,7 +118,7 @@ function resumeFollowing() {
           ><mark v-if="segment.hit" class="barrage-hit">{{ segment.text }}</mark><template v-else>{{ segment.text }}</template></template></span>
         </li>
       </ul>
-      <div v-if="items.length === 0" class="barrage-empty">
+      <div v-if="items.length === 0" class="barrage-empty empty-hint">
         {{ emptyText || '暂无弹幕' }}
       </div>
     </el-scrollbar>
@@ -193,11 +193,10 @@ function resumeFollowing() {
   border-radius: 2px;
 }
 
+/* 文案颜色/字号见全局 .empty-hint；此处仅定面板内的留白 */
 .barrage-empty {
   padding: 24px 0;
   text-align: center;
-  color: var(--el-text-color-placeholder);
-  font-size: 12px;
 }
 
 .resume-follow {

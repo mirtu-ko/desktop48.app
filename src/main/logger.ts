@@ -108,7 +108,7 @@ export function getLogPathForDisplay(): string {
   return getLogPath()
 }
 
-// 退出前刷盘。由 stream.ts 的 before-quit 在清理完子进程后最后调用，
+// 退出前刷盘。由 index.ts 的 will-quit 在所有 before-quit 清理完成后调用，
 // 保证退出过程中产生的日志（进程清理记录等）也能落盘。
 export function closeLog(): void {
   try {

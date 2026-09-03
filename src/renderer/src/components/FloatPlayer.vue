@@ -1,8 +1,26 @@
 <script setup lang="ts">
-import type { FloatPlayerItem } from '../assets/js/use-float-players'
-import { Close, Minus, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
+import type { FloatPlayerItem } from '../composables/use-float-players'
+import type { WindowSize } from '../utils/float-player-layout'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import {
+  BARRAGE_SIDEBAR_WIDTH,
+  CASCADE_MAX,
+  CASCADE_RIGHT_OFFSET,
+  CASCADE_STEP,
+  CASCADE_TOP_OFFSET,
+  DEFAULT_ASPECT,
+  EXPAND_BOX_RATIO,
+  fitAspectInBox,
+  FP_BAR_HEIGHT,
+  MINI_BOX_RATIO,
+  PILL_SIZE,
+  SNAP_EDGE,
+  SNAP_TOP,
+  VIEWPORT_PADDING_BOTTOM,
+  VIEWPORT_PADDING_X,
+} from '../utils/float-player-layout'
 import LivePlayer from './LivePlayer.vue'
+import MediaIcon from './MediaIcon.vue'
 import ReviewPlayer from './ReviewPlayer.vue'
 
 const props = defineProps<{
@@ -11,28 +29,17 @@ const props = defineProps<{
   index: number
 }>()
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'focus'])
 
-// 三种形态尺寸：迷你 / 放大（回放放大时恢复弹幕侧栏）/ 折叠胶囊条
-// 每个尺寸都按视频宽高比区分横竖屏：直播横屏自动套用更宽的窗口，避免窄竖窗塞横画面的尴尬。
-// 回放的放大态带右侧弹幕侧栏，无论横竖屏都保持横屏布局。
-const MINI_SIZE = {
-  live: { portrait: { w: 320, h: 540 }, landscape: { w: 640, h: 360 } },
-  review: { portrait: { w: 320, h: 540 }, landscape: { w: 640, h: 360 } },
-}
-const EXPAND_SIZE = {
-  live: { portrait: { w: 540, h: 800 }, landscape: { w: 1080, h: 720 } },
-  review: { portrait: { w: 1080, h: 720 }, landscape: { w: 1280, h: 800 } },
-}
-const PILL_SIZE = { w: 280, h: 40 }
-const TITLE_BAR_HEIGHT = 36
+// 视口尺寸：外接框随主窗口大小变化，必须在 resize 时保持更新
+const viewport = ref({ w: window.innerWidth, h: window.innerHeight })
 
-// 视频是否为横屏（由子播放器上报，含旋转），默认竖屏
-const landscape = ref(false)
+// 视频实际显示宽高比（由子播放器上报，含旋转后的交换），未就绪时按竖向兜底
+const aspect = ref(DEFAULT_ASPECT)
 
 const kind = computed(() => props.item.kind)
 
-// 标题栏：有主播名时展示「主播名 · 标题」，否则回退到 title
+// 标题栏：有主播名时展示「主播名: 标题」，否则回退到 title
 const barTitle = computed(() => {
   const { nickname, title } = props.item.payload
   if (nickname)
@@ -41,6 +48,12 @@ const barTitle = computed(() => {
 })
 const collapsed = ref(false)
 const expanded = ref(false)
+// 弹幕侧栏是否实际占位（由 ReviewPlayer 上报：有弹幕且未收起）
+const sidebarActive = ref(false)
+function onSidebar(active: boolean) {
+  sidebarActive.value = active
+  clampPos()
+}
 // 头部头像：由子播放器加载完成（或 open 模式传入）后上报，显示在 fp-bar
 const avatarUrl = ref('')
 function onAvatar(url: string) {
@@ -48,21 +61,43 @@ function onAvatar(url: string) {
     avatarUrl.value = url
 }
 
-// 当前窗口尺寸：折叠态返回胶囊条，否则按形态（迷你/放大）与横竖屏取对应档位
-const orientName = computed(() => (landscape.value ? 'landscape' : 'portrait'))
-const size = computed(() => {
+function fitIntoViewport(base: WindowSize): WindowSize {
+  const maxW = viewport.value.w - VIEWPORT_PADDING_X
+  const maxH = viewport.value.h - FP_BAR_HEIGHT - VIEWPORT_PADDING_BOTTOM
+  if (base.w <= maxW && base.h <= maxH)
+    return base
+  const scale = Math.min(maxW / base.w, maxH / base.h)
+  return { w: Math.round(base.w * scale), h: Math.round(base.h * scale) }
+}
+
+// 当前窗口尺寸：折叠态返回胶囊条；否则取视口外接框，
+// 内接出视频比例的最大矩形（回放放大且侧栏实际占位时预留弹幕侧栏宽），窗口高 = 视频区 + 标题条，
+// 最后再按视口硬钳制一次，不会被裁掉
+const size = computed<WindowSize>(() => {
   if (collapsed.value)
     return PILL_SIZE
-  if (expanded.value)
-    return EXPAND_SIZE[kind.value][orientName.value]
-  return MINI_SIZE[kind.value][orientName.value]
+  const ratio = expanded.value ? EXPAND_BOX_RATIO : MINI_BOX_RATIO
+  const sidebar = expanded.value && kind.value === 'review' && sidebarActive.value ? BARRAGE_SIDEBAR_WIDTH : 0
+  const boxW = viewport.value.w * ratio.w
+  const boxH = (viewport.value.h - FP_BAR_HEIGHT) * ratio.h
+  const video = fitAspectInBox(
+    aspect.value,
+    Math.max(140, boxW - sidebar),
+    Math.max(100, boxH - FP_BAR_HEIGHT),
+  )
+  return fitIntoViewport({ w: video.w + sidebar, h: video.h + FP_BAR_HEIGHT })
 })
 
 // 初始位置：从右上角开始按创建序号级联错位，避免多窗完全重叠
 const order = props.item.order
+const initialMiniWidth = fitAspectInBox(
+  DEFAULT_ASPECT,
+  window.innerWidth * MINI_BOX_RATIO.w,
+  (window.innerHeight - FP_BAR_HEIGHT) * MINI_BOX_RATIO.h - FP_BAR_HEIGHT,
+).w
 const pos = ref({
-  x: Math.max(12, window.innerWidth - MINI_SIZE[kind.value].portrait.w - 24 - (order % 6) * 36),
-  y: Math.max(TITLE_BAR_HEIGHT + 36, TITLE_BAR_HEIGHT + 60 + (order % 6) * 36),
+  x: Math.max(12, window.innerWidth - initialMiniWidth - CASCADE_RIGHT_OFFSET - (order % CASCADE_MAX) * CASCADE_STEP),
+  y: FP_BAR_HEIGHT + CASCADE_TOP_OFFSET + (order % CASCADE_MAX) * CASCADE_STEP,
 })
 
 const windowStyle = computed(() => ({
@@ -73,51 +108,90 @@ const windowStyle = computed(() => ({
   zIndex: 1000 + props.index,
 }))
 
-let dragging = false
-let dragStart = { x: 0, y: 0 }
-let basePos = { x: 0, y: 0 }
-
 function clampX(x: number) {
-  return Math.min(Math.max(0, x), Math.max(0, window.innerWidth - size.value.w))
+  return Math.min(Math.max(0, x), Math.max(0, viewport.value.w - size.value.w))
 }
 
 function clampY(y: number) {
-  return Math.min(Math.max(TITLE_BAR_HEIGHT, y), Math.max(TITLE_BAR_HEIGHT, window.innerHeight - size.value.h))
+  return Math.min(Math.max(FP_BAR_HEIGHT, y), Math.max(FP_BAR_HEIGHT, viewport.value.h - size.value.h))
 }
 
-// 子播放器上报视频宽高比后据此切换窗口横竖比例
-function onOrientation(isLandscape: boolean) {
-  landscape.value = isLandscape
-  // 尺寸变化后把窗口重新约束在视口内
-  pos.value.x = clampX(pos.value.x)
-  pos.value.y = clampY(pos.value.y)
+// 尺寸变化（换比例/缩放/展开折叠）后把窗口重新约束在视口内
+function clampPos() {
+  pos.value = { x: clampX(pos.value.x), y: clampY(pos.value.y) }
 }
 
-function onBarMouseDown(e: MouseEvent) {
-  const target = e.target as HTMLElement
-  // 点击操作按钮不触发拖拽
-  if (target.closest('.fp-actions'))
+// 子播放器上报视频宽高比后窗口自动定形（旋转切换也走这里）
+function onAspect(value: number) {
+  if (value > 0)
+    aspect.value = value
+  clampPos()
+}
+
+// 拖拽：Pointer Events + setPointerCapture，指针移出标题栏也不会丢事件；
+// 坐标写入经 rAF 节流，每帧最多触发一次重渲染
+interface DragState {
+  pointerId: number
+  startX: number
+  startY: number
+  baseX: number
+  baseY: number
+  dx: number
+  dy: number
+}
+let drag: DragState | null = null
+let dragFrame: number | null = null
+
+function applyDrag() {
+  if (!drag)
     return
-  dragging = true
-  dragStart = { x: e.clientX, y: e.clientY }
-  basePos = { x: pos.value.x, y: pos.value.y }
-  window.addEventListener('mousemove', onWindowMouseMove)
-  window.addEventListener('mouseup', onWindowMouseUp)
+  pos.value = { x: clampX(drag.baseX + drag.dx), y: clampY(drag.baseY + drag.dy) }
 }
 
-function onWindowMouseMove(e: MouseEvent) {
-  if (!dragging)
-    return
-  pos.value.x = clampX(basePos.x + e.clientX - dragStart.x)
-  pos.value.y = clampY(basePos.y + e.clientY - dragStart.y)
+function scheduleDrag() {
+  if (dragFrame !== null)
+    cancelAnimationFrame(dragFrame)
+  dragFrame = requestAnimationFrame(() => {
+    dragFrame = null
+    applyDrag()
+  })
 }
 
-function onWindowMouseUp() {
-  if (!dragging)
+function onBarPointerDown(e: PointerEvent) {
+  if (e.button !== 0)
     return
-  dragging = false
-  window.removeEventListener('mousemove', onWindowMouseMove)
-  window.removeEventListener('mouseup', onWindowMouseUp)
+  // 按下操作按钮不触发拖拽
+  if ((e.target as HTMLElement).closest('.fp-actions'))
+    return
+  drag = {
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    baseX: pos.value.x,
+    baseY: pos.value.y,
+    dx: 0,
+    dy: 0,
+  }
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function onBarPointerMove(e: PointerEvent) {
+  if (!drag || e.pointerId !== drag.pointerId)
+    return
+  drag.dx = e.clientX - drag.startX
+  drag.dy = e.clientY - drag.startY
+  scheduleDrag()
+}
+
+function onBarPointerUp(e: PointerEvent) {
+  if (!drag || e.pointerId !== drag.pointerId)
+    return
+  if (dragFrame !== null) {
+    cancelAnimationFrame(dragFrame)
+    dragFrame = null
+  }
+  applyDrag()
+  drag = null
   snapToEdge()
 }
 
@@ -125,18 +199,18 @@ function onWindowMouseUp() {
 function snapToEdge() {
   const { x, y } = pos.value
   const w = size.value.w
-  if (x < 16)
+  if (x < SNAP_EDGE)
     pos.value.x = 0
-  else if (x + w > window.innerWidth - 16)
-    pos.value.x = window.innerWidth - w
-  if (y < TITLE_BAR_HEIGHT + 24)
-    pos.value.y = TITLE_BAR_HEIGHT
+  else if (x + w > viewport.value.w - SNAP_EDGE)
+    pos.value.x = viewport.value.w - w
+  if (y < FP_BAR_HEIGHT + SNAP_TOP)
+    pos.value.y = FP_BAR_HEIGHT
 }
 
-// 窗口尺寸变化（如窗口缩放）时把迷你窗拉回可视区域
+// 窗口尺寸变化（如主窗口缩放）时刷新视口，把浮窗拉回可视区域
 function onWindowResize() {
-  pos.value.x = clampX(pos.value.x)
-  pos.value.y = clampY(pos.value.y)
+  viewport.value = { w: window.innerWidth, h: window.innerHeight }
+  clampPos()
 }
 
 function onClose() {
@@ -153,12 +227,10 @@ function toggleExpand() {
   expanded.value = !expanded.value
   if (expanded.value)
     collapsed.value = false
-  // 放大后窗口变宽，重新约束在视口内
-  pos.value.x = clampX(pos.value.x)
-  pos.value.y = clampY(pos.value.y)
+  clampPos()
 }
 
-// 标题栏双击：在 MINI_SIZE → EXPAND_SIZE → PILL_SIZE 之间循环切换
+// 标题栏双击：在 MINI → EXPAND → PILL 之间循环切换
 function cycleSize() {
   if (expanded.value) {
     // EXPAND → PILL（折叠胶囊）
@@ -173,12 +245,10 @@ function cycleSize() {
     // MINI → EXPAND（放大）
     expanded.value = true
   }
-  // 尺寸变化后把窗口重新约束在视口内
-  pos.value.x = clampX(pos.value.x)
-  pos.value.y = clampY(pos.value.y)
+  clampPos()
 }
 
-// 双击标题栏快速折叠/还原
+// 双击入口：落在操作按钮区的不处理，其余交给 cycleSize 三态循环
 function onBarDblClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (target.closest('.fp-actions'))
@@ -192,8 +262,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onWindowResize)
-  window.removeEventListener('mousemove', onWindowMouseMove)
-  window.removeEventListener('mouseup', onWindowMouseUp)
+  if (dragFrame !== null) {
+    cancelAnimationFrame(dragFrame)
+    dragFrame = null
+  }
 })
 </script>
 
@@ -202,13 +274,19 @@ onUnmounted(() => {
     class="fp-window frosted-surface frosted-surface--deep"
     :class="{ 'is-collapsed': collapsed }"
     :style="windowStyle"
+    @pointerdown="emit('focus')"
   >
     <div
       class="fp-bar"
-      @mousedown="onBarMouseDown"
+      title="拖动移动 · 双击切换形态"
+      @pointerdown="onBarPointerDown"
+      @pointermove="onBarPointerMove"
+      @pointerup="onBarPointerUp"
+      @pointercancel="onBarPointerUp"
       @dblclick="onBarDblClick"
     >
-      <span class="fp-kind" :class="{ 'is-review': kind === 'review' }">
+      <!-- 胶囊态隐藏「直播/回放」徽章，给标题让出空间 -->
+      <span v-if="!collapsed" class="fp-kind" :class="{ 'is-review': kind === 'review' }">
         {{ kind === 'live' ? '直播' : '回放' }}
       </span>
       <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="fp-avatar">
@@ -217,23 +295,27 @@ onUnmounted(() => {
       </span>
       <div class="fp-actions">
         <el-button
-          v-if="collapsed" circle size="small" :icon="ZoomIn"
+          v-if="collapsed" circle size="small"
           title="还原窗口" @click.stop="toggleCollapse"
-        />
+        >
+          <MediaIcon name="windowMaximize" :size="15" class="fp-icon" />
+        </el-button>
         <template v-else>
+          <!-- 折叠为胶囊：用 minus 表达「收起」，避免误读为最小化到任务栏 -->
+          <el-button circle size="small" title="折叠为迷你条" @click.stop="toggleCollapse">
+            <MediaIcon name="minus" :size="15" class="fp-icon" />
+          </el-button>
+          <!-- 换档：与 AppTitleBar 最大化/还原同族窗口控件语言（单框放大 / 双叠框还原） -->
           <el-button
-            circle size="small" :icon="expanded ? ZoomOut : ZoomIn"
+            circle size="small"
             :title="expanded ? '缩小还原' : '放大窗口'" @click.stop="toggleExpand"
-          />
-          <el-button
-            circle size="small" :icon="Minus"
-            title="折叠为迷你条" @click.stop="toggleCollapse"
-          />
+          >
+            <MediaIcon :name="expanded ? 'windowRestore' : 'windowMaximize'" :size="15" class="fp-icon" />
+          </el-button>
         </template>
-        <el-button
-          circle size="small" :icon="Close"
-          title="关闭" @click.stop="onClose"
-        />
+        <el-button circle size="small" title="关闭" class="fp-icon--close" @click.stop="onClose">
+          <MediaIcon name="close" :size="15" class="fp-icon" />
+        </el-button>
       </div>
     </div>
 
@@ -249,7 +331,7 @@ onUnmounted(() => {
         :avatar-url="item.payload.avatar || ''"
         :compact="!expanded"
         @avatar="onAvatar"
-        @orientation="onOrientation"
+        @aspect="onAspect"
         @close="onClose"
       />
       <ReviewPlayer
@@ -261,7 +343,8 @@ onUnmounted(() => {
         :avatar-url="item.payload.avatar || ''"
         :compact="!expanded"
         @avatar="onAvatar"
-        @orientation="onOrientation"
+        @aspect="onAspect"
+        @sidebar="onSidebar"
       />
     </div>
   </div>
@@ -280,6 +363,7 @@ onUnmounted(() => {
     height 0.2s ease;
 }
 
+/* 高度与 utils/float-player-layout.ts 的 FP_BAR_HEIGHT 保持一致 */
 .fp-bar {
   display: flex;
   align-items: center;
@@ -289,6 +373,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   cursor: move;
   user-select: none;
+  touch-action: none;
   -webkit-app-region: no-drag;
   border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 35%, transparent);
 
@@ -343,5 +428,16 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.fp-icon {
+  stroke-width: 1;
+}
+
+.fp-icon--close:hover {
+  background: linear-gradient(135deg, #e5484d, #e03d52);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px -2px rgba(224, 61, 82, 0.5);
 }
 </style>

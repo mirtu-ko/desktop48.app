@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { VideoCameraFilled } from '@element-plus/icons-vue'
 import { computed } from 'vue'
+import Tools from '../utils/tools'
 
 interface Member {
   teamName: string
@@ -35,7 +36,7 @@ const liveBadge = computed(() => {
 </script>
 
 <template>
-  <div class="live-card">
+  <div class="live-card lift-card clickable">
     <div class="cover-container">
       <el-image class="cover" :src="item.cover[0]" fit="cover" lazy>
         <template #placeholder>
@@ -63,7 +64,7 @@ const liveBadge = computed(() => {
           class="team-badge"
           :style="item.member.teamColor ? { '--tb-color': `#${item.member.teamColor}` } : undefined"
         >
-          {{ item.member.teamName.replace('TEAM ', '') }}
+          {{ Tools.shortTeamName(item.member.teamName) }}
         </span>
       </div>
       <p class="live-date">
@@ -74,23 +75,13 @@ const liveBadge = computed(() => {
 </template>
 
 <style scoped lang="scss">
+/* 卡片皮肤（实底白卡 + hover 上浮）见全局 .lift-card */
 .live-card {
   position: relative;
   margin: 0;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
   cursor: pointer;
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-md);
-
     .cover {
       transform: scale(1.05);
     }
