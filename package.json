@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "description": "desktop48",
   "author": "Zack",
+  "license": "MIT",
   "homepage": "https://electron-vite.org",
   "main": "./out/main/index.js",
   "scripts": {
@@ -32,17 +33,17 @@
     "mpegts.js": "^1.8.2"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^9.3.0",
+    "@antfu/eslint-config": "^9.5.1",
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@types/node": "^26.4.0",
     "@vitejs/plugin-vue": "^6.0.8",
-    "electron": "^43.4.1",
+    "electron": "^44.2.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0-beta.1",
     "eslint": "^10.9.1",
     "eslint-plugin-format": "^2.0.1",
     "prettier": "^3.9.6",
-    "sass-embedded": "^1.103.1",
+    "sass-embedded": "^1.104.0",
     "typescript": "~6.0.3",
     "vite": "^8.2.2",
     "vue": "^3.5.42",
