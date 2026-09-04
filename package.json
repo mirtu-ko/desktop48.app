@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "description": "desktop48",
   "author": "Zack",
+  "license": "MIT",
   "homepage": "https://electron-vite.org",
   "main": "./out/main/index.js",
   "scripts": {

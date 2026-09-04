@@ -1,6 +1,6 @@
 # desktop48.app
 
-Fork from [desktop48](https://github.com/Jarvay/desktop48), build with [electron-vite](https://electron-vite.org/).
+Fork from [desktop48](https://github.com/Jarvay/desktop48).
 
 ## Project Setup
 
@@ -31,7 +31,7 @@ $ npm run build:linux
 
 ## 预览
 
-![Desktop48 截图](resources/screenshot.jpg)
+![Desktop48 截图](resources/screenshot.png)
 
 ## macOS 常见问题
 
@@ -47,3 +47,7 @@ sudo xattr -rd com.apple.quarantine /Applications/Desktop48.app
 ```
 
 或者在访达中右键应用 → 选择「打开」（而非双击），在弹出的对话框中点击「打开」。
+
+## 开源协议
+
+本项目基于 [MIT License](LICENSE) 开源。
