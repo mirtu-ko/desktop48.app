@@ -53,6 +53,7 @@ function onRangeInput(event: Event) {
         :min="0"
         :max="duration || 0"
         :value="currentTime"
+        :style="{ '--fill': duration > 0 ? `${Math.min((currentTime / duration) * 100, 100)}%` : '0%' }"
         :aria-label="`播放进度 ${formatMediaTime(currentTime)} / ${formatMediaTime(duration)}`"
         @input="onRangeInput"
       >
@@ -111,13 +112,53 @@ function onRangeInput(event: Event) {
 
 /* 迷你进度条：录播必须可 seek。grow 因子 1：容器富余空间全部归进度条（时间串被推到右端）；
  * shrink 因子 1000：按 basis×factor 加权，空间不足时进度条先收缩（可压到 0），
- * 时间串的份额小到亚像素（100 时仍漏 1px 出省略号），进度条让尽后时间串才截断。
- * 实测 Chromium 并不会把 left:50% 绝对定位盒卡在 50% 宽，勿再依赖该假说 */
+ * 时间串的份额小到亚像素（100 时仍漏 1px 出省略号），进度条让尽后时间串才截断。*/
 .mini-range {
   flex: 1 1000 140px;
   min-width: 0;
-  accent-color: var(--brand-primary);
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+
+  &::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 3px;
+    /* --fill 由模板按 currentTime/duration 注入：填充段品牌渐变，底段半透明白 */
+    background: linear-gradient(
+      to right,
+      var(--brand-secondary),
+      var(--brand-primary) var(--fill, 0%),
+      rgba(255, 255, 255, 0.2) var(--fill, 0%)
+    );
+    transition: transform 0.15s ease;
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -3px;
+    border-radius: 50%;
+    background: var(--brand-primary);
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  &:hover {
+    &::-webkit-slider-runnable-track {
+      transform: scaleY(1.3);
+    }
+    &::-webkit-slider-thumb {
+      transform: scaleX(1.3);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+    }
+  }
+
+  &:active::-webkit-slider-thumb {
+    transform: scale(1.1);
+  }
 }
 
 /* 时间串优先级高于进度条：只在进度条让尽后才截断 */
