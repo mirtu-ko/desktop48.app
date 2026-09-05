@@ -189,7 +189,7 @@ async function getOne() {
       isRadio.value = false
       number.value = 0
       realName.value = data.subTitle || data.title || '开放公演'
-      userAvatar.value = props.avatarUrl
+      userAvatar.value = Tools.sourceUrl(props.avatarUrl || '')
       emit('avatar', userAvatar.value)
       barrageUrl.value = data.msgFilePath || ''
       playStreamPath.value = stream.streamPath

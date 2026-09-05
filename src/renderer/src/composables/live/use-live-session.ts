@@ -66,7 +66,7 @@ export function useLiveSession(options: {
     carouselTime.value = normalizeCarouselTime(data.carousels?.carouselTime)
     realName.value = data.user.userName
     // 头像：优先调用方传入（open 公演为封面），否则取详情的主播头像；open 模式无在线人数
-    userAvatar.value = options.avatarUrl() || Tools.sourceUrl(data.user.userAvatar)
+    userAvatar.value = Tools.sourceUrl(options.avatarUrl() || '')
     options.onAvatar(userAvatar.value)
     if (typeof data.onlineNum === 'number')
       options.onOnlineNum(data.onlineNum)

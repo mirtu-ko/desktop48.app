@@ -185,7 +185,7 @@ async function updateMembers() {
               <img
                 v-if="section.teamBadge"
                 class="team-badge-img"
-                :src="section.teamBadge"
+                :src="Tools.sourceUrl(section.teamBadge)"
                 alt=""
                 @error="hideBadge"
               >

@@ -7,6 +7,11 @@ class Tools {
    * 将相对路径 / 相对图片路径归一化为 source.48.cn 完整 URL；已是完整 URL 时原样返回
    */
   private static toSourceUrl(path: string): string {
+    // 空进空出：空串拼前缀会产出必然 404 的垃圾 URL（头像位碎图的根源）
+    if (!path)
+      return ''
+    if (path.endsWith('.png.png'))
+      path = path.replace('.png.png', '.png')
     if (path.includes('http'))
       return path
     return `https://source.48.cn${path}`
