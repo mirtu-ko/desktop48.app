@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import type { TaskPayload } from '../../services/task-payload'
 import { ElMessage } from 'element-plus'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMediaShortcuts } from '../../composables/media/use-media-shortcuts'
 import { useSleepBlocker } from '../../composables/media/use-sleep-blocker'
 import { useVideoRotation } from '../../composables/media/use-video-rotation'
 import { useReviewDanmaku } from '../../composables/review/use-review-danmaku'
 import { useReviewMedia } from '../../composables/review/use-review-media'
-import { useDownloadGuard } from '../../composables/tasks/use-download-guard'
-import useTasks from '../../composables/tasks/use-tasks'
+import useMediaDownload from '../../composables/tasks/use-media-download'
 import Apis from '../../services/apis'
 
+import { BARRAGE_SIDEBAR_WIDTH } from '../../utils/float-player-layout'
 import { normalizeCarouselTime, pickPreferredVodStream } from '../../utils/live-stream'
 import Tools from '../../utils/tools'
 import BarrageBox from '../danmaku/BarrageBox.vue'
@@ -245,42 +244,16 @@ function seekTo(seconds: number) {
   void mediaElement.play()
 }
 
-// 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
-const { checkDownloadDirectory } = useDownloadGuard()
-
-function getReviewDownloadFilename() {
-  return Tools.taskFilename(realName.value, Number.parseInt(String(props.startTime)), 'mp4')
-}
-
-// 任务由 useTasks 共享 store 直接接住并下发
-const { handleTask, isTaskRunning, stopTask } = useTasks()
-const downloading = computed(() => isTaskRunning('download', props.liveId))
-
-async function download() {
-  const valid = await checkDownloadDirectory()
-  if (!valid)
-    return
-
-  const filename = getReviewDownloadFilename()
-  const downloadTask: TaskPayload = {
-    url: playStreamPath.value,
-    filename,
-    liveId: props.liveId,
-  }
-  // 任务由 useTasks 这个模块级单例直接接住并启动，状态在按钮上就地可见，
-  // 不再跳转下载页——播放器本身也是浮窗，跳走反而打断浏览
-  await handleTask(downloadTask, 'download')
-}
-
-/** 下载中再次点击 = 取消下载 */
-function onDownloadClick() {
-  if (!downloading.value) {
-    download()
-    return
-  }
-  stopTask('download', props.liveId)
-  ElMessage({ message: '已停止下载', type: 'info' })
-}
+// 下载发起流程收口在 useMediaDownload（目录校验/文件名/任务下发与直播录制共用）。
+// 回放地址用当前已解析的 playStreamPath（VOD 地址稳定，无需重新拉详情）
+const { running: downloading, onActionClick: onDownloadClick } = useMediaDownload({
+  kind: 'download',
+  liveId: () => props.liveId,
+  getRealName: () => realName.value,
+  startTime: () => props.startTime,
+  ext: () => 'mp4',
+  getUrl: async () => playStreamPath.value,
+})
 
 onMounted(async () => {
   loadSettings()
@@ -298,7 +271,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="rootRef" class="review-player" tabindex="-1" @keydown="onKeydown" @pointerdown="onPointerDown">
+  <div
+    ref="rootRef"
+    class="review-player"
+    :style="{ '--barrage-sidebar-width': `${BARRAGE_SIDEBAR_WIDTH}px` }"
+    tabindex="-1"
+    @keydown="onKeydown"
+    @pointerdown="onPointerDown"
+  >
     <div class="review-content">
       <div class="video-box">
         <div
@@ -465,8 +445,9 @@ onUnmounted(() => {
 }
 
 .barrage-box {
-  /* 宽度与 utils/float-player-layout.ts 的 BARRAGE_SIDEBAR_WIDTH 同步（浮窗放大档按此预留侧栏位） */
-  width: 360px;
+  /* 宽度单一来源：utils/float-player-layout.ts 的 BARRAGE_SIDEBAR_WIDTH，
+     经根节点 :style 注入的 --barrage-sidebar-width 变量传入（浮窗放大档按此预留侧栏位） */
+  width: var(--barrage-sidebar-width);
   flex-shrink: 0;
   min-height: 0;
   background: var(--el-bg-color-page);

@@ -89,17 +89,6 @@ const { onInfiniteScroll } = useLoadMore({
   scrollbarRef: showsScrollRef,
 })
 
-/** 加载失败的封面 liveId（空 URL 或 404 都走占位图） */
-const brokenImages = ref(new Set<string>())
-
-function markBroken(liveId: string) {
-  brokenImages.value.add(liveId)
-}
-
-function isBroken(show: OpenLive): boolean {
-  return !show.coverPath || brokenImages.value.has(show.liveId)
-}
-
 onMounted(async () => {
   await fetchShows()
   // 首屏数据太少（不足一屏）时不会触发 end-reached，主动补拉下一页直到填满或无更多
@@ -193,7 +182,7 @@ function openHistoryStream(show: OpenLive) {
                 :class="{ clickable: show.status === 2 }"
                 @click="openLiveStream(show)"
               >
-                <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+                <ShowCard :show="show" />
               </div>
             </div>
           </template>
@@ -210,7 +199,7 @@ function openHistoryStream(show: OpenLive) {
                 :class="{ clickable: show.status === 2 }"
                 @click="openLiveStream(show)"
               >
-                <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+                <ShowCard :show="show" />
               </div>
             </div>
           </template>
@@ -226,7 +215,7 @@ function openHistoryStream(show: OpenLive) {
                 class="show-item lift-card clickable"
                 @click="openHistoryStream(show)"
               >
-                <ShowCard :show="show" :is-broken="isBroken" @mark-broken="markBroken" />
+                <ShowCard :show="show" />
               </div>
             </div>
           </template>

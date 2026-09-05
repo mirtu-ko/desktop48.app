@@ -3,6 +3,7 @@ import type { AudioTrack } from '../composables/use-audio-player'
 import { Headset, Link, Plus, ShoppingCart, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
+import CoverImage from '../components/ui/CoverImage.vue'
 import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
 import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
 import useAudioPlayer from '../composables/use-audio-player'
@@ -109,13 +110,6 @@ async function fetchAlbums() {
 }
 
 const refresh = fetchAlbums
-
-/** 封面加载失败的专辑 sid（原生 img 没有内置兜底槽，手动记录后渲染占位图标） */
-const brokenCovers = ref(new Set<string>())
-
-function markCoverBroken(sid: string) {
-  brokenCovers.value = new Set(brokenCovers.value).add(sid)
-}
 
 /** 专辑详情抽屉 */
 const detailVisible = ref(false)
@@ -253,24 +247,16 @@ onMounted(fetchAlbums)
             <div class="album-cover">
               <div class="vinyl">
                 <span class="vinyl-label">
-                  <!-- 盘标同样走原生懒加载：用 background-image 会绕过懒加载立即请求全部封面 -->
-                  <img class="vinyl-label-img" :src="album.image" loading="lazy" decoding="async" alt="">
+                  <CoverImage class="vinyl-label-img" :src="album.image" loading="lazy" />
                 </span>
               </div>
               <!-- 原生懒加载：视口外不请求，滚动接近时浏览器提前预取，比 el-image 的滚动节流更早就位 -->
               <div class="cover-img">
-                <img
-                  v-if="!brokenCovers.has(album.sid)"
-                  class="cover-src"
-                  :src="album.image"
-                  loading="lazy"
-                  decoding="async"
-                  alt=""
-                  @error="markCoverBroken(album.sid)"
-                >
-                <div v-else class="cover-fallback">
-                  <el-icon><Headset /></el-icon>
-                </div>
+                <CoverImage class="cover-src" :src="album.image" loading="lazy">
+                  <div class="cover-fallback">
+                    <el-icon><Headset /></el-icon>
+                  </div>
+                </CoverImage>
               </div>
             </div>
 

@@ -2,6 +2,7 @@
 import { Film, Hide, Link, User, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import Constants from '../../utils/constants'
 import Tools from '../../utils/tools'
 
 /** 成员详情（树节点为 starInfo 全量字段的 spread，这里声明展示用到的字段） */
@@ -37,12 +38,8 @@ const emit = defineEmits<{ close: [], toggleBlock: [member: MemberDetail] }>()
 
 const router = useRouter()
 
-/** 成员状态元信息 */
-const STATUS_META: Record<number, { label: string, tag: 'success' | 'warning' | 'info' }> = {
-  1: { label: '在团', tag: 'success' },
-  2: { label: '暂休', tag: 'warning' },
-  3: { label: '退团', tag: 'info' },
-}
+/** 成员状态元信息：收口于 Constants.MemberStatusMeta（与成员页分区/回放页排序共用） */
+const STATUS_META = Constants.MemberStatusMeta
 
 const statusMeta = computed(() =>
   STATUS_META[props.member?.status ?? 1] || STATUS_META[1],

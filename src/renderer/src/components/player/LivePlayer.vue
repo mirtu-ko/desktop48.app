@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { TaskPayload } from '../../services/task-payload'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useLivePlayer } from '../../composables/live/use-live-player'
@@ -9,11 +8,9 @@ import { useStreamRetry } from '../../composables/live/use-stream-retry'
 import { dispatchMediaShortcut } from '../../composables/media/use-media-shortcuts'
 import { useSleepBlocker } from '../../composables/media/use-sleep-blocker'
 import { useVideoRotation } from '../../composables/media/use-video-rotation'
-import { useDownloadGuard } from '../../composables/tasks/use-download-guard'
+import useMediaDownload from '../../composables/tasks/use-media-download'
 
-import useTasks from '../../composables/tasks/use-tasks'
 import EventBus from '../../services/event-bus'
-import Tools from '../../utils/tools'
 
 import MediaIcon from '../ui/MediaIcon.vue'
 import MiniControls from './MiniControls.vue'
@@ -183,43 +180,29 @@ function handleRetryExhausted() {
 }
 
 // ── 录制 ─────────────────────────────────────────────────────────
-// 录制状态取共享任务 store：任务由谁发起、下载页是否挂载都不影响这里；
-// 停止也走同一个任务对象，避免两处各持一份状态互相打架
-const { handleTask, isTaskRunning, stopTask } = useTasks()
-const recording = computed(() => isTaskRunning('record', props.liveId))
-
+// 录制发起流程收口在 useMediaDownload（目录校验/文件名/任务下发与回放下载共用）；
 // 录制走原始 RTMP 地址直存文件，和页面播放的 HTTP-FLV 链路保持解耦。
-// 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
-const { checkDownloadDirectory } = useDownloadGuard()
-
-async function record() {
-  const valid = await checkDownloadDirectory()
-  if (!valid)
-    return
-
-  session.fetchLiveDetail().then(async (detail) => {
-    const filename = Tools.taskFilename(realName.value, Number.parseInt(String(props.startTime)), 'flv', ' ')
-    const recordTask: TaskPayload = {
-      url: detail.playStreamPath,
-      filename,
-      liveId: props.liveId,
+// 状态查询与停止取共享任务 store：任务由谁发起、下载页是否挂载都不影响这里
+const { running: recording, onActionClick: onRecordClick } = useMediaDownload({
+  kind: 'record',
+  liveId: () => props.liveId,
+  getRealName: () => realName.value,
+  startTime: () => props.startTime,
+  ext: () => 'flv',
+  separator: () => ' ',
+  // 每次录制都拉最新详情：直播的 RTMP 地址会随推流变化，用缓存的旧地址可能拉不到流
+  getUrl: async () => {
+    try {
+      const detail = await session.fetchLiveDetail()
+      return detail.playStreamPath
     }
-    // 任务由 useTasks 这个模块级单例直接接住并启动，状态在按钮上就地可见，
-    // 不再跳转下载页——完整播放器本身也是浮窗，跳走反而打断浏览
-    await handleTask(recordTask, 'record')
-  }).catch((error) => {
-    console.error(error)
-  })
-}
-
-function onRecordClick() {
-  if (!recording.value) {
-    record()
-    return
-  }
-  stopTask('record', props.liveId)
-  ElMessage({ message: '已结束录制', type: 'info' })
-}
+    catch (error) {
+      // 失败原因已由 Apis.request 统一弹窗提示（直播已下架/网络错误）
+      console.error('[LivePlayer.vue] 获取录制源地址失败:', error)
+      return null
+    }
+  },
+})
 
 // ── 键盘快捷键（悬浮制：仅视频模式、鼠标悬浮时响应） ─────────────────────────
 // 按键分派与 ReviewPlayer 共用 dispatchMediaShortcut（键位单源）；

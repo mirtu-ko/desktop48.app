@@ -34,10 +34,8 @@ const groupId = ref('0')
 /** 左上角分团切换 tab 选项（与公演页共用同一份分团配置 Constants.GroupTabs） */
 const groupTabs = Constants.GroupTabs
 
-/** 成员状态（starInfo.status）：1 正常 2 暂休 3 退团 */
-const STATUS_ACTIVE = 1
-const STATUS_HIATUS = 2
-const STATUS_LEFT = 3
+/** 成员状态（starInfo.status）取值收口见 Constants.MemberStatus（与详情抽屉/回放页共用） */
+const { Active: STATUS_ACTIVE, Hiatus: STATUS_HIATUS, Left: STATUS_LEFT } = Constants.MemberStatus
 
 interface MemberSection {
   title: string

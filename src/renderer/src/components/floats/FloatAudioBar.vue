@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import useAudioPlayer from '../../composables/use-audio-player'
 import Tools from '../../utils/tools'
+import CoverImage from '../ui/CoverImage.vue'
 import MediaIcon from '../ui/MediaIcon.vue'
 
 const {
@@ -72,7 +73,9 @@ function onClearAll() {
               </span>
               <template v-else>{{ index + 1 }}</template>
             </span>
-            <img class="row-cover" :src="track.cover" alt="">
+            <CoverImage class="row-cover" :src="track.cover" :alt="track.name" loading="lazy">
+              <span class="row-cover-ph"><MediaIcon name="playlistFilled" :size="14" /></span>
+            </CoverImage>
             <div class="row-info">
               <div class="row-name ellipsis">
                 {{ track.name }}
@@ -249,6 +252,18 @@ function onClearAll() {
   border-radius: var(--radius-sm);
   object-fit: cover;
   box-shadow: var(--shadow-xs);
+}
+
+/* 破图占位：与 img 同尺寸的图标底座 */
+.row-cover-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
 }
 
 .row-info {

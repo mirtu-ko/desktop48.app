@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import type { OpenLive } from '../../services/apis'
 import Tools from '../../utils/tools'
+import CoverImage from './CoverImage.vue'
 
 defineProps<{
   show: OpenLive
-  isBroken: (_show: OpenLive) => boolean
-}>()
-
-defineEmits<{
-  markBroken: [liveId: string]
 }>()
 
 function formatTime(stime: string): string {
@@ -19,10 +15,11 @@ function formatTime(stime: string): string {
 <template>
   <div class="show-card">
     <div class="show-image">
-      <img v-if="!isBroken(show)" class="cover-image" :src="show.coverPath" :alt="show.title" @error="$emit('markBroken', show.liveId)">
-      <div v-else class="image-placeholder">
-        {{ show.title }}
-      </div>
+      <CoverImage :src="show.coverPath" :alt="show.title" class="cover-image">
+        <div class="image-placeholder">
+          {{ show.title }}
+        </div>
+      </CoverImage>
       <div v-if="show.teamList?.length" class="team-badges">
         <span
           v-for="team in show.teamList"

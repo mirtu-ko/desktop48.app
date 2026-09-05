@@ -6,6 +6,7 @@ import LiveItem from '../components/ui/LiveItem.vue'
 import { enrichLiveItem, usePagedLiveList } from '../composables/data/use-paged-live-list'
 import useFloatPlayers from '../composables/use-float-players'
 import Apis from '../services/apis'
+import Constants from '../utils/constants'
 
 // 组件 props：成员详情「看 TA 的回放」跳转时预置的成员筛选；每次跳转都是新对象，保证 watch 必触发
 const props = withDefaults(defineProps<{ memberPreset?: { userId: string } | null }>(), {
@@ -85,12 +86,12 @@ onMounted(async () => {
     refresh()
 })
 
-/** 末级成员排序：在团成员（status=1）排在前，其余（暂休/退团）保持原有相对顺序排在后 */
+/** 末级成员排序：在团成员（status=Active）排在前，其余（暂休/退团）保持原有相对顺序排在后 */
 function sortMembersByStatus(tree: any[]): any[] {
   for (const group of tree || []) {
     for (const team of group.children || []) {
       team.children?.sort(
-        (a: any, b: any) => Number(b.status === 1) - Number(a.status === 1),
+        (a: any, b: any) => Number(b.status === Constants.MemberStatus.Active) - Number(a.status === Constants.MemberStatus.Active),
       )
     }
   }
