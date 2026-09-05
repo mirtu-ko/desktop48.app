@@ -7,6 +7,11 @@ class Tools {
    * 将相对路径 / 相对图片路径归一化为 source.48.cn 完整 URL；已是完整 URL 时原样返回
    */
   private static toSourceUrl(path: string): string {
+    // 空进空出：空串拼前缀会产出必然 404 的垃圾 URL（头像位碎图的根源）
+    if (!path)
+      return ''
+    if (path.endsWith('.png.png'))
+      path = path.replace('.png.png', '.png')
     if (path.includes('http'))
       return path
     return `https://source.48.cn${path}`
@@ -88,7 +93,9 @@ class Tools {
 
   /**
    * 下载/录制任务文件名：成员名 + 任务开始时间（yyyyMMddhhmm）+ 扩展名。
-   * separator 为成员名与时间戳之间的分隔符（录制为空格、回放下载紧连，保持既有命名）
+   * separator 为成员名与时间戳之间的分隔符（录制为空格、回放下载紧连，保持既有命名）；
+   * 同场直播同一时刻只允许一个任务，文件名保持分钟精度即可，
+   * 跨任务的同名冲突由主进程 Start 前的冲突检测兜底（自动加序号）
    */
   public static taskFilename(realName: string, startTime: number, ext: string, separator = ''): string {
     return `${realName}${separator}${Tools.dateFormat(startTime, 'yyyyMMddhhmm')}.${ext}`

@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { app, ipcMain } from 'electron'
+import { isAllowedStreamUrl } from './allowed-hosts'
 import { Database } from './database'
-import { serverPort } from './http-server'
+import { assertLocalServerAvailable, serverHost, serverPort } from './http-server'
 import { error, log } from './logger'
 
 // 直播播放只在这里维护“会话”和“活跃转流进程”的状态。
@@ -59,6 +60,10 @@ function unregisterActiveProcess(sessionId: string, process: ReturnType<typeof s
     activeStreamProcesses.delete(sessionId)
 }
 
+// 优雅退出（写 'q'）后等待进程自行收尾的期限；超时视为进程卡死，强杀兜底。
+// 正常情况下 ffmpeg 写完文件尾毫秒级退出，2 秒足够宽裕。
+const GRACEFUL_STOP_TIMEOUT_MS = 2000
+
 function stopProcess(process: ReturnType<typeof spawn>) {
   if (process.exitCode !== null || process.killed)
     return
@@ -67,6 +72,17 @@ function stopProcess(process: ReturnType<typeof spawn>) {
     if (process.stdin && !process.stdin.destroyed) {
       process.stdin.write('q')
       process.stdin.end()
+      // 写 'q' 成功不代表进程会退出：网络栈 hang 等场景下 ffmpeg 可能永不收尾，
+      // 挂超时强杀兜底，避免直播转流进程泄漏（持续占用带宽直到应用退出）
+      const timer = setTimeout(() => {
+        if (process.exitCode !== null || process.killed)
+          return
+        error('[stream.ts] FFmpeg 优雅退出超时，强制结束进程')
+        forceKill(process)
+      }, GRACEFUL_STOP_TIMEOUT_MS)
+      timer.unref()
+      // 进程如期退出则取消强杀定时器
+      process.once('close', () => clearTimeout(timer))
       return
     }
   }
@@ -74,6 +90,11 @@ function stopProcess(process: ReturnType<typeof spawn>) {
     error('[stream.ts] 发送 FFmpeg 退出指令失败:', err)
   }
 
+  forceKill(process)
+}
+
+/** SIGTERM 失败再补 SIGKILL */
+function forceKill(process: ReturnType<typeof spawn>) {
   try {
     process.kill('SIGTERM')
   }
@@ -151,13 +172,19 @@ export function createFlvStreamProcess(liveId: string) {
 
 // 渲染进程只需要知道“这个直播可从哪个本地地址播放”，不直接管理 FFmpeg 进程。
 ipcMain.handle('createLiveStream', async (_event, rtmpUrl: string, liveId: string) => {
+  // 端口耗尽时本地 HTTP 服务不存在，返回 URL 只会让播放器静默连接失败——显式拒绝并说明原因
+  assertLocalServerAvailable()
+  // rtmpUrl 直接交给 ffmpeg 拉流，必须过白名单，否则渲染层被攻破即可诱导主进程连任意地址
+  if (!isAllowedStreamUrl(rtmpUrl))
+    throw new Error(`直播流地址不在允许范围内: ${rtmpUrl}`)
   const sessionId = getSafeLiveId(liveId)
   const existingSession = streamSessions.get(sessionId)
   const publicPath = getStreamRoute(liveId)
 
   if (existingSession && existingSession.inputUrl === rtmpUrl) {
     return {
-      url: `http://localhost:${serverPort()}${publicPath}`,
+      // 用 127.0.0.1 而非 localhost：localhost 可能解析到 ::1，与回环 IPv4 监听不匹配。
+      url: `http://${serverHost}:${serverPort()}${publicPath}`,
       liveId,
     }
   }
@@ -169,7 +196,7 @@ ipcMain.handle('createLiveStream', async (_event, rtmpUrl: string, liveId: strin
   })
 
   return {
-    url: `http://localhost:${serverPort()}${publicPath}`,
+    url: `http://${serverHost}:${serverPort()}${publicPath}`,
     liveId,
   }
 })

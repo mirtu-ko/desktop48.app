@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 
 /** 播放列表条目 */
 export interface AudioTrack {
@@ -26,8 +26,12 @@ const currentIndex = ref(-1)
 const playing = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
-/** 加载/播放失败的音频直链（失效 MP3 标记后不再重试） */
-const brokenUrls = ref(new Set<string>())
+/**
+ * 加载/播放失败的音频直链（失效 MP3 标记后不再重试）。
+ * 用 shallowRef + 整体替换：Vue 3 的 ref/ref 不会深度代理 Set，
+ * 原地 add() 不触发依赖更新，"失效曲目"的置灰就不会出现
+ */
+const brokenUrls = shallowRef(new Set<string>())
 
 /** 全局唯一的 HTML5 Audio 元素，首次播放时惰性创建 */
 let audio: HTMLAudioElement | null = null
@@ -59,7 +63,8 @@ function ensureAudio(): HTMLAudioElement {
     const track = currentTrack.value
     if (track && audio?.src && track.url && audio.src.includes(track.url)) {
       console.warn('[use-audio-player]音频加载失败，标记失效:', track.url)
-      brokenUrls.value.add(track.url)
+      // 替换整个 Set 才能触发 shallowRef 的依赖更新（原地 add 不会）
+      brokenUrls.value = new Set(brokenUrls.value).add(track.url)
       // 自动顺延下一首，没有下一首则停止
       if (currentIndex.value < playlist.value.length - 1) {
         playAt(currentIndex.value + 1)

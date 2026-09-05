@@ -8,6 +8,7 @@ build/icons
 .workbuddy/
 .DS_Store
 .eslintcache
+.vitest/
 *.log*
 .trae/rules/git-commit-message.md
 tsconfig.web.tsbuildinfo
