@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app, ipcMain } from 'electron'
 import { Database } from './database'
-import { serverPort } from './http-server'
+import { serverHost, serverPort } from './http-server'
 import { error, log } from './logger'
 
 // 直播播放只在这里维护“会话”和“活跃转流进程”的状态。
@@ -157,7 +157,8 @@ ipcMain.handle('createLiveStream', async (_event, rtmpUrl: string, liveId: strin
 
   if (existingSession && existingSession.inputUrl === rtmpUrl) {
     return {
-      url: `http://localhost:${serverPort()}${publicPath}`,
+      // 用 127.0.0.1 而非 localhost：localhost 可能解析到 ::1，与回环 IPv4 监听不匹配。
+      url: `http://${serverHost}:${serverPort()}${publicPath}`,
       liveId,
     }
   }
@@ -169,7 +170,7 @@ ipcMain.handle('createLiveStream', async (_event, rtmpUrl: string, liveId: strin
   })
 
   return {
-    url: `http://localhost:${serverPort()}${publicPath}`,
+    url: `http://${serverHost}:${serverPort()}${publicPath}`,
     liveId,
   }
 })

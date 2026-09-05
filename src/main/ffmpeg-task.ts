@@ -26,6 +26,14 @@ interface TaskSnapshot {
 const activeProcesses = new Set<ChildProcess>()
 
 /**
+ * 全局并发上限（下载 + 录制两组任务共用）：
+ * ffmpeg 转封装/录制很吃 CPU、磁盘与带宽，无上限时用户连点 N 个回放就会
+ * 同时跑 N 个进程拖垮机器。同 liveId 已有 closePromises 串行保护，
+ * 跨任务此前完全无保护，这里做全局熔断
+ */
+const MAX_CONCURRENT_FFMPEG_TASKS = 3
+
+/**
  * 应用退出时对所有 ffmpeg 写 'q' 优雅收尾；
  * 子进程会独立完成文件尾写入后自行退出，避免残留孤儿进程
  */
@@ -82,7 +90,23 @@ function registerFfmpegTask(config: FfmpegTaskConfig): void {
     const ffmpegPath = path.join(ffmpegDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
     if (!fs.existsSync(ffmpegPath))
       throw new Error('ffmpeg 二进制文件不存在')
-    const filePath = path.join(saveDir, filename)
+    // 全局并发熔断：达到上限直接拒绝（错误经 IPC 抛回渲染端，use-tasks 会用 ElMessage 展示）
+    if (activeProcesses.size >= MAX_CONCURRENT_FFMPEG_TASKS) {
+      throw new Error(`下载/录制任务已达并发上限（${MAX_CONCURRENT_FFMPEG_TASKS}），请先停止或等待部分任务完成`)
+    }
+    let filePath = path.join(saveDir, filename)
+    // 文件冲突保护：仅"同一任务重启"允许覆盖自己上次写的文件（渲染端重启语义即为覆盖原文件）；
+    // 其余任何冲突（如同分钟内对同一成员重复发起下载）一律自动追加序号，杜绝静默覆盖已下载内容
+    const isRestartOfSameTask = snapshots.get(liveId)?.filePath === filePath
+    if (!isRestartOfSameTask && fs.existsSync(filePath)) {
+      const ext = path.extname(filePath)
+      const stem = ext ? filePath.slice(0, -ext.length) : filePath
+      let seq = 2
+      while (fs.existsSync(`${stem} (${seq})${ext}`))
+        seq++
+      filePath = `${stem} (${seq})${ext}`
+      log(`[${logTag}]目标文件已存在，自动改用新文件名`, filePath)
+    }
     // 同一 liveId 上一进程可能仍在优雅退出（写文件尾），等待其完全退出后再启动
     const prevClose = closePromises.get(liveId)
     if (prevClose)
@@ -112,7 +136,8 @@ function registerFfmpegTask(config: FfmpegTaskConfig): void {
     snapshots.set(liveId, {
       liveId,
       url,
-      filename,
+      // 冲突保护可能已改用带序号的新文件名，快照以实际路径为准
+      filename: path.basename(filePath),
       filePath,
       saveDirectory: saveDir,
       status: 'running',

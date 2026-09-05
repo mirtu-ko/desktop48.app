@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import type { TaskPayload } from '../services/task-payload'
 import { ElMessage } from 'element-plus'
-import mpegts from 'mpegts.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useDownloadGuard } from '../composables/use-download-guard'
+import { useLivePlayer } from '../composables/use-live-player'
+import { useLivePolling } from '../composables/use-live-polling'
+import { useLiveSession } from '../composables/use-live-session'
 import { useSleepBlocker } from '../composables/use-sleep-blocker'
+import { useStreamRetry } from '../composables/use-stream-retry'
 import useTasks from '../composables/use-tasks'
 
 import { useVideoRotation } from '../composables/use-video-rotation'
-import Apis from '../services/apis'
 import EventBus from '../services/event-bus'
-import { formatMediaTime } from '../utils/time-format'
 import Tools from '../utils/tools'
 
 import MediaIcon from './MediaIcon.vue'
@@ -18,22 +19,6 @@ import MiniControls from './MiniControls.vue'
 import PlayerLoading from './PlayerLoading.vue'
 import RadioStage from './RadioStage.vue'
 import RotationControls from './RotationControls.vue'
-
-interface LiveDetail {
-  playStreamPath: string
-  coverPath: string
-  user: {
-    userName: string
-    userAvatar: string
-  }
-  onlineNum?: number
-  liveId?: string
-  /** 电台轮播图（liveType !== 1 时接口返回） */
-  carousels?: {
-    carousels: string[]
-    carouselTime?: number | string
-  }
-}
 
 const props = defineProps({
   liveTitle: { type: String, required: true },
@@ -51,30 +36,21 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'avatar', 'aspect'])
 
-const realName = ref('')
-const userAvatar = ref('')
-const playStreamPath = ref('')
 const nativeVideo = ref<HTMLVideoElement | null>(null)
 // 电台模式的 audio 元素由 RadioStage 挂载/卸载时经 @audio 事件回传
 const nativeAudio = ref<HTMLAudioElement | null>(null)
-const streamId = ref('')
 const videoBoxRef = ref<HTMLElement | null>(null)
 const mediaLoading = ref(true)
-const retryCount = ref(0)
-const maxRetries = 3
+// 鼠标悬浮才响应快捷键：同屏可能有多个浮窗播放器，否则一次按键会把它们全部转一遍。
+// 注：ReviewPlayer 走的是另一套「根节点焦点 keydown」策略，两边改动请互相参照。
+const hovered = ref(false)
+// 卸载标记：置位后所有在途异步回包直接丢弃
 const isManuallyUnmounted = ref(false)
-const streamRestartToken = ref(0)
-const isRecoveringStream = ref(false)
-const coverImage = ref('')
-const onlineNum = ref(0)
-// 播放防休眠（use-sleep-blocker，与 ReviewPlayer 共用）
-const { acquire: acquireSleepBlocker, release: releaseSleepBlocker } = useSleepBlocker()
-const elapsedTime = ref(0)
-/** 电台轮播图与切换间隔（毫秒） */
-const carousels = ref<string[]>([])
-const carouselTime = ref(5000)
 
 const isRadio = computed(() => props.liveType !== 1)
+
+// 播放防休眠（use-sleep-blocker，与 ReviewPlayer 共用）
+const { acquire: acquireSleepBlocker, release: releaseSleepBlocker } = useSleepBlocker()
 
 // 旋转 / 容器全屏 / 迷你控制条状态：与 ReviewPlayer 共用同一套实现（useVideoRotation）
 const {
@@ -105,124 +81,146 @@ const {
   onAspect: aspect => emit('aspect', aspect),
 })
 
-const onlineNumTimer = ref<ReturnType<typeof setInterval> | null>(null)
+// ── 直播轮询：已播时长 + 在线人数 ────────────────────────────────
+const polling = useLivePolling({
+  startTime: () => props.startTime,
+  liveId: () => props.liveId,
+  skipOnlineNum: () => props.source === 'open',
+})
+const { liveElapsedText, onlineNum } = polling
 
-let activeStreamRequestId = 0
-let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
-let elapsedTimer: ReturnType<typeof setInterval> | null = null
-let playerWatchStopHandle: (() => void) | null = null
-let livePlayer: ReturnType<typeof mpegts.createPlayer> | null = null
-
-// 这一组方法只负责“直播详情”和界面状态同步，不直接处理播放器。
-function applyLiveDetail(data: LiveDetail) {
-  coverImage.value = Tools.sourceUrl(data.coverPath)
-  // 电台轮播图：接口返回 carousels 时使用，否则回退封面图单张展示
-  carousels.value = isRadio.value && data.carousels?.carousels?.length
-    ? data.carousels.carousels.map(carousel => Tools.sourceUrl(carousel))
-    : (data.coverPath ? [Tools.sourceUrl(data.coverPath)] : [])
-  carouselTime.value = data.carousels?.carouselTime
-    ? Number.parseInt(String(data.carousels.carouselTime))
-    : 5000
-  realName.value = data.user.userName
-  // open 模式优先用传入的队伍 logo 作为顶部头像
-  userAvatar.value = props.source === 'open' && props.avatarUrl
-    ? props.avatarUrl
-    : Tools.sourceUrl(data.user.userAvatar)
-  // 头像上报给浮窗头部（fp-bar）展示
-  emit('avatar', userAvatar.value)
-  if (typeof data.onlineNum === 'number')
-    onlineNum.value = data.onlineNum
-}
-
-async function fetchLiveDetail(): Promise<LiveDetail> {
-  if (props.source === 'open') {
-    // 开放公演：getOpenLiveOne 返回 playStreams 数组，选高清（streamType 2），
-    // 没有用户信息，用标题兜底
-    const data = await Apis.instance().openLive(props.liveId)
-    const streams: Array<{ streamPath: string, streamType: number }> = data.playStreams || []
-    const stream = streams.find(s => s.streamType === 2 && s.streamPath)
-      || streams.find(s => s.streamPath)
-    return {
-      playStreamPath: stream?.streamPath || '',
-      coverPath: data.coverPath || '',
-      user: { userName: data.subTitle || data.title || '开放公演', userAvatar: '' },
-      liveId: data.liveId,
-    }
-  }
-  return await Apis.instance().live(props.liveId)
-}
-
-// 首次进入直播页时，先拿最新直播地址，再创建本地 HTTP-FLV 播放入口。
-async function getOne() {
-  mediaLoading.value = true
-  retryCount.value = 0
-  isRecoveringStream.value = false
-  try {
-    const data = await fetchLiveDetail()
-    if (isManuallyUnmounted.value)
-      return
-    console.log('获取到的直播信息:', data)
-    applyLiveDetail(data)
-    await restartLiveStream(data.playStreamPath)
-  }
-  catch (error: any) {
-    console.error('getOne()', error)
-    ElMessage.error('获取直播信息失败')
-    mediaLoading.value = false
-    // 详情都取不到通常意味着直播已下架，广播通知列表页刷新
+// ── 直播会话：详情获取 + 本地 HTTP-FLV 生命周期 ──────────────────
+const session = useLiveSession({
+  liveId: () => props.liveId,
+  source: () => props.source,
+  avatarUrl: () => props.avatarUrl,
+  isRadio: () => isRadio.value,
+  isDisposed: isManuallyUnmounted,
+  onAvatar: avatarUrl => emit('avatar', avatarUrl),
+  onOnlineNum: (num) => {
+    polling.onlineNum.value = num
+  },
+  // 详情都取不到通常意味着直播已下架：广播通知列表页刷新，并关闭当前 tab
+  onUnavailable: () => {
     EventBus.emit('live-unavailable', props.liveId)
     emit('close')
-  }
-}
-
-function startOnlineNumTimer() {
-  onlineNumTimer.value = setInterval(() => {
-    updateOnlineNum()
-  }, 30000)
-}
-
-function stopOnlineNumTimer() {
-  if (onlineNumTimer.value) {
-    clearInterval(onlineNumTimer.value)
-    onlineNumTimer.value = null
-  }
-}
-
-// 直播已播时长：每秒刷新，基于开播时间戳（毫秒）累加。
-function startElapsedTimer() {
-  elapsedTimer = setInterval(() => {
-    elapsedTime.value = Date.now() - props.startTime
-  }, 1000)
-}
-
-function stopElapsedTimer() {
-  if (elapsedTimer) {
-    clearInterval(elapsedTimer)
-    elapsedTimer = null
-  }
-}
-
-const liveElapsedText = computed(() => {
-  const totalSeconds = Math.max(0, Math.floor(elapsedTime.value / 1000))
-  return formatMediaTime(totalSeconds)
+  },
+  // 回调依赖 retry/player，创建顺序成环，统一走提升的函数声明（见文件末尾）
+  onBeforeRebuild: rebuildMedia,
+  onSessionStart: beginSession,
 })
 
-function updateOnlineNum() {
-  // 开放公演接口没有在线人数字段，跳过轮询
-  if (props.source === 'open') {
+// 详情展示状态直接解构给模板（ref 解构不丢响应性）
+const { playStreamPath, coverImage, realName, carousels, carouselTime } = session
+
+// ── mpegts 播放器实例 ────────────────────────────────────────────
+const player = useLivePlayer({
+  getMedia: () => (isRadio.value ? nativeAudio.value : nativeVideo.value),
+  isRadio: () => isRadio.value,
+  isDisposed: () => isManuallyUnmounted.value,
+  mediaLoading,
+  onCanPlay: onPlayerCanPlay,
+  onLoadedMetadata: () => updateVideoDimensions(),
+  onError: handleStreamError,
+})
+
+// ── 断流重试状态机 ───────────────────────────────────────────────
+const retry = useStreamRetry({
+  isDisposed: () => isManuallyUnmounted.value,
+  mediaLoading,
+  attempt: recoverStream,
+  onExhausted: handleRetryExhausted,
+})
+
+/** 单次恢复尝试：拉详情 → 重建流（节奏由重试状态机安排） */
+async function recoverStream() {
+  const data = await session.fetchLiveDetail()
+  if (isManuallyUnmounted.value)
     return
+  session.applyLiveDetail(data)
+  await session.restartLiveStream(data.playStreamPath)
+}
+
+/** 会话启动（getOne 开始）：复位 loading 与重试计数 */
+function beginSession() {
+  mediaLoading.value = true
+  retry.reset()
+}
+
+/** canplay：加载完成，复位恢复态并刷新视频尺寸 */
+function onPlayerCanPlay() {
+  retry.isRecoveringStream.value = false
+  if (!isRadio.value)
+    updateVideoDimensions()
+}
+
+/** 重建流之前：清重试计时器、销毁播放器、复位媒体元素 */
+function rebuildMedia() {
+  retry.clearTimer()
+  player.destroyPlayer()
+  player.resetMediaElement()
+}
+
+/** 媒体元素/FLV 错误统一处理：网络错误保持 loading 重试，致命错误先销毁播放器 */
+function handleStreamError(reason: string, isNetwork: boolean) {
+  console.error('[LivePlayer.vue] 直播播放异常:', reason)
+  if (isNetwork) {
+    mediaLoading.value = true
   }
-  Apis.instance().live(props.liveId).then((data) => {
-    onlineNum.value = data.onlineNum
-  }).catch((error: any) => {
+  else {
+    player.destroyPlayer()
+    mediaLoading.value = false
+  }
+  retry.schedule()
+}
+
+/** 重试耗尽视为直播结束：停流、广播下架、关闭 tab */
+function handleRetryExhausted() {
+  session.stopStreamNow()
+  EventBus.emit('live-unavailable', props.liveId)
+  emit('close')
+}
+
+// ── 录制 ─────────────────────────────────────────────────────────
+// 录制状态取共享任务 store：任务由谁发起、下载页是否挂载都不影响这里；
+// 停止也走同一个任务对象，避免两处各持一份状态互相打架
+const { handleTask, isTaskRunning, stopTask } = useTasks()
+const recording = computed(() => isTaskRunning('record', props.liveId))
+
+// 录制走原始 RTMP 地址直存文件，和页面播放的 HTTP-FLV 链路保持解耦。
+// 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
+const { checkDownloadDirectory } = useDownloadGuard()
+
+async function record() {
+  const valid = await checkDownloadDirectory()
+  if (!valid)
+    return
+
+  session.fetchLiveDetail().then(async (detail) => {
+    const filename = Tools.taskFilename(realName.value, Number.parseInt(String(props.startTime)), 'flv', ' ')
+    const recordTask: TaskPayload = {
+      url: detail.playStreamPath,
+      filename,
+      liveId: props.liveId,
+    }
+    // 任务由 useTasks 这个模块级单例直接接住并启动，状态在按钮上就地可见，
+    // 不再跳转下载页——完整播放器本身也是浮窗，跳走反而打断浏览
+    await handleTask(recordTask, 'record')
+  }).catch((error) => {
     console.error(error)
   })
 }
 
-// 鼠标悬浮才响应快捷键：同屏可能有多个浮窗播放器，否则一次按键会把它们全部转一遍。
-// 注：ReviewPlayer 走的是另一套「根节点焦点 keydown」策略，两边改动请互相参照。
-const hovered = ref(false)
+function onRecordClick() {
+  if (!recording.value) {
+    record()
+    return
+  }
+  stopTask('record', props.liveId)
+  ElMessage({ message: '已结束录制', type: 'info' })
+}
 
+// ── 键盘快捷键（仅视频模式、悬浮时响应） ─────────────────────────
 function onKeyDown(event: KeyboardEvent) {
   if (isRadio.value || !hovered.value || event.repeat || event.ctrlKey || event.metaKey || event.altKey)
     return
@@ -243,272 +241,41 @@ function onKeyDown(event: KeyboardEvent) {
   }
 }
 
-// 录制状态取共享任务 store：任务由谁发起、下载页是否挂载都不影响这里；
-// 停止也走同一个任务对象，避免两处各持一份状态互相打架
-const { handleTask, isTaskRunning, stopTask } = useTasks()
-const recording = computed(() => isTaskRunning('record', props.liveId))
-
-function onRecordClick() {
-  if (!recording.value) {
-    record()
-    return
-  }
-  stopTask('record', props.liveId)
-  ElMessage({ message: '已结束录制', type: 'info' })
-}
-
-// 这一组方法只处理“本地直播流会话”与播放器实例的清理，不涉及列表/录制逻辑。
-function clearStreamRetryTimer() {
-  if (streamRetryTimer) {
-    clearTimeout(streamRetryTimer)
-    streamRetryTimer = null
-  }
-}
-
-function destroyLivePlayer() {
-  if (livePlayer) {
-    livePlayer.destroy()
-    livePlayer = null
-  }
-}
-
-function resetMediaElement() {
-  const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
-  if (!mediaElement)
-    return
-
-  mediaElement.pause()
-  mediaElement.removeAttribute('src')
-  mediaElement.load()
-  mediaElement.onerror = null
-  mediaElement.oncanplay = null
-}
-
-async function stopCurrentLiveStream() {
-  const currentStreamId = streamId.value
-  if (!currentStreamId)
-    return
-
-  streamId.value = ''
-  try {
-    await window.mainAPI.stopLiveStream(currentStreamId)
-  }
-  catch (err) {
-    console.error('停止直播流失败:', err)
-  }
-}
-
-async function startLiveStream(rtmpUrl: string, requestId: number) {
-  const result = await window.mainAPI.createLiveStream(rtmpUrl, props.liveId)
-
-  if (isManuallyUnmounted.value || requestId !== activeStreamRequestId) {
-    try {
-      await window.mainAPI.stopLiveStream(result.liveId || props.liveId)
-    }
-    catch (err) {
-      console.error('关闭过期直播流失败:', err)
-    }
-    return false
-  }
-
-  streamId.value = result.liveId
-  playStreamPath.value = `${result.url}?t=${Date.now()}&r=${streamRestartToken.value}`
-  return true
-}
-
-async function restartLiveStream(rtmpUrl: string) {
-  const requestId = ++activeStreamRequestId
-  clearStreamRetryTimer()
-  destroyLivePlayer()
-  resetMediaElement()
-  await stopCurrentLiveStream()
-  if (isManuallyUnmounted.value || requestId !== activeStreamRequestId)
-    return false
-  streamRestartToken.value++
-  return await startLiveStream(rtmpUrl, requestId)
-}
-
-// 网络抖动、链接过期等都走这里的统一重试节奏，避免并发重连。
-function scheduleStreamRetry() {
-  if (isManuallyUnmounted.value || isRecoveringStream.value)
-    return
-
-  if (retryCount.value < maxRetries) {
-    retryCount.value++
-    isRecoveringStream.value = true
-    mediaLoading.value = true
-    clearStreamRetryTimer()
-    streamRetryTimer = setTimeout(async () => {
-      try {
-        const data = await fetchLiveDetail()
-        if (isManuallyUnmounted.value)
-          return
-        applyLiveDetail(data)
-        await restartLiveStream(data.playStreamPath)
-      }
-      catch (error) {
-        console.error('[LivePlayer.vue] 重试恢复直播流失败:', error)
-        isRecoveringStream.value = false
-        scheduleStreamRetry()
-        return
-      }
-      finally {
-        if (mediaLoading.value)
-          isRecoveringStream.value = false
-      }
-    }, 2000)
-  }
-  else {
-    mediaLoading.value = false
-    isRecoveringStream.value = false
-    ElMessage.warning('直播已结束')
-    if (streamId.value) {
-      window.mainAPI.stopLiveStream(streamId.value).catch((err) => {
-        console.error('停止直播流失败:', err)
-      })
-    }
-    // 重试耗尽视为直播结束：广播通知列表页刷新（流已不存在），并直接关闭当前 tab
-    EventBus.emit('live-unavailable', props.liveId)
-    emit('close')
-  }
-}
-
-function handleStreamError(reason: string) {
-  console.error('[LivePlayer.vue] 直播播放异常:', reason)
-  destroyLivePlayer()
-  mediaLoading.value = false
-  scheduleStreamRetry()
-}
-
-// 录制走原始 RTMP 地址直存文件，和页面播放的 HTTP-FLV 链路保持解耦。
-// 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
-const { checkDownloadDirectory } = useDownloadGuard()
-
-async function record() {
-  const valid = await checkDownloadDirectory()
-  if (!valid)
-    return
-
-  fetchLiveDetail().then(async (detail) => {
-    const filename = Tools.taskFilename(realName.value, Number.parseInt(String(props.startTime)), 'flv', ' ')
-    const recordTask: TaskPayload = {
-      url: detail.playStreamPath,
-      filename,
-      liveId: props.liveId,
-    }
-    // 任务由 useTasks 这个模块级单例直接接住并启动，状态在按钮上就地可见，
-    // 不再跳转下载页——完整播放器本身也是浮窗，跳走反而打断浏览
-    await handleTask(recordTask, 'record')
-  }).catch((error) => {
-    console.error(error)
-  })
-}
-
-// 基于本地 HTTP-FLV 地址创建并挂载 mpegts 播放器
-function setupPlayer(path: string) {
-  const mediaElement = isRadio.value ? nativeAudio.value : nativeVideo.value
-  if (!mediaElement || !path)
-    return
-
-  // 播放地址变化时，销毁旧实例并按最新本地 FLV 地址重新挂载。
-  destroyLivePlayer()
-
-  if (!mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
-    mediaLoading.value = false
+/** 挂载播放器；环境不支持 HTTP-FLV 时统一在此提示 */
+function mountPlayer(path: string) {
+  if (!player.setupPlayer(path))
     ElMessage.error('当前环境不支持 HTTP-FLV 直播播放')
-    return
-  }
-
-  const player = mpegts.createPlayer({
-    type: 'flv',
-    isLive: true,
-    cors: true,
-    withCredentials: false,
-    url: path,
-  }, {
-    enableWorker: true,
-    enableStashBuffer: false,
-    isLive: true,
-    lazyLoad: false,
-    liveBufferLatencyChasing: true,
-    liveBufferLatencyMaxLatency: 1.5,
-    liveBufferLatencyMinRemain: 0.3,
-    liveSync: true,
-    liveSyncMaxLatency: 1.2,
-    liveSyncTargetLatency: 0.6,
-    liveSyncPlaybackRate: 1.2,
-  })
-
-  livePlayer = player
-  player.attachMediaElement(mediaElement)
-  player.load()
-  void Promise.resolve(player.play()).catch((error) => {
-    console.error('[LivePlayer.vue] 自动播放失败:', error)
-  })
-
-  mediaElement.oncanplay = () => {
-    mediaLoading.value = false
-    isRecoveringStream.value = false
-    if (!isRadio.value) {
-      updateVideoDimensions()
-    }
-  }
-
-  if (!isRadio.value)
-    mediaElement.onloadedmetadata = () => updateVideoDimensions()
-
-  mediaElement.onerror = () => {
-    handleStreamError('native media error')
-  }
-
-  player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
-    if (isManuallyUnmounted.value) {
-      player.destroy()
-      if (livePlayer === player)
-        livePlayer = null
-      return
-    }
-
-    console.error('[LivePlayer.vue] HTTP-FLV 错误:', errorType, errorDetail, errorInfo)
-    if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
-      mediaLoading.value = true
-      scheduleStreamRetry()
-      return
-    }
-
-    handleStreamError(`${errorType}:${errorDetail}`)
-  })
 }
 
+/** 续播：浮窗回到前台 / 重新挂载时按播放器现存状态恢复 */
 async function resumeLive() {
   if (isManuallyUnmounted.value)
     return
   await acquireSleepBlocker()
-  startElapsedTimer()
-  startOnlineNumTimer()
+  polling.startElapsedTimer()
+  polling.startOnlineNumTimer()
   // 播放器仍在则直接续播，否则按缓存地址重建或全量拉流
-  if (livePlayer) {
-    void Promise.resolve(livePlayer.play()).catch((error) => {
-      console.error('[LivePlayer.vue] 恢复播放失败:', error)
-    })
+  if (player.hasPlayer()) {
+    player.play()
   }
   else if (playStreamPath.value) {
-    setupPlayer(playStreamPath.value)
+    mountPlayer(playStreamPath.value)
   }
   else {
-    await getOne()
+    await session.getOne()
   }
 }
 
-onMounted(() => {
-  console.log('[LivePlayer.vue] onMounted', props)
+let playerWatchStopHandle: (() => void) | null = null
 
+onMounted(() => {
+  // 播放器实例跟随播放地址：地址变化即重建（含首挂载）
   playerWatchStopHandle = watch(
     () => playStreamPath.value,
     (newPath) => {
       if (isManuallyUnmounted.value)
         return
-      setupPlayer(newPath)
+      mountPlayer(newPath)
     },
     { immediate: true },
   )
@@ -520,23 +287,17 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  isManuallyUnmounted.value = true
-  activeStreamRequestId++
-  clearStreamRetryTimer()
-  stopElapsedTimer()
+  // 先 dispose：所有在途异步回包（详情响应、开会话响应）立即失效
+  session.dispose()
+  retry.clearTimer()
+  polling.stopAll()
   if (playerWatchStopHandle) {
     playerWatchStopHandle()
     playerWatchStopHandle = null
   }
-  destroyLivePlayer()
-  resetMediaElement()
-  if (streamId.value) {
-    window.mainAPI.stopLiveStream(streamId.value).catch((err) => {
-      console.error('停止直播流失败:', err)
-    })
-  }
+  player.destroyPlayer()
+  player.resetMediaElement()
   releaseSleepBlocker()
-  stopOnlineNumTimer()
   window.removeEventListener('keydown', onKeyDown)
 })
 </script>

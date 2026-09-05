@@ -1,3 +1,4 @@
+import type { electronAPI as ElectronAPI, mainAPI } from './api-types'
 import { contextBridge, ipcRenderer } from 'electron'
 
 // 替代 @electron-toolkit/preload，仅暴露渲染进程实际需要的最小 API
@@ -11,15 +12,14 @@ const electronAPI = {
       node: process.versions.node,
     },
   },
-}
+} satisfies ElectronAPI
 
 // 渲染进程的自定义 API
+// satisfies mainAPI：实现与契约在编译期强制一致，新增/改名通道漏改任何一侧都会 typecheck 报错
 const api = {
   saveMemberData: (data: any) => ipcRenderer.invoke('saveMemberData', data),
   // 成员
   getMember: (userId: number) => ipcRenderer.invoke('getMember', userId),
-  getTeamOptions: () => ipcRenderer.invoke('getTeamOptions'),
-  getGroupOptions: () => ipcRenderer.invoke('getGroupOptions'),
   getMemberTree: () => ipcRenderer.invoke('getMemberTree'),
   getBlockedMembers: () => ipcRenderer.invoke('getBlockedMembers'),
   setBlockedMembers: (ids: number[]) => ipcRenderer.invoke('setBlockedMembers', ids),
@@ -27,20 +27,20 @@ const api = {
   removeBlockedMember: (userId: number) => ipcRenderer.invoke('removeBlockedMember', userId),
   hasMembers: () => ipcRenderer.invoke('hasMembers'),
   // 配置相关
-  getConfig: (key: string, defaultValue: any) => ipcRenderer.invoke('getConfig', key, defaultValue),
+  getConfig: (key: string, defaultValue?: any) => ipcRenderer.invoke('getConfig', key, defaultValue),
   setConfig: (key: string, value: any) => ipcRenderer.invoke('setConfig', key, value),
   // 网络
-  netRequest: (options: any) => ipcRenderer.invoke('net-request', options),
+  netRequest: (options: any) => ipcRenderer.invoke('netRequest', options),
   // 播放
   createLiveStream: (rtmpUrl: string, liveId: string) => ipcRenderer.invoke('createLiveStream', rtmpUrl, liveId),
   stopLiveStream: (liveId: string) => ipcRenderer.invoke('stopLiveStream', liveId),
   // 文件夹目录
-  openPath: (filePath: string) => ipcRenderer.invoke('open-path', filePath),
-  getDesktopPath: () => ipcRenderer.invoke('get-desktop-path'),
-  selectDirectory: () => ipcRenderer.invoke('select-directory'),
-  checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('check-ffmpeg-binaries', dir),
+  openPath: (filePath: string) => ipcRenderer.invoke('openPath', filePath),
+  getDesktopPath: () => ipcRenderer.invoke('getDesktopPath'),
+  selectDirectory: () => ipcRenderer.invoke('selectDirectory'),
+  checkFfmpegBinaries: (dir: string) => ipcRenderer.invoke('checkFfmpegBinaries', dir),
   getPlatform: () => process.platform,
-  pathJoin: (...paths: string[]) => ipcRenderer.invoke('path-join', ...paths),
+  pathJoin: (...paths: string[]) => ipcRenderer.invoke('pathJoin', ...paths),
   // 下载
   downloadTaskStart: (url: string, filename: string, liveId: string) => ipcRenderer.invoke('downloadTaskStart', url, filename, liveId),
   downloadTaskProgress: (callback: (_liveId: string, _time: string) => void) => {
@@ -82,20 +82,20 @@ const api = {
   recordTaskList: () => ipcRenderer.invoke('recordTaskList'),
   recordTaskRemove: (liveId: string) => ipcRenderer.invoke('recordTaskRemove', liveId),
   // 窗口控制
-  windowMinimize: () => ipcRenderer.invoke('window-minimize'),
-  windowToggleMaximize: () => ipcRenderer.invoke('window-toggle-maximize'),
-  windowClose: () => ipcRenderer.invoke('window-close'),
-  windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+  windowMinimize: () => ipcRenderer.invoke('windowMinimize'),
+  windowToggleMaximize: () => ipcRenderer.invoke('windowToggleMaximize'),
+  windowClose: () => ipcRenderer.invoke('windowClose'),
+  windowIsMaximized: () => ipcRenderer.invoke('windowIsMaximized'),
   windowOnMaximizeChange: (callback: (_isMaximized: boolean) => void) => {
     const listener = (_e: Electron.IpcRendererEvent, isMaximized: boolean) => callback(isMaximized)
-    ipcRenderer.on('window-maximized-changed', listener)
-    return () => ipcRenderer.removeListener('window-maximized-changed', listener)
+    ipcRenderer.on('windowOnMaximizeChange', listener)
+    return () => ipcRenderer.removeListener('windowOnMaximizeChange', listener)
   },
   // 阻止系统休眠
-  preventSleep: () => ipcRenderer.invoke('prevent-sleep'),
+  preventSleep: () => ipcRenderer.invoke('preventSleep'),
   // 允许系统休眠
-  allowSleep: (id: number) => ipcRenderer.invoke('allow-sleep', id),
-}
+  allowSleep: (id: number) => ipcRenderer.invoke('allowSleep', id),
+} satisfies mainAPI
 
 // 经 contextBridge 暴露给渲染进程（上下文隔离已启用）
 contextBridge.exposeInMainWorld('electron', electronAPI)

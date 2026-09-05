@@ -3,7 +3,7 @@ import type { TaskChannelAdapter } from '../services/task-base'
 import type { TaskPayload, TaskSnapshot } from '../services/task-payload'
 import { ElMessage } from 'element-plus'
 import { reactive, ref } from 'vue'
-import EventBus from '../services/event-bus'
+import { subscribe } from '../services/event-bus'
 import TaskBase from '../services/task-base'
 
 export type TaskKind = 'download' | 'record'
@@ -144,6 +144,8 @@ function stopTask(kind: TaskKind, liveId: string) {
 }
 
 let restored = false
+let installed = false
+let unsubscribe: Array<() => void> = []
 
 /** 首次调用时从主进程恢复一次任务快照（幂等） */
 async function ensureRestored() {
@@ -153,16 +155,36 @@ async function ensureRestored() {
   await Promise.all([restoreTasks('download'), restoreTasks('record')])
 }
 
-// 在模块加载时订阅（早于任何组件的 setup）：发起方可能在 Downloads 未挂载的页面上，
-// 若等到页面 mount 再订阅，事件可能在订阅前发出而静默丢失。
-EventBus.on('download-task', payload => handleTask(payload, 'download'))
-EventBus.on('record-task', payload => handleTask(payload, 'record'))
+/**
+ * 应用级安装：由入口 main.ts 显式调用一次，注册事件订阅并恢复一次任务快照。
+ *  副作用从"import 即执行"改为"显式安装"，消除 import 顺序依赖与 HMR 重复订阅；
+ *  重复调用安全（幂等），HMR 时自动卸载旧实例监听。
+ */
+export function installTasks() {
+  if (installed)
+    return
+  installed = true
+  // subscribe 返回卸载函数，供 HMR dispose / 测试重置统一卸载
+  unsubscribe = [
+    subscribe('download-task', payload => handleTask(payload, 'download')),
+    subscribe('record-task', payload => handleTask(payload, 'record')),
+  ]
+  // 订阅须早于任何组件 setup：发起方可能在 Downloads 未挂载的页面上，
+  // 若等到页面 mount 再订阅，事件可能在订阅前发出而静默丢失。
+  // 应用启动即恢复一次：播放器可能在下载页从未挂载过的情况下进入，
+  // 此时也要能正确显示「录制中」并能停止
+  void ensureRestored().catch((error: any) => {
+    console.error('[use-tasks] 恢复任务列表失败:', error)
+  })
+}
 
-// 应用启动即恢复一次：播放器可能在下载页从未挂载过的情况下进入，
-// 此时也要能正确显示「录制中」并能停止
-void ensureRestored().catch((error: any) => {
-  console.error('[use-tasks] 恢复任务列表失败:', error)
-})
+// HMR：卸载旧实例的监听，避免热更新后残留过期订阅
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    unsubscribe.forEach(off => off())
+    unsubscribe = []
+  })
+}
 
 export function useTasks() {
   return {

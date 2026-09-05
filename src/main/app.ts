@@ -30,7 +30,7 @@ log('[app.ts] Chromium 版本:', process.versions.chrome)
 
 // IPC 事件注册
 
-ipcMain.handle('open-path', async (_event: IpcMainInvokeEvent, filePath: string) => {
+ipcMain.handle('openPath', async (_event: IpcMainInvokeEvent, filePath: string) => {
   // 校验路径：允许系统标准用户目录 + 用户配置的下载目录/ffmpeg目录
   const allowedRoots = [
     app.getPath('desktop'),
@@ -64,20 +64,20 @@ ipcMain.handle('open-path', async (_event: IpcMainInvokeEvent, filePath: string)
     throw new Error(failure)
 })
 
-ipcMain.handle('select-directory', async () => {
+ipcMain.handle('selectDirectory', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
   if (result.canceled)
     return null
   return result.filePaths[0]
 })
 
-ipcMain.handle('path-join', (_event: IpcMainInvokeEvent, ...paths: string[]) => path.join(...paths))
+ipcMain.handle('pathJoin', (_event: IpcMainInvokeEvent, ...paths: string[]) => path.join(...paths))
 
 // 网络请求 - 域名白名单校验
 const NET_REQUEST_TIMEOUT = 20 * 1000
 const NET_REQUEST_MAX_BYTES = 32 * 1024 * 1024
 
-ipcMain.handle('net-request', async (_event: IpcMainInvokeEvent, options: any) => {
+ipcMain.handle('netRequest', async (_event: IpcMainInvokeEvent, options: any) => {
   const url: string = typeof options === 'string' ? options : options?.url
   if (!url || !isAllowedUrl(url)) {
     throw new Error(`请求被拒绝：域名不在白名单中 (${url})`)
@@ -145,10 +145,10 @@ ipcMain.handle('net-request', async (_event: IpcMainInvokeEvent, options: any) =
   })
 })
 
-ipcMain.handle('get-desktop-path', () => app.getPath('desktop'))
+ipcMain.handle('getDesktopPath', () => app.getPath('desktop'))
 
 // ffmpeg 相关
-ipcMain.handle('check-ffmpeg-binaries', async (_event: IpcMainInvokeEvent, dir: string) => {
+ipcMain.handle('checkFfmpegBinaries', async (_event: IpcMainInvokeEvent, dir: string) => {
   function ffmpegFullFilename(name: string): string {
     return process.platform === 'win32' ? `${name}.exe` : name
   }
@@ -209,7 +209,7 @@ function createWindow(): void {
 function wireWindowEvents(win: BrowserWindow): void {
   const send = () => {
     if (!win.isDestroyed())
-      win.webContents.send('window-maximized-changed', win.isMaximized())
+      win.webContents.send('windowOnMaximizeChange', win.isMaximized())
   }
   win.on('maximize', send)
   win.on('unmaximize', send)
@@ -223,8 +223,8 @@ function activeWindow(): BrowserWindow | null {
 }
 
 // 自定义标题栏窗口控制
-ipcMain.handle('window-minimize', () => activeWindow()?.minimize())
-ipcMain.handle('window-toggle-maximize', () => {
+ipcMain.handle('windowMinimize', () => activeWindow()?.minimize())
+ipcMain.handle('windowToggleMaximize', () => {
   const win = activeWindow()
   if (!win)
     return
@@ -233,8 +233,8 @@ ipcMain.handle('window-toggle-maximize', () => {
   else
     win.maximize()
 })
-ipcMain.handle('window-close', () => activeWindow()?.close())
-ipcMain.handle('window-is-maximized', () => activeWindow()?.isMaximized() ?? false)
+ipcMain.handle('windowClose', () => activeWindow()?.close())
+ipcMain.handle('windowIsMaximized', () => activeWindow()?.isMaximized() ?? false)
 
 // 当运行第二个实例时，聚焦到已有窗口（单实例锁在 index.ts 中已获取）
 app.on('second-instance', () => {
@@ -309,7 +309,7 @@ function releaseAllSleepBlockers(): void {
     releaseSleepBlocker(webContentsId)
 }
 
-ipcMain.handle('prevent-sleep', (event) => {
+ipcMain.handle('preventSleep', (event) => {
   const webContentsId = event.sender.id
   // 幂等：同一 webContents 重复请求（如两次 playing 事件竞态）时复用已有 blocker，避免泄漏
   const existing = sleepBlockers.get(webContentsId)
@@ -323,7 +323,7 @@ ipcMain.handle('prevent-sleep', (event) => {
   return id
 })
 
-ipcMain.handle('allow-sleep', (event, _id: number) => {
+ipcMain.handle('allowSleep', (event, _id: number) => {
   // 以 webContents 为准，忽略渲染进程传来的 id：刷新后它持有的 id 已经失效
   releaseSleepBlocker(event.sender.id)
 })

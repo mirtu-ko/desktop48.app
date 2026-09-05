@@ -157,7 +157,7 @@ function onRangeInput(event: Event) {
   }
 
   &:active::-webkit-slider-thumb {
-    transform: scale(1.1);
+    transform: scaleX(1.3);
   }
 }
 

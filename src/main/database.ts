@@ -2,9 +2,9 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app, ipcMain } from 'electron'
 import { LowSync } from 'lowdb'
-import { JSONFileSync } from 'lowdb/node'
 import data from './data'
 import { log } from './logger'
+import { SafeJSONFileSync } from './safe-json-file-sync'
 
 interface Team {
   label: string
@@ -64,8 +64,12 @@ class Database {
       const t = this.db.teamInfo?.find((i: any) => Number(i.teamId) === Number(teamId))
       return t?.seineTeamBadge || ''
     }
+    const teamColorOf = (teamId: number) => {
+      const t = this.db.teamInfo?.find((i: any) => Number(i.teamId) === Number(teamId))
+      return t?.teamColor || ''
+    }
 
-    // 转换为数组结构，直接存到 this.db.memberTree；group/team/member 的 value 用 id 字符串，便于回放按维度筛选
+    // 转换为纯内存派生结构（不写回 db）；group/team/member 的 value 用 id 字符串，便于回放按维度筛选
     this.memberTree = [...groupMap.values()]
       .sort((a, b) => groupSortOf(a.groupId) - groupSortOf(b.groupId))
       .map((group) => {
@@ -81,6 +85,9 @@ class Database {
               label: member.realName,
               value: String(member.userId),
               ...member,
+              // teamColor 纯派生：优先取 teamInfo 里的队伍色（原始数据不做任何改写），
+              // 查不到队伍时退回成员自带颜色，再退空串
+              teamColor: teamColorOf(team.teamId) || member.teamColor || '',
             })),
           }))
         return {
@@ -92,7 +99,6 @@ class Database {
           children: teamNodes,
         }
       })
-    this.db.memberTree = this.memberTree
   }
 
   public static instance() {
@@ -101,12 +107,10 @@ class Database {
 
   private static database: Database = new Database()
   private dbPath: string
-  private adapter: JSONFileSync<any>
+  private adapter: SafeJSONFileSync<any>
   private lowdb: LowSync<any>
   public db: any
   public membersDB: any
-  public teamsDB: any
-  public groupsDB: any
 
   private constructor() {
     const userDataPath = app.getPath('userData')
@@ -114,41 +118,8 @@ class Database {
     if (!existsSync(dirname(this.dbPath))) {
       mkdirSync(dirname(this.dbPath), { recursive: true })
     }
-    this.adapter = new JSONFileSync(this.dbPath)
+    this.adapter = new SafeJSONFileSync(this.dbPath)
     this.lowdb = new LowSync(this.adapter, data) // 传递默认数据，避免 data 未初始化
-  }
-
-  private memberTeamUpdate() {
-    // 为 starInfo 每一项补 teamColor；查不到队伍时保留旧值（粘性），
-    // 保证解散队伍被清洗后，退团成员仍保留最后一次已知的队伍颜色（颜色随成员持久化）
-    if (Array.isArray(this.db.starInfo) && Array.isArray(this.db.teamInfo)) {
-      this.db.starInfo.forEach((member: any) => {
-        const team = this.db.teamInfo.find((t: any) => Number(t.teamId) === Number(member.teamId))
-        member.teamColor = team?.teamColor || member.teamColor || ''
-      })
-    }
-  }
-
-  private pruneTeamsAndGroups() {
-    // 清洗 teamInfo/groupInfo：存活 = 被在团/暂休成员引用（status !== 3，含旧数据缺 status 的兜底）
-    // 或 API 标记 status === 1；两者都说死才删除，任一信号存活即保留（防 API 误标/缺字段）
-    if (!Array.isArray(this.db.starInfo) || !Array.isArray(this.db.teamInfo) || !Array.isArray(this.db.groupInfo)) {
-      return
-    }
-    const activeTeamIds = new Set(
-      this.db.starInfo.filter((m: any) => m.status !== 3).map((m: any) => Number(m.teamId)),
-    )
-    this.db.teamInfo = this.db.teamInfo.filter(
-      (t: any) => t.status === 1 || activeTeamIds.has(Number(t.teamId)),
-    )
-    const activeGroupIds = new Set(
-      this.db.starInfo.filter((m: any) => m.status !== 3).map((m: any) => Number(m.groupId)),
-    )
-    this.db.groupInfo = this.db.groupInfo.filter(
-      (g: any) => g.status === 1 || activeGroupIds.has(Number(g.groupId)),
-    )
-    this.teamsDB = this.db.teamInfo
-    this.groupsDB = this.db.groupInfo
   }
 
   public init() {
@@ -166,9 +137,10 @@ class Database {
       delete this.db.hiddenMemberIds
     }
 
-    // 统一顺序：先补颜色（粘性留存）→ 再清洗（解散队伍移除）→ 再建树（树的孩子是 spread 拷贝，最后建才能带上 teamColor）
-    this.memberTeamUpdate()
-    this.pruneTeamsAndGroups()
+    // 清理旧库遗留的派生字段：memberTree 现在是纯内存派生（见 buildMemberTree），不再持久化
+    delete this.db.memberTree
+
+    // 建树（纯内存派生，不写回原始数据）
     this.buildMemberTree()
     this.lowdb.write()
     // 调试打印数据库路径
@@ -183,17 +155,14 @@ class Database {
       this.db.teamInfo = content.teamInfo
     if (content.groupInfo)
       this.db.groupInfo = content.groupInfo
-    log('[database.ts] save-member-data 写入成功:', {
+    log('[database.ts] save-member-data 原始数据写入成功:', {
       starInfo: this.db.starInfo?.length,
       teamInfo: this.db.teamInfo?.length,
       groupInfo: this.db.groupInfo?.length,
-      memberTree: this.db.memberTree?.length,
     })
     // 同步缓存引用：starInfo 是整组替换，不刷新的话 hasMembers 等会读到旧数据直到重启
     this.membersDB = this.db.starInfo
-    // 顺序与 init 一致：补颜色 → 清洗 → 建树
-    this.memberTeamUpdate()
-    this.pruneTeamsAndGroups()
+    // 原始数据只读：清洗/派生全部发生在内存里（buildMemberTree），落盘的只有 API 原始内容
     this.buildMemberTree()
     this.lowdb.write()
     return { ok: true }
@@ -201,19 +170,6 @@ class Database {
 
   public getMember(userId: number) {
     return this.db.starInfo.find((m: any) => Number(m.userId) === Number(userId))
-  }
-
-  public getTeamOptions() {
-    // 拼接 groupName-teamName 作为 label，不修改原始数据，避免重复调用导致名字叠加
-    return (this.teamsDB || []).map((t: any) => {
-      const group = this.db.groupInfo.find((g: any) => Number(g.groupId) === Number(t.groupId))
-      const label = `${group?.groupName || ''}-${t.teamName || ''}`
-      return { label, value: t.teamId }
-    })
-  }
-
-  public getGroupOptions() {
-    return (this.groupsDB || []).map((g: any) => ({ label: g.groupName, value: g.groupId }))
   }
 
   public getBlockedMembers() {
@@ -309,8 +265,7 @@ ipcMain.handle('removeBlockedMember', async (_event, userId) => Database.instanc
 ipcMain.handle('hasMembers', async () => Database.instance().hasMembers())
 ipcMain.handle('getConfig', async (_event, key, defaultValue?: any) => Database.instance().getConfig(key, defaultValue))
 ipcMain.handle('setConfig', async (_event, key, value) => Database.instance().setConfig(key, value))
-ipcMain.handle('getTeamOptions', async () => Database.instance().getTeamOptions())
-ipcMain.handle('getGroupOptions', async () => Database.instance().getGroupOptions())
-ipcMain.handle('getMemberTree', async () => Database.instance().db.memberTree)
+// memberTree 是内存派生数据（不落盘），直接返回内存字段
+ipcMain.handle('getMemberTree', async () => Database.instance().memberTree)
 
 export { Database }
