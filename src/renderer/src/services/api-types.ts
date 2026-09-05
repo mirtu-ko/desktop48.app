@@ -25,7 +25,6 @@ export interface StarInfoItem {
   teamName?: string
   /** 0=未出道 1=在团 2=暂休 3=已退团 */
   status?: number
-  teamColor?: string
   [key: string]: unknown
 }
 

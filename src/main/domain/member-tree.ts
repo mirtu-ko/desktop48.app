@@ -67,6 +67,12 @@ export interface MemberTreeGroupNode {
 
 const sameId = (a: unknown, b: unknown) => Number(a) === Number(b)
 
+/** 按队伍 id 从 teamInfo 查队伍色（原始 starInfo 不带颜色）；成员树与 getMember 派生 teamColor 的同款规则 */
+export function teamColorOf(teamInfo: TeamRecord[] | undefined, teamId: number | string | undefined): string {
+  const t = teamInfo?.find(i => sameId(i.teamId, teamId))
+  return t?.teamColor || ''
+}
+
 /**
  * 构建成员树。用 groupName/teamName 字符串分组，保持树状层级；
  * 同时记录 groupId / teamId 供回放按维度筛选；value 一律用 id 字符串。
@@ -115,10 +121,6 @@ export function buildMemberTree(
     const t = teamInfo?.find(i => sameId(i.teamId, teamId))
     return t?.seineTeamBadge || ''
   }
-  const teamColorOf = (teamId: number | string | undefined) => {
-    const t = teamInfo?.find(i => sameId(i.teamId, teamId))
-    return t?.teamColor || ''
-  }
 
   // 转换为派生结构；group/team/member 的 value 用 id 字符串，便于回放按维度筛选
   return [...groupMap.values()]
@@ -138,7 +140,7 @@ export function buildMemberTree(
             ...member,
             // teamColor 纯派生：优先取 teamInfo 里的队伍色（原始数据不做任何改写），
             // 查不到队伍时退回成员自带颜色，再退空串
-            teamColor: teamColorOf(team.teamId) || member.teamColor || '',
+            teamColor: teamColorOf(teamInfo, team.teamId) || member.teamColor || '',
           })),
         }))
       return {

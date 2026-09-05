@@ -5,7 +5,7 @@ import { app } from 'electron'
 import { LowSync } from 'lowdb'
 import data from './data'
 import { addBlockedMemberId, isBlockedId, removeBlockedId, resolveBlockedMembers } from './domain/blocked-members'
-import { buildMemberTree } from './domain/member-tree'
+import { buildMemberTree, teamColorOf } from './domain/member-tree'
 import { log } from './logger'
 import { SafeJSONFileSync } from './safe-json-file-sync'
 
@@ -124,7 +124,15 @@ class Database {
   }
 
   public getMember(userId: number) {
-    return this.db.starInfo?.find(m => Number(m.userId) === Number(userId))
+    const member = this.db.starInfo?.find(m => Number(m.userId) === Number(userId))
+    if (!member)
+      return member
+    // teamColor 纯派生：原始 starInfo 不带颜色（颜色只存在于 teamInfo），
+    // 与成员树同款规则查 teamInfo 补上；浅拷贝返回，不改写原始数据
+    return {
+      ...member,
+      teamColor: teamColorOf(this.db.teamInfo, member.teamId) || member.teamColor || '',
+    }
   }
 
   public getBlockedMembers() {
