@@ -2,7 +2,6 @@
 import { Film, Hide, Link, User, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import EventBus from '../../services/event-bus'
 import Tools from '../../utils/tools'
 
 /** 成员详情（树节点为 starInfo 全量字段的 spread，这里声明展示用到的字段） */
@@ -86,13 +85,14 @@ function onVisibilityChange(value: boolean) {
     emit('close')
 }
 
-/** 点击卡片「看 TA 的回放」：通知直播页切到回放 tab 并按该成员预置筛选 */
+/** 点击卡片「看 TA 的回放」：跳转直播页回放 tab 并按该成员预置筛选。
+ *  跳转语义由路由 query 承载（原 EventBus 'open-member-reviews' 事件已移除）：
+ *  /lives?tab=review&member=<userId>，Lives 页解析后切 tab + 应用筛选 */
 function openReviews() {
   if (!props.member)
     return
-  EventBus.emit('open-member-reviews', props.member.userId)
   emit('close')
-  router.push('/lives')
+  router.push({ path: '/lives', query: { tab: 'review', member: String(props.member.userId) } })
 }
 </script>
 

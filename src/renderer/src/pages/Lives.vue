@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { LiveListItem } from '../services/api-types'
 import { Film, VideoCamera } from '@element-plus/icons-vue'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
 import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
 import LiveItem from '../components/ui/LiveItem.vue'
@@ -10,6 +11,8 @@ import useFloatPlayers from '../composables/use-float-players'
 import Apis from '../services/apis'
 import EventBus from '../services/event-bus'
 import Reviews from './Reviews.vue'
+
+const route = useRoute()
 
 // 画中画迷你窗：直播/回放/公演共用全局播放挂载点
 const { openLive } = useFloatPlayers()
@@ -32,10 +35,16 @@ function switchTab(tab: string) {
   activeTab.value = tab as 'live' | 'review'
 }
 
-// 成员详情抽屉跳转：切到回放面板并按该成员预置级联筛选
-function onOpenMemberReviews(userId: unknown) {
-  memberPreset.value = { userId: String(userId) }
-  switchTab('review')
+// 成员详情抽屉跳转（/lives?tab=review&member=<userId>）：
+// 切到回放面板并按该成员预置级联筛选。跳转语义由路由 query 承载（原 EventBus 事件已移除）
+function applyMemberReviewsRoute(query: { tab?: string, member?: string }) {
+  if (query.member) {
+    memberPreset.value = { userId: String(query.member) }
+    switchTab('review')
+  }
+  else if (query.tab === 'review') {
+    switchTab('review')
+  }
 }
 
 // 双击当前 tab：直播 tab 刷新直播列表，回放 tab 转发给回放组件刷新
@@ -84,7 +93,7 @@ function play(item: LiveListItem) {
 }
 
 // 浮窗放流失败（流已不存在/直播下架）时，若该直播属于本页列表则自动刷新
-function onLiveUnavailable(liveId: unknown) {
+function onLiveUnavailable(liveId: string) {
   const inList = liveList.value.some(item => item.liveId === liveId)
   if (inList)
     refreshList()
@@ -98,13 +107,20 @@ function refreshList() {
 
 onMounted(() => {
   getLiveList()
+  // 首次挂载即读取跳转参数（从成员页抽屉跳转过来的场景）
+  applyMemberReviewsRoute(route.query as { tab?: string, member?: string })
   EventBus.on('live-unavailable', onLiveUnavailable)
-  EventBus.on('open-member-reviews', onOpenMemberReviews)
+})
+
+// keep-alive 下 Lives 只挂载一次，抽屉的后续跳转通过 query 变化触发
+watch(() => route.query, (query) => {
+  // 仅在当前路由就是 /lives 时响应，避免其他页面 query 变化误触发
+  if (route.path === '/lives')
+    applyMemberReviewsRoute(query as { tab?: string, member?: string })
 })
 
 onUnmounted(() => {
   EventBus.off('live-unavailable', onLiveUnavailable)
-  EventBus.off('open-member-reviews', onOpenMemberReviews)
 })
 </script>
 

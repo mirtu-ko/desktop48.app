@@ -59,6 +59,10 @@ function unregisterActiveProcess(sessionId: string, process: ReturnType<typeof s
     activeStreamProcesses.delete(sessionId)
 }
 
+// 优雅退出（写 'q'）后等待进程自行收尾的期限；超时视为进程卡死，强杀兜底。
+// 正常情况下 ffmpeg 写完文件尾毫秒级退出，2 秒足够宽裕。
+const GRACEFUL_STOP_TIMEOUT_MS = 2000
+
 function stopProcess(process: ReturnType<typeof spawn>) {
   if (process.exitCode !== null || process.killed)
     return
@@ -67,6 +71,17 @@ function stopProcess(process: ReturnType<typeof spawn>) {
     if (process.stdin && !process.stdin.destroyed) {
       process.stdin.write('q')
       process.stdin.end()
+      // 写 'q' 成功不代表进程会退出：网络栈 hang 等场景下 ffmpeg 可能永不收尾，
+      // 挂超时强杀兜底，避免直播转流进程泄漏（持续占用带宽直到应用退出）
+      const timer = setTimeout(() => {
+        if (process.exitCode !== null || process.killed)
+          return
+        error('[stream.ts] FFmpeg 优雅退出超时，强制结束进程')
+        forceKill(process)
+      }, GRACEFUL_STOP_TIMEOUT_MS)
+      timer.unref()
+      // 进程如期退出则取消强杀定时器
+      process.once('close', () => clearTimeout(timer))
       return
     }
   }
@@ -74,6 +89,11 @@ function stopProcess(process: ReturnType<typeof spawn>) {
     error('[stream.ts] 发送 FFmpeg 退出指令失败:', err)
   }
 
+  forceKill(process)
+}
+
+/** SIGTERM 失败再补 SIGKILL */
+function forceKill(process: ReturnType<typeof spawn>) {
   try {
     process.kill('SIGTERM')
   }
