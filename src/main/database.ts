@@ -44,7 +44,7 @@ export interface DatabaseShape {
 /**
  * lowdb 数据库门面：负责原子读写、config CRUD 与成员/屏蔽名单查询。
  *
- * 职责边界（M3 拆分后）：
+ * 职责边界：
  * - 建树逻辑在 `domain/member-tree.ts`（纯函数）
  * - 屏蔽名单的匹配/过滤在 `domain/blocked-members.ts`（纯函数），本类只管落库
  * - IPC 注册在 `ipc/register-database-ipc.ts`

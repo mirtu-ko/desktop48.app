@@ -21,7 +21,9 @@ import RotationControls from './RotationControls.vue'
 const props = defineProps({
   liveTitle: { type: String, required: true },
   liveId: { type: String, required: true },
+  /** 开演时间（毫秒时间戳），用于计算已播时长 */
   startTime: { type: Number, required: true },
+  /** 1=视频直播（走 <video>），其它=电台（纯音频，走 RadioStage 的 <audio>） */
   liveType: { type: Number, required: true },
   liveMode: { type: Number, required: true },
   /** 数据源：user=用户直播(getLiveOne)，open=开放公演(getOpenLiveOne) */
@@ -108,8 +110,9 @@ const session = useLiveSession({
   onSessionStart: beginSession,
 })
 
-// 详情展示状态直接解构给模板（ref 解构不丢响应性）
-const { playStreamPath, coverImage, realName, carousels, carouselTime } = session
+// 详情展示状态直接解构给模板（解构出的仍是 ref，不丢响应性）。
+// localPlaybackUrl = 本地 HTTP-FLV 地址，下方 watch 盯着它重建播放器
+const { localPlaybackUrl, coverImage, realName, carousels, carouselTime } = session
 
 // ── mpegts 播放器实例 ────────────────────────────────────────────
 const player = useLivePlayer({
@@ -236,8 +239,8 @@ async function resumeLive() {
   if (player.hasPlayer()) {
     player.play()
   }
-  else if (playStreamPath.value) {
-    mountPlayer(playStreamPath.value)
+  else if (localPlaybackUrl.value) {
+    mountPlayer(localPlaybackUrl.value)
   }
   else {
     await session.getOne()
@@ -247,9 +250,11 @@ async function resumeLive() {
 let playerWatchStopHandle: (() => void) | null = null
 
 onMounted(() => {
-  // 播放器实例跟随播放地址：地址变化即重建（含首挂载）
+  // 播放器实例跟随播放地址：地址一变就重建。
+  // 首次播放 / 断流重试 / 恢复播放都只是「写 localPlaybackUrl」，
+  // 重建播放器的逻辑收敛在这一处（immediate 让首挂载也走同一条路径）。
   playerWatchStopHandle = watch(
-    () => playStreamPath.value,
+    () => localPlaybackUrl.value,
     (newPath) => {
       if (isManuallyUnmounted.value)
         return

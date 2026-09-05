@@ -6,7 +6,7 @@ import { useDanmakuOverlay } from '../media/use-danmaku-overlay'
 import { useDanmakuSettings } from '../media/use-danmaku-settings'
 
 /**
- * 录播弹幕编排（M2 从 ReviewPlayer.vue 拆出）：
+ * 录播弹幕编排：
  * 收敛三套进度游标（播放进度 currentTime、右侧列表游标、叠加层游标）的唯一入口——
  * 播放推进只走 onTimeUpdate，seek/重播只走 seekBarragesTo，
  * 任何一条路径都不可能漏同步（拆分前两者分散在组件两处，靠约定维持一致）。

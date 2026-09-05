@@ -30,6 +30,7 @@ export default class Apis {
     // 更新数据到数据库
     const content = await this.request<SyncInfoContent>(ApiUrls.UPDATE_INFO_URL, {}, {})
     console.log('[apis.ts]更新成员信息', content)
+    // ★ 跨进程：preload/index.ts → main/ipc/register-database-ipc.ts（写 database.json 并重建成员树）
     await window.mainAPI.saveMemberData(content)
     return content
   }
@@ -155,7 +156,6 @@ export default class Apis {
       debug: false,
       record,
     }
-    console.log('[apis.ts]openLives', data)
     return this.request<LiveListContent<OpenLive>>(ApiUrls.OPEN_LIVE_LIST_URL, data, {})
   }
 
@@ -175,7 +175,7 @@ export default class Apis {
     ElMessage.error(message)
   }
 
-  /** 统一请求：解析 JSON 信封，成功返回 content，失败抛 message（M6 泛型化） */
+  /** 统一请求：解析 JSON 信封，成功返回 content，失败抛 message */
   private async request<T>(url: string, data: object, headers: Record<string, string>): Promise<T> {
     let responseBody: string
     try {

@@ -19,6 +19,11 @@ interface TaskKindConfig {
   logTag: string
 }
 
+// ★ 跨进程：下方 taskConfigs 里的 downloadTask* / recordTask* 通道全部经
+// preload/index.ts 转到 main/ffmpeg/register-ffmpeg-task.ts。
+// 与其它 IPC 不同，这组是**双向**的：invoke 发起任务，主进程再用 ipcRenderer.on
+// 持续回推 progress / end / error 事件（见 preload 里返回 unsubscribe 的那几个）。
+//
 // 模块级单例：任务不随 Downloads 页面卸载而消失。
 // 否则在列表页/悬浮迷你窗发起的录制会因为 Downloads 未挂载而丢失事件，
 // 只能靠「先跳到下载页」这种副作用来保证任务被接住。

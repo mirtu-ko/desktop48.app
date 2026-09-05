@@ -11,8 +11,15 @@ onMounted(() => {
   init()
 })
 
+/**
+ * 首屏环境自检：ffmpeg 目录未配置则引导用户选择。
+ *
+ * ★ 跨进程：本文件的 getConfig / setConfig 对端是 main/ipc/register-database-ipc.ts，
+ * selectDirectory / checkFfmpegBinaries / getPlatform 对端是 main/app.ts。
+ */
 async function init() {
   try {
+    // preload 注入失败时（打包异常/contextBridge 未生效）整个应用不可用，这里给出可读提示
     if (!window.mainAPI || typeof window.mainAPI.getConfig !== 'function') {
       initText.value = 'Electron API 未注入，无法获取平台信息'
       console.error('window.mainAPI 未定义或 getConfig 方法不存在')

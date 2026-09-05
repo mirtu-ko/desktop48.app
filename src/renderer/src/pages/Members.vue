@@ -147,6 +147,7 @@ onMounted(() => {
 async function fetchGroups() {
   loading.value = true
   try {
+    // ★ 跨进程：preload/index.ts → main/ipc/register-database-ipc.ts（成员树是主进程内存派生，不落盘）
     groups.value = (await window.mainAPI.getMemberTree()) || []
   }
   catch (error) {

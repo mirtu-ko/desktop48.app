@@ -19,7 +19,12 @@ interface BlockTarget {
 /** 模块级共享状态：成员页与设置页读写同一份名单，跨页切换自动同步 */
 const blockedMembers = ref<BlockedMember[]>([])
 
-/** 屏蔽名单的单一数据源：读取、判断、屏蔽 / 解除 / 清空都在这里收口 */
+/**
+ * 屏蔽名单的单一数据源：读取、判断、屏蔽 / 解除 / 清空都在这里收口。
+ *
+ * ★ 跨进程：本文件所有 window.mainAPI.*BlockedMember* 调用经 preload/index.ts
+ * 转到 main/ipc/register-database-ipc.ts，名单落盘在 database.json。
+ */
 export function useBlockedMembers() {
   /** 从主进程拉取最新名单（页面挂载时调用） */
   async function refreshBlockedMembers() {

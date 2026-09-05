@@ -3,7 +3,7 @@ import Apis from '../../services/apis'
 import { formatMediaTime } from '../../utils/time-format'
 
 /**
- * 直播轮询（从 LivePlayer.vue 拆出）：
+ * 直播轮询：
  * - 已播时长：每秒刷新，基于开播时间戳（毫秒）累加，启动时立即算一次避免首秒显示 0
  * - 在线人数：每 30 秒拉一次详情；开放公演接口无此字段，跳过轮询
  */

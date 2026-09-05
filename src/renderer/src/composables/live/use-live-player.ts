@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import mpegts from 'mpegts.js'
 
 /**
- * mpegts 播放器实例管理（从 LivePlayer.vue 拆出）：
+ * mpegts 播放器实例管理：
  * 创建/销毁/复位媒体元素，错误经回调上抛给组件编排层。
  * 直播用本地 HTTP-FLV + 追帧配置，低延迟优先。
  */

@@ -3,7 +3,7 @@ import { nextTick, ref, watch } from 'vue'
 import { usePlaybackEngine } from '../media/use-playback-engine'
 
 /**
- * 录播媒体编排（M2 从 ReviewPlayer.vue 拆出）：
+ * 录播媒体编排：
  * usePlaybackEngine 的业务接线 + retryPlayback + 播放地址变化的挂载 watch。
  * 引擎维护「加载中 / 缓冲中 / 出错」三态，媒体事件经回调交还调用方做业务处理。
  */

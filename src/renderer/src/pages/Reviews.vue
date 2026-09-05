@@ -75,6 +75,7 @@ function filterMethod(node: any, keyword: string) {
 onMounted(async () => {
   // 成员树仅用于筛选器选项，失败不应阻断回放列表本身
   try {
+    // ★ 跨进程：preload/index.ts → main/ipc/register-database-ipc.ts
     memberOption.value = sortMembersByStatus(await window.mainAPI.getMemberTree())
   }
   catch (error) {

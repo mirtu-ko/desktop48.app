@@ -6,9 +6,12 @@ import Constants from '../../utils/constants'
 export type AppConfigKey = 'downloadDirectory' | 'ffmpegDirectory' | 'userAgent'
 
 /**
- * 应用配置的读写收口（消除 A-11 中 Setting.vue 直接散落 9+ 处 IPC 调用的问题）：
- * 三项配置（下载目录 / ffmpeg 目录 / User-Agent）的状态、持久化与目录选择流程都在这里，
- * Setting.vue 只负责模板接线
+ * 应用配置的读写收口：三项配置（下载目录 / ffmpeg 目录 / User-Agent）的状态、
+ * 持久化与目录选择流程都在这里，Setting.vue 只负责模板接线。
+ *
+ * ★ 跨进程：本文件的 getConfig / setConfig / selectDirectory / openPath /
+ * checkFfmpegBinaries 全部经 preload/index.ts 转到主进程
+ * （配置读写对端 main/ipc/register-database-ipc.ts，目录与文件操作对端 main/app.ts）。
  */
 export function useAppConfig() {
   // 下载目录 / ffmpeg目录 / User-Agent

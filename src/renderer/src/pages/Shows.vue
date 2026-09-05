@@ -89,19 +89,33 @@ const { onInfiniteScroll } = useLoadMore({
   scrollbarRef: showsScrollRef,
 })
 
+/** 首屏加载中：覆盖“拉第一页 → 补满首屏（含衔接历史公演）”的整段串行请求，
+ *  全页遮罩只呈现一次；避免多接口轮流置 loading 导致页面连续刷新多次 */
+const initialLoading = ref(false)
+
+/** 首次进入 / 刷新 / 切换团体共用的首屏加载序列 */
+async function loadFirstScreen() {
+  initialLoading.value = true
+  try {
+    await fetchShows()
+    showsScrollRef.value?.setScrollTop?.(0)
+    // 首屏数据太少（不足一屏）时不会触发 end-reached，主动补拉下一页直到填满或无更多
+    await onInfiniteScroll()
+  }
+  finally {
+    initialLoading.value = false
+  }
+}
+
 onMounted(async () => {
-  await fetchShows()
-  // 首屏数据太少（不足一屏）时不会触发 end-reached，主动补拉下一页直到填满或无更多
-  await onInfiniteScroll()
+  await loadFirstScreen()
 })
 
 /** 刷新/切换团体共用：重置两份列表的翻页游标后重新拉取，并回到列表顶部 */
 async function reload() {
   resetShows()
   resetHistory()
-  await fetchShows()
-  showsScrollRef.value?.setScrollTop?.(0)
-  await onInfiniteScroll()
+  await loadFirstScreen()
 }
 
 const refresh = reload
@@ -157,7 +171,7 @@ function openHistoryStream(show: OpenLive) {
 
 <template>
   <div
-    v-loading="loading || historyLoading"
+    v-loading="initialLoading"
     class="page-root"
   >
     <!-- 左上角浮动团体切换：不占行，内容滚过时呈现磨砂玻璃；双击当前分团刷新列表 -->
@@ -221,7 +235,7 @@ function openHistoryStream(show: OpenLive) {
           </template>
 
           <el-empty
-            v-if="!showList.length && !historyList.length && !loading && !historyLoading"
+            v-if="!showList.length && !historyList.length && !initialLoading && !loading && !historyLoading"
             class="page-empty"
             :image-size="120"
             description="暂无演出信息，换个团体看看吧"

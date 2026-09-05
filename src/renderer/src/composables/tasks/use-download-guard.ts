@@ -11,6 +11,7 @@ export function useDownloadGuard() {
 
   async function checkDownloadDirectory(): Promise<boolean> {
     try {
+      // ★ 跨进程：preload/index.ts → main/ipc/register-database-ipc.ts 的 'getConfig'
       const result = await window.mainAPI.getConfig('downloadDirectory')
       if (!result) {
         ElMessage({

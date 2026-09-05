@@ -15,6 +15,9 @@ function onFullscreenChange() {
 }
 
 onMounted(async () => {
+  // ★ 跨进程：本文件所有 window* 调用对端均为 main/app.ts。
+  // windowOnMaximizeChange 是订阅式通道（主进程主动回推），返回值是退订函数，
+  // 必须在 onUnmounted 调用，否则组件重挂载会累积监听器
   isMaximized.value = await window.mainAPI.windowIsMaximized()
   disposeChange = window.mainAPI.windowOnMaximizeChange((value) => {
     isMaximized.value = value

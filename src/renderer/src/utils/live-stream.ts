@@ -1,6 +1,7 @@
 /**
- * 直播播放纯函数集合：从 LivePlayer.vue 拆出（M1 重构）。
- * 全部无副作用——不碰 DOM / IPC / ElMessage，只做纯计算，可独立单测。
+ * 直播播放纯函数集合。
+ * 全部无副作用——不碰 DOM / IPC / ElMessage，只做纯计算。
+ * 对应单测见 test/live-stream.test.ts（测试即用法文档）。
  */
 
 export interface OpenLiveStream {

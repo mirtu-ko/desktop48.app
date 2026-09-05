@@ -43,10 +43,9 @@ export default class TaskBase {
     this._logTag = logTag
   }
 
-  /**
-   * 异步初始化，获取保存目录等
-   */
+  /** 异步初始化：从主进程配置读取保存目录（构造函数不能 await，故单独一步） */
   public async init() {
+    // ★ 跨进程：preload/index.ts → main/ipc/register-database-ipc.ts 的 'getConfig'
     this._saveDirectory = await window.mainAPI.getConfig('downloadDirectory', '')
   }
 
@@ -88,6 +87,7 @@ export default class TaskBase {
     if (!this._saveDirectory)
       throw new Error('保存目录为空')
 
+    // ★ 跨进程：路径拼接交给主进程，避免渲染层猜测平台分隔符（对端 main/app.ts）
     this._filePath = await window.mainAPI.pathJoin(this._saveDirectory, this._filename)
 
     // 先注册监听器，避免 ffmpeg 启动后立即发送的事件丢失。
@@ -170,6 +170,7 @@ export default class TaskBase {
       console.error('saveDirectory is not initialized')
       return
     }
+    // ★ 跨进程：preload/index.ts → main/app.ts 的 'openPath'（调用系统文件管理器）
     window.mainAPI.openPath(this._saveDirectory)
   }
 }

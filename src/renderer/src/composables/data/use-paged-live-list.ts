@@ -4,7 +4,7 @@ import { ref } from 'vue'
 import Tools from '../../utils/tools'
 import { usePagedList } from './use-paged-list'
 
-// 条目与分页响应的结构定义已收敛至 services/api-types.ts（M6），
+// 条目与分页响应的结构定义已收敛至 services/api-types.ts，
 // 这里保留历史命名的类型别名，既有导入不受影响
 export type PagedLive = LiveListItem
 export type PagedLiveResponse<T = LiveListItem> = LiveListContent<T>
@@ -32,6 +32,7 @@ export function usePagedLiveList<T extends PagedLive = PagedLive>({
 }: UsePagedLiveListOptions<T>) {
   const blockedMemberIds = ref<number[]>([])
   async function updateBlockedMemberIds() {
+    // ★ 跨进程：preload/index.ts → main/ipc/register-database-ipc.ts
     const blockedMembers = await window.mainAPI.getBlockedMembers()
     blockedMemberIds.value = blockedMembers.map(member => member.userId)
   }

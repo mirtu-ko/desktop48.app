@@ -11,14 +11,20 @@ import {
 } from '../../utils/live-stream'
 import Tools from '../../utils/tools'
 
-/** 直播详情形状见 services/api-types.ts（M6 起契约统一收敛到 api-types） */
+/** 直播详情形状统一在 services/api-types.ts 建模 */
 export type { LiveDetail }
 
 /**
- * 直播会话（从 LivePlayer.vue 拆出）：
- * 直播详情获取 + 本地 HTTP-FLV 会话生命周期（创建/停止/重启）。
- * 只管"拿地址、开会话"，不管播放器实例与重试节奏——
- * 播放器在 use-live-player，重试在 use-stream-retry，由组件编排。
+ * 直播会话：直播详情获取 + 本地 HTTP-FLV 会话生命周期（创建/停止/重启）。
+ *
+ * 只管「拿地址、开会话」，不管播放器实例与重试节奏：
+ * 播放器在 use-live-player，重试在 use-stream-retry，三者由 LivePlayer.vue 编排。
+ *
+ * 两个方向相反的「地址」不要搞混：
+ * - 入参 / LiveDetail.playStreamPath = rtmp://...      远程源，喂给主进程的 FFmpeg
+ * - 出参 localPlaybackUrl            = http://127.0.0.1 本地地址，喂给 mpegts 播放器
+ *
+ * 完整链路见 docs/播放链路.md
  */
 export function useLiveSession(options: {
   liveId: () => string
@@ -40,8 +46,10 @@ export function useLiveSession(options: {
   /** 会话启动（getOne 开始）时调用：组件在此复位重试计数与 loading 态 */
   onSessionStart: () => void
 }) {
-  const playStreamPath = ref('')
-  const streamId = ref('')
+  /** 本地 HTTP-FLV 播放地址（http://127.0.0.1:<port>/live/xxx.flv?t=&r=），播放器的唯一数据源 */
+  const localPlaybackUrl = ref('')
+  /** 当前已在主进程注册的会话标识（值即 liveId）；空串表示当前无会话 */
+  const activeSessionLiveId = ref('')
   /** 流重启序号：拼进播放地址，防止同 URL 复用旧连接 */
   const streamRestartToken = ref(0)
   const coverImage = ref('')
@@ -72,10 +80,15 @@ export function useLiveSession(options: {
       options.onOnlineNum(data.onlineNum)
   }
 
+  /**
+   * 取直播详情，把两个上游接口抹平成同一个 LiveDetail 形状，
+   * 后续代码不必再区分公演 / 个人直播。
+   * 返回值里的 playStreamPath 是**远程 rtmp 地址**（不是本地播放地址）。
+   */
   async function fetchLiveDetail(): Promise<LiveDetail> {
     if (options.source() === 'open') {
-      // 开放公演：getOpenLiveOne 返回 playStreams 数组，选高清（streamType 2），
-      // 没有用户信息，用标题兜底
+      // 开放公演：getOpenLiveOne 返回 playStreams 数组（多档清晰度），选高清（streamType 2）；
+      // 该接口没有主播信息，用副标题/标题兜底成 user.userName 以满足 LiveDetail 契约
       const data = await Apis.instance().openLive(options.liveId())
       const stream = pickPreferredStream(data.playStreams)
       return {
@@ -88,13 +101,15 @@ export function useLiveSession(options: {
     return await Apis.instance().live(options.liveId())
   }
 
+  /** 停掉当前会话并等待主进程确认（重建流之前调用，确保旧 FFmpeg 已退出） */
   async function stopCurrentLiveStream() {
-    const currentStreamId = streamId.value
-    if (!currentStreamId)
+    const currentLiveId = activeSessionLiveId.value
+    if (!currentLiveId)
       return
-    streamId.value = ''
+    activeSessionLiveId.value = ''
     try {
-      await window.mainAPI.stopLiveStream(currentStreamId)
+      // ★ 跨进程：preload/index.ts → main/stream.ts 的 'stopLiveStream' handler
+      await window.mainAPI.stopLiveStream(currentLiveId)
     }
     catch (err) {
       console.error('停止直播流失败:', err)
@@ -106,6 +121,9 @@ export function useLiveSession(options: {
     // 这条链路不经过 Apis.request，没有统一兜底弹窗
     let result
     try {
+      // ★ 跨进程：preload/index.ts → main/stream.ts 的 'createLiveStream' handler。
+      // 主进程只登记 { liveId → rtmpUrl } 并返回本地地址，此时 FFmpeg 尚未启动；
+      // 真正 spawn 发生在播放器 GET 这个地址时（见 main/http-server.ts）
       result = await window.mainAPI.createLiveStream(rtmpUrl, options.liveId())
     }
     catch (err: any) {
@@ -113,8 +131,10 @@ export function useLiveSession(options: {
       throw err
     }
 
+    // 等待期间组件已卸载 / 又发起了更新的一次重启：本次结果作废，顺手把刚登记的会话撤掉
     if (options.isDisposed.value || requestId !== activeStreamRequestId) {
       try {
+        // ★ 跨进程：preload/index.ts → main/stream.ts 的 'stopLiveStream' handler
         await window.mainAPI.stopLiveStream(result.liveId || options.liveId())
       }
       catch (err) {
@@ -123,12 +143,16 @@ export function useLiveSession(options: {
       return false
     }
 
-    streamId.value = result.liveId
-    playStreamPath.value = buildPlaybackUrl(result.url, streamRestartToken.value)
+    activeSessionLiveId.value = result.liveId
+    // 写入即触发 LivePlayer 里的 watch，由它重建 mpegts 播放器
+    localPlaybackUrl.value = buildPlaybackUrl(result.url, streamRestartToken.value)
     return true
   }
 
-  /** 首次进入 / 重试恢复：按最新 RTMP 地址重建本地 HTTP-FLV 会话 */
+  /**
+   * 首次进入 / 重试恢复：按最新 RTMP 地址重建本地 HTTP-FLV 会话。
+   * @param rtmpUrl 远程源地址（来自 LiveDetail.playStreamPath）
+   */
   async function restartLiveStream(rtmpUrl: string) {
     const requestId = ++activeStreamRequestId
     options.onBeforeRebuild()
@@ -139,7 +163,10 @@ export function useLiveSession(options: {
     return await startLiveStream(rtmpUrl, requestId)
   }
 
-  /** 会话入口：拿最新直播地址再开会话；失败视为直播下架 */
+  /**
+   * 会话入口：拉详情 → 同步界面 → 开本地转流会话。
+   * 详情都取不到通常意味着直播已下架，走 onUnavailable 关窗。
+   */
   async function getOne() {
     options.onSessionStart()
     try {
@@ -159,11 +186,13 @@ export function useLiveSession(options: {
 
   /** 重试耗尽 / 组件卸载时：停止当前流并清空会话 */
   function stopStreamNow() {
-    const currentStreamId = streamId.value
-    if (!currentStreamId)
+    const currentLiveId = activeSessionLiveId.value
+    if (!currentLiveId)
       return
-    streamId.value = ''
-    window.mainAPI.stopLiveStream(currentStreamId).catch((err) => {
+    activeSessionLiveId.value = ''
+    // ★ 跨进程：preload/index.ts → main/stream.ts 的 'stopLiveStream' handler。
+    // 卸载路径上不 await：调用方（onUnmounted）是同步的，失败只记日志
+    window.mainAPI.stopLiveStream(currentLiveId).catch((err) => {
       console.error('停止直播流失败:', err)
     })
   }
@@ -176,8 +205,8 @@ export function useLiveSession(options: {
   }
 
   return {
-    playStreamPath,
-    streamId,
+    localPlaybackUrl,
+    activeSessionLiveId,
     streamRestartToken,
     coverImage,
     realName,

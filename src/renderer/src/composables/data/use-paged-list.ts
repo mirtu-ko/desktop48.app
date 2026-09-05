@@ -22,7 +22,7 @@ export interface UsePagedListOptions<T> {
 }
 
 /**
- * 分页列表通用逻辑，抽取自 usePagedLiveList 与公演页的双列表实现：
+ * 分页列表通用逻辑（Lives / Reviews / Shows 三页共用）：
  * - 列表 / 游标 / loading / noMore 四件套
  * - 请求序号丢弃过期响应，避免刷新与滚动并发导致数据错乱
  * - 去重追加 + 触底加载（useLoadMore）
@@ -49,7 +49,7 @@ export function usePagedList<T>({
 
   /**
    * 分页加载入口，返回是否成功（供 useLoadMore 终止自动补拉递归）：
-   * 失败时不抛错（历史约定），以 false 返回
+   * 失败时不抛错，以 false 返回（调用方据此终止自动补拉，而不是靠 try/catch）
    */
   async function getList(): Promise<boolean> {
     const requestId = ++listRequestId

@@ -4,7 +4,7 @@ import { ref } from 'vue'
 import { nextRetryAttempt } from '../../utils/live-stream'
 
 /**
- * 直播断流重试状态机（从 LivePlayer.vue 拆出）：
+ * 直播断流重试状态机：
  * 统一重试节奏（定时器串行，避免并发重连），计满 maxRetries 次后
  * 走 onExhausted（提示直播结束 + 停流 + 关闭浮窗）。
  * 重试决策用纯函数 nextRetryAttempt，见 utils/live-stream.ts。
