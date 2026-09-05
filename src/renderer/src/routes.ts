@@ -1,9 +1,9 @@
-import Albums from './components/Albums.vue'
-import Downloads from './components/Downloads.vue'
-import Lives from './components/Lives.vue'
-import Members from './components/Members.vue'
-import Setting from './components/Setting.vue'
-import Shows from './components/Shows.vue'
+import Albums from './pages/Albums.vue'
+import Downloads from './pages/Downloads.vue'
+import Lives from './pages/Lives.vue'
+import Members from './pages/Members.vue'
+import Setting from './pages/Setting.vue'
+import Shows from './pages/Shows.vue'
 
 const routes: any[] = [
   {

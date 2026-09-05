@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { OpenLive } from '../services/apis'
 import { computed, onMounted, ref, watch } from 'vue'
-import FloatingRefreshDock from '../components/FloatingRefreshDock.vue'
-import FloatingTabBar from '../components/FloatingTabBar.vue'
-import ShowCard from '../components/ShowCard.vue'
+import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
+import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
+import ShowCard from '../components/ui/ShowCard.vue'
 import useLoadMore from '../composables/data/use-load-more'
 import usePagedList from '../composables/data/use-paged-list'
 import useFloatPlayers from '../composables/use-float-players'

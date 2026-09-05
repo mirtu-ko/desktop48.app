@@ -2,13 +2,13 @@
 import type { LiveListItem } from '../services/api-types'
 import { Film, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref } from 'vue'
-import LiveItem from '../components/LiveItem.vue'
+import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
+import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
+import LiveItem from '../components/ui/LiveItem.vue'
 import { enrichLiveItem, usePagedLiveList } from '../composables/data/use-paged-live-list'
 import useFloatPlayers from '../composables/use-float-players'
 import Apis from '../services/apis'
 import EventBus from '../services/event-bus'
-import FloatingRefreshDock from './FloatingRefreshDock.vue'
-import FloatingTabBar from './FloatingTabBar.vue'
 import Reviews from './Reviews.vue'
 
 // 画中画迷你窗：直播/回放/公演共用全局播放挂载点

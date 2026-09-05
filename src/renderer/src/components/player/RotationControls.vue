@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import MediaIcon from './MediaIcon.vue'
+import MediaIcon from '../ui/MediaIcon.vue'
 
 defineProps<{ angle: number }>()
 

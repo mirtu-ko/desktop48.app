@@ -2,13 +2,13 @@
 import { Download, Headset, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppDock from '../components/app/AppDock.vue'
+import FloatAudioBar from '../components/floats/FloatAudioBar.vue'
+import FloatPlayerHost from '../components/floats/FloatPlayerHost.vue'
 import { useMemberSync } from '../composables/data/use-member-sync'
 import useTasks from '../composables/tasks/use-tasks'
 import EventBus from '../services/event-bus'
 import Constants from '../utils/constants'
-import AppDock from './AppDock.vue'
-import FloatAudioBar from './FloatAudioBar.vue'
-import FloatPlayerHost from './FloatPlayerHost.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -29,7 +29,7 @@ const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Con
 const { recordTasks, downloadTasks } = useTasks()
 
 // Dock「下载」角标：正在下载中的任务数量
-const downloadingCount = computed(() => downloadTasks.value.filter(task => task.isRunning()).length + recordTasks.value.filter(task => task.isRunning()).length)
+const runningTaskCount = computed(() => downloadTasks.value.filter(task => task.isRunning()).length + recordTasks.value.filter(task => task.isRunning()).length)
 
 // 底部 Dock 菜单项（语义色统一取自 Constants.Theme；每项专属色用于激活/悬浮的图标渐变）
 const dockItems = computed(() => [
@@ -37,7 +37,7 @@ const dockItems = computed(() => [
   { index: Constants.Menu.Shows, label: '公演', icon: Microphone, color: Constants.Theme.SHOWS },
   { index: Constants.Menu.Albums, label: '专辑', icon: Headset, color: Constants.Theme.ALBUMS },
   { index: Constants.Menu.Members, label: '成员', icon: User, color: Constants.Theme.MEMBERS },
-  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: Constants.Theme.DOWNLOADS, badge: downloadingCount.value },
+  { index: Constants.Menu.DOWNLOADS, label: '下载', icon: Download, color: Constants.Theme.DOWNLOADS, badge: runningTaskCount.value },
   { index: Constants.Menu.SETTING, label: '设置', icon: Setting, color: Constants.Theme.SETTING },
 ])
 

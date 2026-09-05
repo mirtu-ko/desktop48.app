@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { FloatPlayerItem } from '../composables/use-float-players'
-import type { WindowSize } from '../utils/float-player-layout'
+import type { FloatPlayerItem } from '../../composables/use-float-players'
+import type { WindowSize } from '../../utils/float-player-layout'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
   BARRAGE_SIDEBAR_WIDTH,
@@ -18,10 +18,10 @@ import {
   SNAP_TOP,
   VIEWPORT_PADDING_BOTTOM,
   VIEWPORT_PADDING_X,
-} from '../utils/float-player-layout'
-import LivePlayer from './LivePlayer.vue'
-import MediaIcon from './MediaIcon.vue'
-import ReviewPlayer from './ReviewPlayer.vue'
+} from '../../utils/float-player-layout'
+import LivePlayer from '../player/LivePlayer.vue'
+import ReviewPlayer from '../player/ReviewPlayer.vue'
+import MediaIcon from '../ui/MediaIcon.vue'
 
 const props = defineProps<{
   item: FloatPlayerItem

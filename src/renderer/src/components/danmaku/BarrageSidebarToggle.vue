@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import MediaIcon from './MediaIcon.vue'
+import MediaIcon from '../ui/MediaIcon.vue'
 
 defineProps<{
   /** 弹幕侧栏当前是否展开，决定竖条上的文案与提示 */

@@ -1,4 +1,4 @@
-import type { BarrageListItem } from '../../components/Barrage.vue'
+import type { BarrageListItem } from '../../components/danmaku/Barrage.vue'
 import { ElMessage } from 'element-plus'
 import { ref, shallowRef } from 'vue'
 import Apis from '../../services/apis'

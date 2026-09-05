@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import AppTitleBar from './components/AppTitleBar.vue'
-import Index from './components/Index.vue'
-import Initialize from './components/Initialize.vue'
+import AppTitleBar from './components/app/AppTitleBar.vue'
+import Initialize from './components/app/Initialize.vue'
+import Index from './pages/Index.vue'
 
 const isInitialized = ref(false)
 

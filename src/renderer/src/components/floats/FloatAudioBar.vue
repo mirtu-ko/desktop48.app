@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import useAudioPlayer from '../composables/use-audio-player'
-import Tools from '../utils/tools'
-import MediaIcon from './MediaIcon.vue'
+import useAudioPlayer from '../../composables/use-audio-player'
+import Tools from '../../utils/tools'
+import MediaIcon from '../ui/MediaIcon.vue'
 
 const {
   playlist,

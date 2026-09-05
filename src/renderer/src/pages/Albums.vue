@@ -3,11 +3,11 @@ import type { AudioTrack } from '../composables/use-audio-player'
 import { Headset, Link, Plus, ShoppingCart, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
+import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
+import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
 import useAudioPlayer from '../composables/use-audio-player'
 import Apis from '../services/apis'
 import Tools from '../utils/tools'
-import FloatingRefreshDock from './FloatingRefreshDock.vue'
-import FloatingTabBar from './FloatingTabBar.vue'
 
 /** CDN JSON 中的歌曲条目 */
 interface AlbumSong {

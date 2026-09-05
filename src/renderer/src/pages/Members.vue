@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { MemberDetail } from './MemberDetailDrawer.vue'
+import type { MemberDetail } from '../components/ui/MemberDetailDrawer.vue'
 import { Hide, User, View } from '@element-plus/icons-vue'
 import { computed, onMounted, ref } from 'vue'
+import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
+import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
+import MemberDetailDrawer from '../components/ui/MemberDetailDrawer.vue'
 import { useBlockedMembers } from '../composables/data/use-blocked-members'
 import { useMemberSync } from '../composables/data/use-member-sync'
 import Constants from '../utils/constants'
 import Tools from '../utils/tools'
-import FloatingRefreshDock from './FloatingRefreshDock.vue'
-import FloatingTabBar from './FloatingTabBar.vue'
-import MemberDetailDrawer from './MemberDetailDrawer.vue'
 
 /** 成员树：分团 → 队伍 → 成员（getMemberTree 返回结构） */
 interface TeamNode {
