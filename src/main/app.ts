@@ -9,10 +9,16 @@ import icon from '../../resources/icon.png?asset'
 
 import { isAllowedUrl } from './allowed-hosts'
 import { Database } from './database'
-import { stopAllFfmpegTasks } from './ffmpeg-task' // 含下载/录制任务通道注册（side effect）
+import { stopAllFfmpegTasks } from './ffmpeg/ffmpeg-process'
+import { registerDatabaseIPC } from './ipc/register-database-ipc'
 import { closeLog, getLogPathForDisplay, log } from './logger'
+import './ffmpeg/register-ffmpeg-task' // 含下载/录制任务通道注册（side effect）
 import './stream' // 流媒体相关主进程注册
 import './http-server' // live中转服务器主进程注册
+
+// 数据库初始化与通道注册（database.ts 模块本身无副作用，单例在此显式拉起）
+Database.instance().init()
+registerDatabaseIPC()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

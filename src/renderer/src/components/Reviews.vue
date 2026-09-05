@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import LiveItem from '../components/LiveItem.vue'
+import { enrichLiveItem, usePagedLiveList } from '../composables/data/use-paged-live-list'
 import useFloatPlayers from '../composables/use-float-players'
-import { enrichLiveItem, usePagedLiveList } from '../composables/use-paged-live-list'
 import Apis from '../services/apis'
 import FloatingRefreshDock from './FloatingRefreshDock.vue'
 

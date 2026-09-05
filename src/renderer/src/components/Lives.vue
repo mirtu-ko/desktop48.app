@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import type { LiveListItem } from '../services/api-types'
 import { Film, VideoCamera } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref } from 'vue'
 import LiveItem from '../components/LiveItem.vue'
+import { enrichLiveItem, usePagedLiveList } from '../composables/data/use-paged-live-list'
 import useFloatPlayers from '../composables/use-float-players'
-import { enrichLiveItem, usePagedLiveList } from '../composables/use-paged-live-list'
 import Apis from '../services/apis'
 import EventBus from '../services/event-bus'
 import FloatingRefreshDock from './FloatingRefreshDock.vue'
@@ -59,19 +60,26 @@ const {
 } = usePagedLiveList({
   loadPage: next => Apis.instance().lives(next),
   // 封面/队伍Logo/日期/成员信息补全：与回放页共用 enrichLiveItem，成员查询失败逐条容错
-  processItem: (item: any) => enrichLiveItem(item, 'fallback'),
+  processItem: item => enrichLiveItem(item, 'fallback'),
   stopOnError: false,
 })
 
+/** enrichLiveItem 补全后的条目（cover/date/member 由 processItem 就地写入，渲染时必然就绪） */
+type EnrichedLiveItem = LiveListItem & {
+  cover: string[]
+  date: string
+  member: { teamName: string, teamColor: string } | null
+}
+
 // 点击卡片：以画中画迷你窗打开直播，可边看边继续浏览列表
-function play(item: any) {
+function play(item: LiveListItem) {
   openLive({
     liveId: item.liveId,
     nickname: item.userInfo.nickname,
-    title: item.title,
+    title: item.title ?? '',
     startTime: Number.parseInt(item.ctime),
-    liveType: item.liveType,
-    liveMode: item.liveMode,
+    liveType: item.liveType ?? 1,
+    liveMode: item.liveMode ?? 0,
   })
 }
 
@@ -119,7 +127,8 @@ onUnmounted(() => {
       >
         <div class="live-list">
           <div v-for="item in liveList" :key="item.liveId" class="live-item" @click="play(item)">
-            <LiveItem :item="item" />
+            <!-- enrichLiveItem 在 processItem 阶段已就地补全 cover/date/member，渲染时必然就绪 -->
+            <LiveItem :item="item as EnrichedLiveItem" />
           </div>
         </div>
         <div v-if="noMore" class="list-end">

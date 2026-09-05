@@ -2,7 +2,7 @@ import ElementPlus from 'element-plus'
 import { createApp } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import App from './App.vue'
-import { installTasks } from './composables/use-tasks'
+import { installTasks } from './composables/tasks/use-tasks'
 import routes from './routes'
 import Constants from './utils/constants'
 

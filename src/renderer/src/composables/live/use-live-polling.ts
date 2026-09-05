@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
-import Apis from '../services/apis'
-import { formatMediaTime } from '../utils/time-format'
+import Apis from '../../services/apis'
+import { formatMediaTime } from '../../utils/time-format'
 
 /**
  * 直播轮询（从 LivePlayer.vue 拆出）：
@@ -38,7 +38,7 @@ export function useLivePolling(options: {
     if (options.skipOnlineNum())
       return
     Apis.instance().live(options.liveId()).then((data) => {
-      onlineNum.value = data.onlineNum
+      onlineNum.value = data.onlineNum ?? 0
     }).catch((error: any) => {
       console.error(error)
     })

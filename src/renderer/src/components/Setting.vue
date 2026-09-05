@@ -1,25 +1,32 @@
 <script setup lang="ts">
 import { Connection, Cpu, Document, Folder, Hide } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { onMounted, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useBlockedMembers } from '../composables/use-blocked-members'
+import { useAppConfig } from '../composables/data/use-app-config'
+import { useBlockedMembers } from '../composables/data/use-blocked-members'
 import Constants from '../utils/constants'
 
-// 下载目录 / ffmpeg目录 / User-Agent
-const downloadDirectory = ref('')
-const ffmpegDirectory = ref('')
-const userAgent = ref('')
-
 const router = useRouter()
+
+// 配置三项（下载目录 / ffmpeg 目录 / User-Agent）的状态与读写收口在 use-app-config.ts
+const {
+  downloadDirectory,
+  ffmpegDirectory,
+  userAgent,
+  loadAppConfig,
+  setDownloadDirectory,
+  openDownloadDirectory,
+  setFfmpegDirectory,
+  openFfmpegDirectory,
+  setUserAgent,
+} = useAppConfig()
 
 /** 屏蔽名单：模块级共享状态，机制见 use-blocked-members.ts */
 const { blockedMembers, refreshBlockedMembers, unblockMember, clearBlockedMembers } = useBlockedMembers()
 
 onMounted(async () => {
-  downloadDirectory.value = await window.mainAPI.getConfig('downloadDirectory')
-  ffmpegDirectory.value = await window.mainAPI.getConfig('ffmpegDirectory', '')
-  userAgent.value = await window.mainAPI.getConfig('userAgent', Constants.DEFAULT_USER_AGENT)
+  await loadAppConfig()
   await refreshBlockedMembers()
 })
 
@@ -75,64 +82,6 @@ function linkHost(url: string) {
 /** logo 加载失败时隐藏图片，露出首字磁贴 */
 function hideLogo(event: Event) {
   (event.target as HTMLImageElement).style.display = 'none'
-}
-
-async function setDownloadDirectory() {
-  const dir = await window.mainAPI.selectDirectory()
-  if (dir) {
-    downloadDirectory.value = dir
-    await window.mainAPI.setConfig('downloadDirectory', downloadDirectory.value)
-    ElMessage({
-      message: '设置成功',
-      type: 'success',
-    })
-  }
-}
-
-async function openDownloadDirectory() {
-  window.mainAPI.openPath(downloadDirectory.value)
-}
-
-async function setFfmpegDirectory() {
-  const dir = await window.mainAPI.selectDirectory()
-  if (dir) {
-    try { // 校验 ffmpeg/ffplay 可执行文件存在
-      await window.mainAPI.checkFfmpegBinaries(dir)
-      ffmpegDirectory.value = dir
-      await window.mainAPI.setConfig('ffmpegDirectory', ffmpegDirectory.value)
-      ElMessage({
-        message: '设置成功',
-        type: 'success',
-      })
-    }
-    catch (e) {
-      console.error('[Setting] 设置ffmpeg目录失败:', e)
-      confirmFfmpegDir()
-    }
-  }
-}
-
-function confirmFfmpegDir() {
-  ElMessageBox.confirm('选择的目录下没有ffmpeg或ffplay', {
-    confirmButtonText: '重新选择',
-    cancelButtonText: '取消',
-  }).then(() => {
-    setFfmpegDirectory()
-  }).catch(() => {
-    // 用户取消操作
-  })
-}
-
-async function openFfmpegDirectory() {
-  window.mainAPI.openPath(ffmpegDirectory.value)
-}
-
-async function setUserAgent() {
-  await window.mainAPI.setConfig('userAgent', userAgent.value)
-  ElMessage({
-    message: '设置成功',
-    type: 'success',
-  })
 }
 </script>
 

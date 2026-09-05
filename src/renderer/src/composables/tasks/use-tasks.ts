@@ -1,10 +1,10 @@
 import type { Ref } from 'vue'
-import type { TaskChannelAdapter } from '../services/task-base'
-import type { TaskPayload, TaskSnapshot } from '../services/task-payload'
+import type { TaskChannelAdapter } from '../../services/task-base'
+import type { TaskPayload, TaskSnapshot } from '../../services/task-payload'
 import { ElMessage } from 'element-plus'
 import { reactive, ref } from 'vue'
-import { subscribe } from '../services/event-bus'
-import TaskBase from '../services/task-base'
+import { subscribe } from '../../services/event-bus'
+import TaskBase from '../../services/task-base'
 
 export type TaskKind = 'download' | 'record'
 

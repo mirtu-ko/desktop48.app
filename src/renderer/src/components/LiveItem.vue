@@ -13,13 +13,13 @@ interface UserInfo {
 }
 
 interface Item {
-  title: string
-  liveMode: number
-  liveType: number
+  title?: string
+  liveMode?: number
+  liveType?: number
   cover: string[]
   date: string
   userInfo: UserInfo
-  member: Member
+  member: Member | null
 }
 
 const props = defineProps<{ item: Item }>()

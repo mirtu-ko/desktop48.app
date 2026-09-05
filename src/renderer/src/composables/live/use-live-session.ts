@@ -1,31 +1,18 @@
 import type { Ref } from 'vue'
+import type { LiveDetail } from '../../services/api-types'
 import { ElMessage } from 'element-plus'
 import { ref } from 'vue'
-import Apis from '../services/apis'
+import Apis from '../../services/apis'
 import {
   buildPlaybackUrl,
   normalizeCarouselTime,
   pickPreferredStream,
   resolveCarouselImages,
-} from '../utils/live-stream'
-import Tools from '../utils/tools'
+} from '../../utils/live-stream'
+import Tools from '../../utils/tools'
 
-/** 直播详情（getLiveOne / getOpenLiveOne 归一化后的形状） */
-export interface LiveDetail {
-  playStreamPath: string
-  coverPath: string
-  user: {
-    userName: string
-    userAvatar: string
-  }
-  onlineNum?: number
-  liveId?: string
-  /** 电台轮播图（liveType !== 1 时接口返回） */
-  carousels?: {
-    carousels: string[]
-    carouselTime?: number | string
-  }
-}
+/** 直播详情形状见 services/api-types.ts（M6 起契约统一收敛到 api-types） */
+export type { LiveDetail }
 
 /**
  * 直播会话（从 LivePlayer.vue 拆出）：

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { MemberDetail } from './MemberDetailDrawer.vue'
 import { Hide, User, View } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
-import { useBlockedMembers } from '../composables/use-blocked-members'
-import Apis from '../services/apis'
+import { useBlockedMembers } from '../composables/data/use-blocked-members'
+import { useMemberSync } from '../composables/data/use-member-sync'
 import Constants from '../utils/constants'
 import Tools from '../utils/tools'
 import FloatingRefreshDock from './FloatingRefreshDock.vue'
@@ -159,22 +158,14 @@ async function fetchGroups() {
   }
 }
 
-/** 是否正在同步成员数据库 */
-const isSyncing = ref(false)
+/** 成员同步：loading 态与接口调用收口在 use-member-sync.ts（与首页的启动兜底共用一份逻辑） */
+const { isSyncing, syncMembers } = useMemberSync()
 
-/** 更新成员数据库：从接口同步最新名单，完成后刷新本页 */
-async function syncMembers() {
-  isSyncing.value = true
-  try {
-    await Apis.instance().syncInfo()
-    ElMessage({ message: `更新完毕！注意不要频繁更新～`, type: 'success' })
+/** 更新成员数据库：从接口同步最新名单，成功后刷新本页 */
+async function updateMembers() {
+  const ok = await syncMembers()
+  if (ok) {
     await fetchGroups()
-  }
-  catch (error) {
-    console.error('更新成员数据库失败:', error)
-  }
-  finally {
-    isSyncing.value = false
   }
 }
 </script>
@@ -287,7 +278,7 @@ async function syncMembers() {
     <FloatingRefreshDock
       :loading="isSyncing"
       title="更新成员数据库"
-      @refresh="syncMembers"
+      @refresh="updateMembers"
     >
       <span class="member-count">更新成员数据库</span>
     </FloatingRefreshDock>

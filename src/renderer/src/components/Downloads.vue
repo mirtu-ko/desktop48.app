@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { TaskKind } from '../composables/use-tasks'
+import type { TaskKind } from '../composables/tasks/use-tasks'
 import { Check, Download, Loading, VideoCamera } from '@element-plus/icons-vue'
 import { computed, onMounted } from 'vue'
-import useTasks from '../composables/use-tasks'
+import useTasks from '../composables/tasks/use-tasks'
 import Constants from '../utils/constants'
 
 // 任务状态由 useTasks 这个模块级单例持有：本页卸载后任务照常运行，

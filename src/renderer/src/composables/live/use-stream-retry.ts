@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ref } from 'vue'
-import { nextRetryAttempt } from '../utils/live-stream'
+import { nextRetryAttempt } from '../../utils/live-stream'
 
 /**
  * 直播断流重试状态机（从 LivePlayer.vue 拆出）：

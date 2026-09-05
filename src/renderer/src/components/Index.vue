@@ -2,8 +2,8 @@
 import { Download, Headset, Microphone, Setting, User, VideoCamera } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import useTasks from '../composables/use-tasks'
-import Apis from '../services/apis'
+import { useMemberSync } from '../composables/data/use-member-sync'
+import useTasks from '../composables/tasks/use-tasks'
 import EventBus from '../services/event-bus'
 import Constants from '../utils/constants'
 import AppDock from './AppDock.vue'
@@ -26,10 +26,10 @@ const pathToMenu = {
 const activeIndex = ref(pathToMenu[route.path as keyof typeof pathToMenu] || Constants.Menu.LIVES)
 
 // 任务状态由 useTasks 模块级单例持有，跨页面实时更新 Dock 角标
-const { downloadTasks } = useTasks()
+const { recordTasks, downloadTasks } = useTasks()
 
 // Dock「下载」角标：正在下载中的任务数量
-const downloadingCount = computed(() => downloadTasks.value.filter(task => task.isRunning()).length)
+const downloadingCount = computed(() => downloadTasks.value.filter(task => task.isRunning()).length + recordTasks.value.filter(task => task.isRunning()).length)
 
 // 底部 Dock 菜单项（语义色统一取自 Constants.Theme；每项专属色用于激活/悬浮的图标渐变）
 const dockItems = computed(() => [
@@ -56,15 +56,13 @@ watch(
 
 let changeMenuHandler: any
 
+// 启动兜底：数据库没有成员信息时自动同步一次（逻辑见 use-member-sync.ts）
+const { ensureMembers } = useMemberSync()
+
 onMounted(async () => {
   changeMenuHandler = changeMenu
   EventBus.on('change-selected-menu', changeMenuHandler)
-  // 当数据库没有成员信息时
-  if (!(await window.mainAPI.hasMembers?.())) {
-    console.log('[Index.vue]数据库没有成员信息, 同步成员信息')
-    await Apis.instance().syncInfo()
-    console.log('[Index.vue]数据库没有成员信息, 同步完成')
-  }
+  await ensureMembers()
 })
 
 onUnmounted(() => {

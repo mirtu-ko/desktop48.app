@@ -40,7 +40,7 @@ export interface mainAPI {
 
   // 团队与分组
   saveMemberData: (content: any) => Promise<any>
-  hasMembers: () => Promise<any>
+  hasMembers: () => Promise<boolean>
 
   // 数据库相关
   getMember: (userId: number) => Promise<any>

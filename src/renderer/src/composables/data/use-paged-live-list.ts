@@ -1,26 +1,13 @@
+import type { LiveListContent, LiveListItem } from '../../services/api-types'
 import type { UsePagedListOptions } from './use-paged-list'
 import { ref } from 'vue'
-import Tools from '../utils/tools'
+import Tools from '../../utils/tools'
 import { usePagedList } from './use-paged-list'
 
-/** 直播 / 回放列表条目的最小结构 */
-export interface PagedLive {
-  liveId: string
-  coverPath: string
-  ctime: string
-  userInfo: {
-    userId: string
-    nickname: string
-    teamLogo: string
-  }
-  [key: string]: any
-}
-
-/** 分页接口返回结构 */
-export interface PagedLiveResponse<T = PagedLive> {
-  next: string
-  liveList: T[]
-}
+// 条目与分页响应的结构定义已收敛至 services/api-types.ts（M6），
+// 这里保留历史命名的类型别名，既有导入不受影响
+export type PagedLive = LiveListItem
+export type PagedLiveResponse<T = LiveListItem> = LiveListContent<T>
 
 export interface UsePagedLiveListOptions<T> {
   /** 请求一页数据：返回 { next, liveList }；通过闭包可注入筛选参数 */

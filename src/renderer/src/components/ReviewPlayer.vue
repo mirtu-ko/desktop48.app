@@ -1,20 +1,19 @@
 <script setup lang="ts">
-import type { DanmakuSettings } from '../composables/use-danmaku-settings'
 import type { TaskPayload } from '../services/task-payload'
 import { ElMessage } from 'element-plus'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BarrageBox from '../components/BarrageBox.vue'
-import { useBarrageList } from '../composables/use-barrage-list'
-import { useDanmakuOverlay } from '../composables/use-danmaku-overlay'
-import { useDanmakuSettings } from '../composables/use-danmaku-settings'
-import { useDownloadGuard } from '../composables/use-download-guard'
-import { usePlaybackEngine } from '../composables/use-playback-engine'
-import { useSleepBlocker } from '../composables/use-sleep-blocker'
-import useTasks from '../composables/use-tasks'
-import { useVideoRotation } from '../composables/use-video-rotation'
+import { useMediaShortcuts } from '../composables/media/use-media-shortcuts'
+import { useSleepBlocker } from '../composables/media/use-sleep-blocker'
+import { useVideoRotation } from '../composables/media/use-video-rotation'
+import { useReviewDanmaku } from '../composables/review/use-review-danmaku'
+import { useReviewMedia } from '../composables/review/use-review-media'
+import { useDownloadGuard } from '../composables/tasks/use-download-guard'
+import useTasks from '../composables/tasks/use-tasks'
 
 import Apis from '../services/apis'
+import { normalizeCarouselTime, pickPreferredVodStream } from '../utils/live-stream'
 import Tools from '../utils/tools'
 import BarrageSidebarToggle from './BarrageSidebarToggle.vue'
 import DanmakuSettingsPopover from './DanmakuSettingsPopover.vue'
@@ -44,47 +43,14 @@ const number = ref(0)
 const nativeVideo = ref<HTMLVideoElement | null>(null)
 // 电台模式的 audio 元素由 RadioStage 挂载/卸载时经 @audio 事件回传
 const nativeAudio = ref<HTMLAudioElement | null>(null)
-const currentTime = ref(0)
 const carousels = ref<string[]>([])
 const carouselTime = ref(5000)
-const barrageUrl = ref('')
-// 是否有弹幕数据源：无弹幕时隐藏弹幕叠加层、右缘切换竖条与弹幕侧栏
-const hasBarrage = computed(() => !!barrageUrl.value)
 const realName = ref('')
 const userAvatar = ref('')
 const sidebarVisible = ref(true)
 
-// 侧栏实际占位（有弹幕数据且未收起）上报给浮窗：
-// 无弹幕或收起弹幕列表时，放大窗不预留侧栏宽，画面不留空白
-watch(
-  [hasBarrage, sidebarVisible],
-  ([has, visible]) => emit('sidebar', has && visible),
-  { immediate: true },
-)
-
-// 弹幕数据源与右侧列表游标（引擎见 composables/use-barrage-list.ts）
-const {
-  entries: barrageEntries,
-  items: barrageListItems,
-  loaded: barrageLoaded,
-  load: loadBarrages,
-  buildUpTo: buildListUpTo,
-  advanceTo: advanceListTo,
-  reset: resetBarrages,
-} = useBarrageList()
-
-// 弹幕显示设置（localStorage 持久化见 composables/use-danmaku-settings.ts）
-const {
-  settings,
-  load: loadDanmakuSettings,
-  save: saveDanmakuSettings,
-} = useDanmakuSettings()
-
-/** 设置弹层里改动的参数统一在这里落库 */
-function onDanmakuSettingsUpdate(patch: Partial<DanmakuSettings>) {
-  Object.assign(settings, patch)
-  saveDanmakuSettings()
-}
+const videoBoxRef = ref<HTMLElement | null>(null)
+const rootRef = ref<HTMLElement | null>(null)
 
 const router = useRouter()
 
@@ -95,14 +61,9 @@ function getActiveMediaElement() {
   return isRadio.value ? nativeAudio.value : nativeVideo.value
 }
 
-const videoBoxRef = ref<HTMLElement | null>(null)
-const rootRef = ref<HTMLElement | null>(null)
-
 // =========== 画面旋转 / 容器全屏 / 迷你控制条（与 LivePlayer 共用 useVideoRotation） ===========
 // 旋转作用于 video wrapper，弹幕叠加层与之同级、不参与旋转：
 // 弹幕的轨道/坐标体系基于容器宽高，保持横向滚动即可，旋转不影响弹幕任何逻辑。
-const mediaDuration = ref(0)
-
 const {
   rotationAngle,
   isVerticalRotation,
@@ -130,6 +91,81 @@ const {
   isRadio,
   onAspect: aspect => emit('aspect', aspect),
 })
+// =========== 画面旋转结束 ===========
+
+// 侧栏实际占位（有弹幕数据且未收起）上报给浮窗：
+// 无弹幕或收起弹幕列表时，放大窗不预留侧栏宽，画面不留空白
+const danmaku = useReviewDanmaku({
+  videoBoxRef,
+  getMedia: getActiveMediaElement,
+})
+const {
+  currentTime,
+  barrageUrl,
+  hasBarrage,
+  barrageEntries,
+  barrageListItems,
+  barrageLoaded,
+  danmakuOverlayItems,
+  setDanmakuNode,
+  settings,
+  seekBarragesTo,
+  onTimeUpdate: onDanmakuTimeUpdate,
+  ensureBarragesLoaded,
+  resetBarrageSource,
+  loadSettings,
+  toggleDanmaku,
+  updateSettings: onDanmakuSettingsUpdate,
+  startAnimation: startDanmakuAnimation,
+  stopAnimation: stopDanmakuAnimation,
+} = danmaku
+
+watch(
+  [hasBarrage, sidebarVisible],
+  ([has, visible]) => emit('sidebar', has && visible),
+  { immediate: true },
+)
+
+// 播放防休眠（use-sleep-blocker，与 LivePlayer 共用）
+const { acquire: acquireSleepBlocker, release: releaseSleepBlocker } = useSleepBlocker()
+
+// =========== 播放引擎接线（HLS/原生选择与三态在 use-review-media） ===========
+const {
+  mediaLoading,
+  mediaBuffering,
+  lastPlaybackError,
+  mediaDuration,
+  retryPlayback,
+  destroy: destroyPlayer,
+} = useReviewMedia({
+  playStreamPath,
+  getMediaElement: getActiveMediaElement,
+  getManagedElements: () => [nativeVideo.value, nativeAudio.value],
+  onTimeUpdate: onDanmakuTimeUpdate,
+  onSeeking: time => seekBarragesTo(time),
+  onMetadataLoaded: async () => {
+    // 记录源尺寸供旋转缩放计算，并按（可能旋转后的）画面比例上报浮窗
+    if (!isRadio.value)
+      updateVideoDimensions()
+    await ensureBarragesLoaded()
+  },
+  onPlaying: () => void acquireSleepBlocker(),
+  onIdle: releaseSleepBlocker,
+})
+
+// =========== 键盘策略（根节点焦点制，见 use-media-shortcuts） ===========
+const { onKeydown, onPointerDown } = useMediaShortcuts({
+  getRoot: () => rootRef.value,
+  getMedia: getActiveMediaElement,
+  actions: {
+    togglePlay,
+    toggleFullscreen,
+    toggleDanmaku,
+    rotateLeft,
+    rotateRight,
+    resetRotation,
+  },
+})
 
 // 迷你条拖进度：录播必须可 seek，弹幕游标由 onseeking 统一同步
 function onMiniSeek(value: number) {
@@ -139,80 +175,14 @@ function onMiniSeek(value: number) {
   mediaElement.currentTime = value
   currentTime.value = value
 }
-// =========== 画面旋转结束 ===========
-
-// =========== 视频弹幕叠加层（引擎已抽离至 composables/use-danmaku-overlay.ts） ===========
-const {
-  items: danmakuOverlayItems,
-  setNode: setDanmakuNode,
-  spawnUpTo: processOverlayDanmaku,
-  seekTo: seekOverlayTo,
-  clear: clearOverlay,
-  start: startDanmakuAnimation,
-  stop: stopDanmakuAnimation,
-} = useDanmakuOverlay({
-  videoBoxRef,
-  getMedia: getActiveMediaElement,
-  getEntries: () => barrageEntries.value,
-  settings,
-})
-
-// seek / 重播统一入口：叠加层游标二分定位，列表按“从头到当前”重建
-function seekBarragesTo(time: number) {
-  seekOverlayTo(time)
-  buildListUpTo(time)
-  currentTime.value = time
-}
-// =========== 视频弹幕叠加层结束 ===========
-
-// 播放防休眠（use-sleep-blocker，与 LivePlayer 共用）
-const { acquire: acquireSleepBlocker, release: releaseSleepBlocker } = useSleepBlocker()
-
-async function ensureBarragesLoaded() {
-  // 弹幕晚于播放到达时，按当前进度补齐列表与叠加层
-  if (await loadBarrages(barrageUrl.value))
-    seekBarragesTo(getActiveMediaElement()?.currentTime ?? 0)
-}
-
-// 播放引擎：HLS/原生选择与三态由 use-playback-engine 维护，这里只做业务接线
-const {
-  loading: mediaLoading,
-  buffering: mediaBuffering,
-  error: lastPlaybackError,
-  attach: attachPlaybackSource,
-  destroy: destroyPlayer,
-} = usePlaybackEngine({
-  getMediaElement: getActiveMediaElement,
-  getManagedElements: () => [nativeVideo.value, nativeAudio.value],
-  onTimeUpdate,
-  onSeeking: time => seekBarragesTo(time),
-  onMetadataLoaded: async (mediaElement) => {
-    // 记录源尺寸供旋转缩放计算，并按（可能旋转后的）画面比例上报浮窗
-    if (!isRadio.value)
-      updateVideoDimensions()
-    mediaDuration.value = mediaElement.duration || 0
-    await ensureBarragesLoaded()
-  },
-  onPlaying: () => void acquireSleepBlocker(),
-  onIdle: releaseSleepBlocker,
-})
-
-function retryPlayback() {
-  if (!playStreamPath.value)
-    return
-  attachPlaybackSource(playStreamPath.value)
-}
 
 async function getOne() {
   try {
     if (props.source === 'open') {
-      // 开放公演回放：getOpenLiveOne 返回 playStreams 数组（VOD m3u8），优先选超清（streamType 3），回落高清 2 与任意可用流，
+      // 开放公演回放：getOpenLiveOne 返回 playStreams 数组（VOD m3u8），优先选超清（streamType 3），
       // 详情里没有用户与在线人数信息，用公演标题与传入的队伍 logo 兜底
       const data = await Apis.instance().openLive(props.liveId)
-      const streams: Array<{ streamPath: string, streamType: number }> = data.playStreams || []
-      const stream = streams.find(s => s.streamType === 3 && s.streamPath)
-        || streams.find(s => s.streamType === 2 && s.streamPath)
-        || streams.find(s => s.streamPath)
+      const stream = pickPreferredVodStream(data.playStreams)
       if (!stream?.streamPath) {
         ElMessage({ message: '未获取到公演回放地址', type: 'error' })
         return
@@ -242,37 +212,28 @@ async function getOne() {
     }
 
     isRadio.value = data.liveType === 2
-    number.value = data.onlineNum
+    number.value = data.onlineNum ?? 0
     realName.value = data.user.userName
     userAvatar.value = Tools.sourceUrl(data.user.userAvatar)
     emit('avatar', userAvatar.value)
     carousels.value = isRadio.value && data.carousels?.carousels?.length
       ? data.carousels.carousels.map((carousel: string) => Tools.sourceUrl(carousel))
       : []
-    carouselTime.value = isRadio.value && data.carousels?.carouselTime
-      ? Number.parseInt(data.carousels.carouselTime)
+    carouselTime.value = isRadio.value
+      ? normalizeCarouselTime(data.carousels?.carouselTime)
       : 5000
 
     const barrageSourceChanged = barrageUrl.value !== nextBarrageUrl
     barrageUrl.value = nextBarrageUrl
     playStreamPath.value = nextPlayStreamPath
 
-    if (barrageSourceChanged) {
-      resetBarrages()
-      seekBarragesTo(0)
-    }
+    if (barrageSourceChanged)
+      resetBarrageSource()
   }
   catch (error: any) {
     console.error(error)
     ElMessage({ message: '获取录播信息失败', type: 'error' })
   }
-}
-
-// seek 由 onseeking 处理，这里只负责按进度投放弹幕
-function onTimeUpdate(newTime: number) {
-  currentTime.value = newTime
-  advanceListTo(newTime)
-  processOverlayDanmaku(newTime)
 }
 
 // 点击右侧弹幕即跳转到对应时间点
@@ -282,93 +243,6 @@ function seekTo(seconds: number) {
     return
   mediaElement.currentTime = Math.max(0, seconds)
   void mediaElement.play()
-}
-
-// 切换弹幕显隐：状态持久化到 localStorage，关闭时清空叠加层，重新打开不补灌历史弹幕
-function toggleDanmaku() {
-  // 无弹幕数据源时开关无意义，直接忽略（含快捷键 D）
-  if (!hasBarrage.value)
-    return
-  settings.enabled = !settings.enabled
-  if (!settings.enabled)
-    clearOverlay()
-  saveDanmakuSettings()
-}
-
-// 快捷键绑定在根节点而不是 window：回放页会以多标签形式同时存在多个实例，
-// 只有获得焦点的那个才应该响应按键。
-// 注：LivePlayer 走的是另一套「hover 检测」策略（无焦点概念），两边改动请互相参照。
-
-/** 点击播放器即把焦点收回根节点，让快捷键随即生效（点在按钮/输入上时保留其原生焦点） */
-function onPointerDown(event: PointerEvent) {
-  const target = event.target as HTMLElement | null
-  if (target?.closest('input, textarea, button, [contenteditable="true"]'))
-    return
-  rootRef.value?.focus({ preventScroll: true })
-}
-
-function onKeydown(event: KeyboardEvent) {
-  const target = event.target as HTMLElement | null
-  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
-    return
-
-  // 空格与方向键原生 controls 自身就会响应，焦点落在媒体元素或按钮上时必须交还给原生：
-  // 否则会出现 keydown 由本组件暂停、keyup 又被按钮的默认激活行为恢复播放的重复触发。
-  const nativeOwnsKey = event.key === ' ' || event.key.startsWith('Arrow')
-  const focusInNativeControl = target
-    && (target.tagName === 'VIDEO' || target.tagName === 'AUDIO' || target.tagName === 'BUTTON')
-  if (nativeOwnsKey && focusInNativeControl)
-    return
-
-  const mediaElement = getActiveMediaElement()
-  switch (event.key) {
-    // 空格/播放键与迷你条统一走 useVideoRotation 的 togglePlay（getMedia 即 getActiveMediaElement）
-    case ' ':
-      togglePlay()
-      break
-    case 'ArrowLeft':
-      if (mediaElement)
-        mediaElement.currentTime = Math.max(0, mediaElement.currentTime - 5)
-      break
-    case 'ArrowRight':
-      if (mediaElement)
-        mediaElement.currentTime = mediaElement.currentTime + 5
-      break
-    case 'ArrowUp':
-      if (mediaElement)
-        mediaElement.volume = Math.min(1, mediaElement.volume + 0.1)
-      break
-    case 'ArrowDown':
-      if (mediaElement)
-        mediaElement.volume = Math.max(0, mediaElement.volume - 0.1)
-      break
-    case 'd':
-    case 'D':
-      toggleDanmaku()
-      break
-    case 'f':
-    case 'F':
-      toggleFullscreen()
-      break
-    case 'r':
-    case 'R':
-      // 长按 repeat 只响应第一次，避免连续转圈
-      if (event.repeat)
-        return
-      if (event.shiftKey)
-        rotateLeft()
-      else
-        rotateRight()
-      break
-    case '0':
-      if (event.repeat)
-        return
-      resetRotation()
-      break
-    default:
-      return
-  }
-  event.preventDefault()
 }
 
 // 下载目录校验与 LivePlayer/ReviewPlayer 共用（use-download-guard）
@@ -408,23 +282,8 @@ function onDownloadClick() {
   ElMessage({ message: '已停止下载', type: 'info' })
 }
 
-// 组件卸载时该 watch 会随作用域自动停止，无需手动持有停止函数
-watch(
-  () => playStreamPath.value,
-  async (newPath) => {
-    if (!newPath)
-      return
-
-    // 电台录播会在 isRadio 切换后把 <video> 替换成 <audio>，
-    // 这里等一轮 DOM 更新，确保拿到正确的媒体节点再挂载播放源。
-    await nextTick()
-    attachPlaybackSource(newPath)
-  },
-  { flush: 'post' },
-)
-
 onMounted(async () => {
-  loadDanmakuSettings()
+  loadSettings()
   startDanmakuAnimation()
   rootRef.value?.focus()
 

@@ -4,8 +4,8 @@
  */
 
 export interface OpenLiveStream {
-  streamPath: string
-  streamType: number
+  streamPath?: string
+  streamType?: number
 }
 
 /**
@@ -15,6 +15,18 @@ export interface OpenLiveStream {
 export function pickPreferredStream(streams: OpenLiveStream[] | undefined): OpenLiveStream | null {
   const list = streams || []
   return list.find(s => s.streamType === 2 && s.streamPath)
+    || list.find(s => s.streamPath)
+    || null
+}
+
+/**
+ * 开放公演回放 VOD 流选择：优先超清（streamType 3），
+ * 回落高清（2）与第一条有地址的流；全空返回 null。
+ */
+export function pickPreferredVodStream(streams: OpenLiveStream[] | undefined): OpenLiveStream | null {
+  const list = streams || []
+  return list.find(s => s.streamType === 3 && s.streamPath)
+    || list.find(s => s.streamType === 2 && s.streamPath)
     || list.find(s => s.streamPath)
     || null
 }

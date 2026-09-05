@@ -1,27 +1,17 @@
+import type {
+  LiveDetail,
+  LiveListContent,
+  MusicAlbum,
+  OpenLive,
+  OpenLiveDetail,
+  SyncInfoContent,
+} from './api-types'
 import ApiUrls from './api-urls'
 import Request from './request'
 
-/** 开放公演关联的队伍信息 */
-export interface OpenLiveTeam {
-  teamId: number
-  groupId: number
-  teamName: string
-  teamColor?: string
-}
-
-/** 开放公演条目（getOpenLiveList 接口） */
-export interface OpenLive {
-  liveId: string
-  title: string
-  subTitle: string
-  coverPath: string
-  /** 1=未开始 2=进行中 4=已结束 */
-  status: number
-  /** 开演时间（毫秒时间戳） */
-  stime: string
-  /** 关联队伍，可能为空数组 */
-  teamList?: OpenLiveTeam[]
-}
+// 开放公演模型历史上从 apis.ts 导出（Shows.vue / ShowCard.vue 引用），
+// 定义已迁移至 api-types.ts，这里保留 re-export 兼容既有导入路径
+export type { OpenLive, OpenLiveTeam } from './api-types'
 
 export default class Apis {
   /** 单例入口 */
@@ -32,12 +22,12 @@ export default class Apis {
   private static apis: Apis = new Apis()
 
   /**
-   * 同步成员信息
+   * 同步成员信息：拉取并落库（database.json 的 starInfo/teamInfo/groupInfo）
    */
-  public async syncInfo(): Promise<any> {
+  public async syncInfo(): Promise<SyncInfoContent> {
     console.log('[apis.ts]开始更新成员信息')
     // 更新数据到数据库
-    const content = await this.request(ApiUrls.UPDATE_INFO_URL, {}, {})
+    const content = await this.request<SyncInfoContent>(ApiUrls.UPDATE_INFO_URL, {}, {})
     console.log('[apis.ts]更新成员信息', content)
     await window.mainAPI.saveMemberData(content)
     return content
@@ -47,7 +37,7 @@ export default class Apis {
    * 直播列表
    * @param next
    */
-  public lives(next: string = '0') {
+  public lives(next: string = '0'): Promise<LiveListContent> {
     const data = {
       next,
       loadMore: 'true',
@@ -73,7 +63,7 @@ export default class Apis {
     userId: string
     teamId: string
     groupId: string
-  }) {
+  }): Promise<LiveListContent> {
     const data = {
       next,
       loadMore: 'true',
@@ -87,23 +77,22 @@ export default class Apis {
   }
 
   /** 直播列表通用请求：参数原样透传（next 游标翻页 + 筛选） */
-  public list(data: any) {
-    return this.request(ApiUrls.LIVE_LIST_URL, data, {})
+  public list(data: object): Promise<LiveListContent> {
+    return this.request<LiveListContent>(ApiUrls.LIVE_LIST_URL, data, {})
   }
 
   /**
    * 直播|回放详情
    * @param liveId 直播|回放id
-   * @returns Promise
    */
-  public live(liveId: any): Promise<any> {
+  public live(liveId: string): Promise<LiveDetail> {
     const data = {
       type: 1,
       userId: '0',
       liveId,
     }
 
-    return this.request(ApiUrls.LIVE_ONE_URL, data, {})
+    return this.request<LiveDetail>(ApiUrls.LIVE_ONE_URL, data, {})
   }
 
   /**
@@ -111,26 +100,26 @@ export default class Apis {
    * @param liveId 开放公演的 snowflake liveId（来自 getOpenLiveList）
    * @returns content，其中 roomId 是 live.48.cn 体系里的数字 id
    */
-  public openLive(liveId: string): Promise<any> {
+  public openLive(liveId: string): Promise<OpenLiveDetail> {
     const data = {
       liveId,
     }
-    return this.request(ApiUrls.OPEN_LIVE_URL, data, {})
+    return this.request<OpenLiveDetail>(ApiUrls.OPEN_LIVE_URL, data, {})
   }
 
   /**
-   * 下载弹幕
+   * 下载弹幕：原文（LRC 格式文本），解析见 use-barrage-list / Tools.lyricsParse
    * @param barrageUrl 弹幕地址
    */
-  public barrage(barrageUrl: string): Promise<any> {
+  public barrage(barrageUrl: string): Promise<string> {
     return Request.get(barrageUrl)
   }
 
   /**
    * 音乐专辑列表（CDN 静态 JSON，tag：ep=EP / zj=专辑 / sg=单曲）
    */
-  public async musicAlbums(): Promise<any[]> {
-    let data: any = await Request.get(ApiUrls.MUSIC_LIST_URL)
+  public async musicAlbums(): Promise<MusicAlbum[]> {
+    let data: unknown = await Request.get(ApiUrls.MUSIC_LIST_URL)
     if (typeof data === 'string') {
       try {
         data = JSON.parse(data)
@@ -140,11 +129,29 @@ export default class Apis {
         throw new Error('[apis.ts]音乐专辑接口返回非JSON')
       }
     }
-    return data?.all || [...(data?.ep || []), ...(data?.zj || []), ...(data?.sg || [])]
+    const albumData = data as { all?: MusicAlbum[], ep?: MusicAlbum[], zj?: MusicAlbum[], sg?: MusicAlbum[] }
+    return albumData?.all || [...(albumData?.ep || []), ...(albumData?.zj || []), ...(albumData?.sg || [])]
   }
 
-  private async request(url: string, data: any, headers: any): Promise<any> {
-    // console.log('[apis.ts]request:', url, data)
+  /**
+   * 开放公演列表
+   * @param groupId 团体 id，取值见 Constants.GroupTabs，0=全部
+   * @param next 翻页游标，首页传 '0'
+   * @param record true=可回放的已结束公演，false=排期/进行中
+   */
+  public openLives(groupId: number = 0, next: string = '0', record: boolean = false): Promise<LiveListContent<OpenLive>> {
+    const data = {
+      groupId,
+      next,
+      debug: false,
+      record,
+    }
+    console.log('[apis.ts]openLives', data)
+    return this.request<LiveListContent<OpenLive>>(ApiUrls.OPEN_LIVE_LIST_URL, data, {})
+  }
+
+  /** 统一请求：解析 JSON 信封，成功返回 content，失败抛 message（M6 泛型化） */
+  private async request<T>(url: string, data: object, headers: Record<string, string>): Promise<T> {
     let responseBody = await Request.post(url, data, headers)
     if (typeof responseBody === 'string') {
       try {
@@ -155,30 +162,14 @@ export default class Apis {
         throw new Error(`[apis.ts]接口返回非JSON：${responseBody}`)
       }
     }
-    if (responseBody && responseBody.success) {
-      return responseBody.content
+    const envelope = responseBody as { success?: boolean, message?: string, content?: T }
+    if (envelope && envelope.success) {
+      return envelope.content as T
     }
     else {
-      const message = responseBody && responseBody.message ? responseBody.message : '接口无 success 字段'
+      const message = envelope && envelope.message ? envelope.message : '接口无 success 字段'
       console.log('[apis.ts]reject', message)
       throw new Error(message)
     }
-  }
-
-  /**
-   * 开放公演列表
-   * @param groupId 团体 id，取值见 Constants.GroupTabs，0=全部
-   * @param next 翻页游标，首页传 '0'
-   * @param record true=可回放的已结束公演，false=排期/进行中
-   */
-  public openLives(groupId: number = 0, next: string = '0', record: boolean = false) {
-    const data = {
-      groupId,
-      next,
-      debug: false,
-      record,
-    }
-    console.log('[apis.ts]openLives', data)
-    return this.request(ApiUrls.OPEN_LIVE_LIST_URL, data, {})
   }
 }

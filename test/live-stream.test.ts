@@ -4,6 +4,7 @@ import {
   nextRetryAttempt,
   normalizeCarouselTime,
   pickPreferredStream,
+  pickPreferredVodStream,
   resolveCarouselImages,
 } from '../src/renderer/src/utils/live-stream'
 
@@ -27,6 +28,29 @@ describe('pickPreferredStream（开放公演流选择）', () => {
   it('空列表 / undefined 返回 null', () => {
     expect(pickPreferredStream([])).toBeNull()
     expect(pickPreferredStream(undefined)).toBeNull()
+  })
+})
+
+describe('pickPreferredVodStream（开放公演回放流选择）', () => {
+  it('优先超清（streamType 3），回落高清（2）', () => {
+    const streams = [
+      { streamPath: '/hd.flv', streamType: 2 },
+      { streamPath: '/uhd.flv', streamType: 3 },
+    ]
+    expect(pickPreferredVodStream(streams)?.streamPath).toBe('/uhd.flv')
+    expect(pickPreferredVodStream([
+      { streamPath: '/hd.flv', streamType: 2 },
+      { streamPath: '/low.flv', streamType: 1 },
+    ])?.streamPath).toBe('/hd.flv')
+  })
+
+  it('只有无类型流时取第一条有地址的流', () => {
+    expect(pickPreferredVodStream([{ streamPath: '/any.flv', streamType: 0 }])?.streamPath).toBe('/any.flv')
+  })
+
+  it('全空返回 null', () => {
+    expect(pickPreferredVodStream([{ streamPath: '', streamType: 3 }])).toBeNull()
+    expect(pickPreferredVodStream(undefined)).toBeNull()
   })
 })
 
