@@ -6,6 +6,7 @@ import type {
   OpenLiveDetail,
   SyncInfoContent,
 } from './api-types'
+import { ElMessage } from 'element-plus'
 import ApiUrls from './api-urls'
 import Request from './request'
 
@@ -119,13 +120,21 @@ export default class Apis {
    * 音乐专辑列表（CDN 静态 JSON，tag：ep=EP / zj=专辑 / sg=单曲）
    */
   public async musicAlbums(): Promise<MusicAlbum[]> {
-    let data: unknown = await Request.get(ApiUrls.MUSIC_LIST_URL)
+    let data: unknown
+    try {
+      data = await Request.get(ApiUrls.MUSIC_LIST_URL)
+    }
+    catch (e: any) {
+      Apis.toastApiError(`获取专辑列表失败：${e?.message || '网络错误'}`)
+      throw e
+    }
     if (typeof data === 'string') {
       try {
         data = JSON.parse(data)
       }
       catch (e) {
         console.warn('[apis.ts]musicAlbums 响应不是 JSON', e)
+        Apis.toastApiError('专辑接口返回数据异常，请稍后重试')
         throw new Error('[apis.ts]音乐专辑接口返回非JSON')
       }
     }
@@ -150,15 +159,40 @@ export default class Apis {
     return this.request<LiveListContent<OpenLive>>(ApiUrls.OPEN_LIVE_LIST_URL, data, {})
   }
 
+  /**
+   * 统一错误提示（带 3 秒去重）：断流重试链路会连续失败多次，
+   * 同文案短时间重复弹出只会刷屏；调用方无需各自补 ElMessage。
+   */
+  private static lastToastText = ''
+  private static lastToastAt = 0
+
+  private static toastApiError(message: string): void {
+    const now = Date.now()
+    if (message === Apis.lastToastText && now - Apis.lastToastAt < 3000)
+      return
+    Apis.lastToastText = message
+    Apis.lastToastAt = now
+    ElMessage.error(message)
+  }
+
   /** 统一请求：解析 JSON 信封，成功返回 content，失败抛 message（M6 泛型化） */
   private async request<T>(url: string, data: object, headers: Record<string, string>): Promise<T> {
-    let responseBody = await Request.post(url, data, headers)
+    let responseBody: string
+    try {
+      responseBody = await Request.post(url, data, headers)
+    }
+    catch (e: any) {
+      // 网络层失败（超时/断网/主进程拒绝），调用方大多只静默 console，这里统一兜底提示
+      Apis.toastApiError(`网络请求失败：${e?.message || '未知错误'}`)
+      throw e
+    }
     if (typeof responseBody === 'string') {
       try {
         responseBody = JSON.parse(responseBody)
       }
       catch (e) {
         console.warn('[apis.ts]responseBody 不是 JSON', responseBody, e)
+        Apis.toastApiError('接口返回数据异常，请稍后重试')
         throw new Error(`[apis.ts]接口返回非JSON：${responseBody}`)
       }
     }
@@ -169,6 +203,7 @@ export default class Apis {
     else {
       const message = envelope && envelope.message ? envelope.message : '接口无 success 字段'
       console.log('[apis.ts]reject', message)
+      Apis.toastApiError(message)
       throw new Error(message)
     }
   }

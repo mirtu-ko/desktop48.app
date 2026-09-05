@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ElMessage } from 'element-plus'
 import { onMounted, ref, watch } from 'vue'
 import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
 import LiveItem from '../components/ui/LiveItem.vue'
@@ -71,7 +72,14 @@ function filterMethod(node: any, keyword: string) {
 
 // 初始化
 onMounted(async () => {
-  memberOption.value = sortMembersByStatus(await window.mainAPI.getMemberTree())
+  // 成员树仅用于筛选器选项，失败不应阻断回放列表本身
+  try {
+    memberOption.value = sortMembersByStatus(await window.mainAPI.getMemberTree())
+  }
+  catch (error) {
+    console.error('[Reviews.vue]获取成员树失败:', error)
+    ElMessage.error('成员筛选加载失败，请刷新页面重试')
+  }
   // 先应用预置筛选再拉列表，避免挂载时重复请求
   if (!applyPreset())
     refresh()

@@ -39,23 +39,31 @@ export function usePagedList<T>({
   const listNext = ref('0')
   const loading = ref(false)
   const noMore = ref(false)
+  /** 最近一次加载是否失败：useLoadMore 的“不足一屏自动补拉”据此终止，避免失败后无限重试 */
+  const loadFailed = ref(false)
 
   const disabled = computed(() => loading.value || noMore.value)
 
   // 列表请求序号，用于丢弃过期响应，避免刷新/滚动并发时数据错乱
   let listRequestId = 0
 
-  async function getList() {
+  /**
+   * 分页加载入口，返回是否成功（供 useLoadMore 终止自动补拉递归）：
+   * 失败时不抛错（历史约定），以 false 返回
+   */
+  async function getList(): Promise<boolean> {
     const requestId = ++listRequestId
     loading.value = true
+    loadFailed.value = false
     try {
       const page = await loadPage(listNext.value)
       if (requestId !== listRequestId)
-        return
+        return false
       if (!page || !Array.isArray(page.items)) {
         console.warn('[use-paged-list] 分页数据不是数组或无内容', page?.items)
+        loadFailed.value = true
         noMore.value = true
-        return
+        return false
       }
       if (page.next === '0' || page.items.length === 0)
         noMore.value = true
@@ -66,21 +74,24 @@ export function usePagedList<T>({
       if (filterItems)
         items = await filterItems(items)
       if (requestId !== listRequestId)
-        return
+        return false
       if (processItem)
         await Promise.all(items.map((item, index) => processItem(item, index)))
       if (requestId !== listRequestId)
-        return
+        return false
       // 兜底去重，避免接口分页边界返回重复项导致列表出现重复卡片
       const existedIds = new Set(list.value.map(item => itemKey(item)))
       list.value.push(...items.filter(item => !existedIds.has(itemKey(item))))
+      return true
     }
     catch (error) {
       if (requestId !== listRequestId)
-        return
+        return false
       console.info(error)
+      loadFailed.value = true
       if (stopOnError)
         noMore.value = true
+      return false
     }
     finally {
       loading.value = false
@@ -100,6 +111,7 @@ export function usePagedList<T>({
     list.value = []
     listNext.value = '0'
     noMore.value = false
+    loadFailed.value = false
   }
 
   /** 重置后拉取第一页 */
@@ -114,6 +126,8 @@ export function usePagedList<T>({
     loading,
     noMore,
     disabled,
+    /** 最近一次加载是否失败（供 useLoadMore 终止自动补拉；失败时 UI 也可据此显示重试入口） */
+    loadFailed,
     scrollbarRef,
     onInfiniteScroll,
     getList,

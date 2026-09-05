@@ -72,17 +72,18 @@ const disabled = computed(() =>
 const showsScrollRef = ref<any>(null)
 
 // 统一的触底加载：直播/回放/公演三页共用同一套交互逻辑。
-// 最近的公演翻完后无缝衔接历史公演，避免用户需要再滚一次触底
+// 最近的公演翻完后无缝衔接历史公演，避免用户需要再滚一次触底。
+// 返回 false 表示本轮加载失败：useLoadMore 据此终止“不足一屏自动补拉”，
+// 否则空列表 + 不足一屏会让补拉无限递归（网络错误时页面卡死刷错误提示的根因）
 const { onInfiniteScroll } = useLoadMore({
   load: async () => {
     if (!noMore.value) {
-      await fetchShows()
+      const ok = await fetchShows()
       if (noMore.value)
         await fetchHistoryShows()
+      return ok
     }
-    else {
-      await fetchHistoryShows()
-    }
+    return await fetchHistoryShows()
   },
   disabled,
   scrollbarRef: showsScrollRef,

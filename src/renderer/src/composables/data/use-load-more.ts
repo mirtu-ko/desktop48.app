@@ -2,8 +2,11 @@ import type { Ref } from 'vue'
 import { nextTick, ref } from 'vue'
 
 export interface UseLoadMoreOptions {
-  /** 触底加载回调：内部负责追加数据并维护 loading / noMore 状态 */
-  load: () => Promise<void> | void
+  /**
+   * 触底加载回调：内部负责追加数据并维护 loading / noMore 状态。
+   * 返回 false 表示本次加载失败（供自动补拉递归终止）；返回 void/true 视为成功
+   */
+  load: () => Promise<void | boolean> | void | boolean
   /** 是否禁用触底加载（加载中或已无更多数据时返回 true，拦截重复请求） */
   disabled: Ref<boolean> | (() => boolean)
   /** 绑定到 el-scrollbar 的 ref，用于读取滚动位置；不传时内部自动创建 */
@@ -26,6 +29,7 @@ export function useLoadMore({
   const isDisabled = (): boolean =>
     typeof disabled === 'function' ? disabled() : disabled.value
 
+  /** 补拉前的守卫：load 返回 false 表示本次加载失败，终止“不足一屏自动补拉”的递归 */
   async function onInfiniteScroll(): Promise<void> {
     if (isDisabled())
       return
@@ -35,10 +39,11 @@ export function useLoadMore({
       if (!nearBottom)
         return
     }
-    await load()
+    const ok = await load()
     // 首屏只有零星几条时内容不足一屏，滚动条都不出现，end-reached 永远不会触发；
-    // 这里在渲染完成后自动补齐下一页，直到填满视口或没有更多数据
-    if (!wrap || isDisabled())
+    // 这里在渲染完成后自动补齐下一页，直到填满视口或没有更多数据。
+    // 加载失败（ok===false）时必须终止：列表为空 → 内容永远不足一屏 → 无限递归
+    if (ok === false || !wrap || isDisabled())
       return
     await nextTick()
     if (wrap.scrollHeight <= wrap.clientHeight) {

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app, ipcMain } from 'electron'
 import { Database } from './database'
-import { serverHost, serverPort } from './http-server'
+import { assertLocalServerAvailable, serverHost, serverPort } from './http-server'
 import { error, log } from './logger'
 
 // 直播播放只在这里维护“会话”和“活跃转流进程”的状态。
@@ -151,6 +151,8 @@ export function createFlvStreamProcess(liveId: string) {
 
 // 渲染进程只需要知道“这个直播可从哪个本地地址播放”，不直接管理 FFmpeg 进程。
 ipcMain.handle('createLiveStream', async (_event, rtmpUrl: string, liveId: string) => {
+  // 端口耗尽时本地 HTTP 服务不存在，返回 URL 只会让播放器静默连接失败——显式拒绝并说明原因
+  assertLocalServerAvailable()
   const sessionId = getSafeLiveId(liveId)
   const existingSession = streamSessions.get(sessionId)
   const publicPath = getStreamRoute(liveId)

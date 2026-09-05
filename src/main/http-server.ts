@@ -8,6 +8,21 @@ export const serverPort = () => _serverPort
 // 只监听回环地址：本地流媒体服务无鉴权，绑定 0.0.0.0 会让局域网内任何设备都能拉走直播流。
 export const serverHost = '127.0.0.1'
 
+// 端口全部耗尽时置位。此后 createLiveStream 应显式拒绝，
+// 否则渲染进程会拿到一个指向死端口的播放地址，播放静默失败且无任何提示。
+let _serverPortExhausted = false
+
+// 监听端口区间：8080 起逐个向后退避，至 8090
+const minPort = 8080
+const maxPort = 8090
+
+/** 本地流媒体服务是否可用；端口耗尽时抛出用户可读的错误（经 IPC 回传渲染层弹窗） */
+export function assertLocalServerAvailable(): void {
+  if (_serverPortExhausted) {
+    throw new Error(`本地流媒体服务启动失败（端口 ${minPort}-${maxPort} 均被占用），请关闭占用端口的应用后重启本应用`)
+  }
+}
+
 const liveFlvPathRegex = /^\/live\/([^/]+)\.flv$/
 
 // 渲染进程的来源：生产环境从 file:// 加载（Origin 为 'null'），开发环境是 electron-vite 的 dev server。
@@ -141,10 +156,9 @@ const server = http.createServer((req, res) => {
   }
 })
 
-let port = 8080
-const maxPort = 8090
+let port = minPort
 
-// 上次退出的残留监听或外部程序可能占用端口，按 8080-8090 区间向后退避尝试。
+// 上次退出的残留监听或外部程序可能占用端口，按 minPort-maxPort 区间向后退避尝试。
 function tryListen() {
   server.listen(port, serverHost)
     .on('error', (err: any) => {
@@ -155,7 +169,8 @@ function tryListen() {
           tryListen()
         }
         else {
-          error('[http-server.ts] 无法找到可用端口')
+          _serverPortExhausted = true
+          error('[http-server.ts] 无法找到可用端口，直播播放将不可用')
         }
       }
       else {

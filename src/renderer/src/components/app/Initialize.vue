@@ -12,20 +12,27 @@ onMounted(() => {
 })
 
 async function init() {
-  if (!window.mainAPI || typeof window.mainAPI.getConfig !== 'function') {
-    initText.value = 'Electron API 未注入，无法获取平台信息'
-    console.error('window.mainAPI 未定义或 getConfig 方法不存在')
-    return
+  try {
+    if (!window.mainAPI || typeof window.mainAPI.getConfig !== 'function') {
+      initText.value = 'Electron API 未注入，无法获取平台信息'
+      console.error('window.mainAPI 未定义或 getConfig 方法不存在')
+      return
+    }
+    // 本地已保存过 ffmpeg 目录，说明环境已就绪，直接放行
+    const ffmpegDir = await window.mainAPI.getConfig('ffmpegDirectory', '')
+    if (ffmpegDir) {
+      console.log('[Initialize.vue]当前系统平台：', window.mainAPI.getPlatform())
+      emit('initialized')
+      return
+    }
+    // 只允许手动选择 ffmpeg 目录
+    initText.value = '请选择 ffmpeg 目录'
   }
-  // 本地已保存过 ffmpeg 目录，说明环境已就绪，直接放行
-  const ffmpegDir = await window.mainAPI.getConfig('ffmpegDirectory', '')
-  if (ffmpegDir) {
-    console.log('[Initialize.vue]当前系统平台：', window.mainAPI.getPlatform())
-    emit('initialized')
-    return
+  catch (error) {
+    // 配置读取走 IPC，数据库损坏等异常会让初始化中断，必须给用户可见的失败态
+    console.error('[Initialize.vue]初始化失败:', error)
+    initText.value = '初始化失败，请重启应用重试'
   }
-  // 只允许手动选择 ffmpeg 目录
-  initText.value = '请选择 ffmpeg 目录'
 }
 
 async function selectFfmpegDir() {

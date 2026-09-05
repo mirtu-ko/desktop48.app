@@ -101,6 +101,7 @@ async function fetchAlbums() {
   }
   catch (error) {
     console.error('[Albums.vue]获取专辑信息失败:', error)
+    // 失败原因已由 apis.musicAlbums 统一弹窗提示，这里不重复弹
   }
   finally {
     loading.value = false

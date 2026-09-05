@@ -104,7 +104,16 @@ export function useLiveSession(options: {
   }
 
   async function startLiveStream(rtmpUrl: string, requestId: number) {
-    const result = await window.mainAPI.createLiveStream(rtmpUrl, options.liveId())
+    // 主进程失败（如本地流媒体服务端口全部被占用）在这里显式提示：
+    // 这条链路不经过 Apis.request，没有统一兜底弹窗
+    let result
+    try {
+      result = await window.mainAPI.createLiveStream(rtmpUrl, options.liveId())
+    }
+    catch (err: any) {
+      ElMessage.error(err?.message || '创建直播流失败')
+      throw err
+    }
 
     if (options.isDisposed.value || requestId !== activeStreamRequestId) {
       try {
@@ -144,8 +153,8 @@ export function useLiveSession(options: {
     }
     catch (error: any) {
       console.error('getOne()', error)
-      // 详情都取不到通常意味着直播已下架
-      ElMessage.error('获取直播信息失败')
+      // 详情失败的原因已由 Apis.request 统一弹窗提示（不在这里重复弹）；
+      // 详情都取不到通常意味着直播已下架，走下架处理
       options.onUnavailable()
     }
   }

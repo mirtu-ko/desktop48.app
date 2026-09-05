@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MemberDetail } from '../components/ui/MemberDetailDrawer.vue'
 import { Hide, User, View } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import FloatingRefreshDock from '../components/ui/FloatingRefreshDock.vue'
 import FloatingTabBar from '../components/ui/FloatingTabBar.vue'
@@ -152,6 +153,7 @@ async function fetchGroups() {
   }
   catch (error) {
     console.error('获取成员信息失败:', error)
+    ElMessage.error('获取成员信息失败，请稍后重试')
   }
   finally {
     loading.value = false
