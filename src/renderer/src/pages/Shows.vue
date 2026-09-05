@@ -132,7 +132,7 @@ function isToday(stime: string): boolean {
 const todayShows = computed(() => showList.value.filter(show => isToday(show.stime)))
 const recentShows = computed(() => showList.value.filter(show => !isToday(show.stime)))
 
-/** 进行中的公演：以画中画迷你窗直接打开直播，无需再经顶部 tab 中转 */
+/** 进行中的公演：以画中画迷你窗直接打开直播，停留当前页继续浏览 */
 function openLiveStream(show: OpenLive) {
   if (show.status !== 2) {
     return
@@ -143,6 +143,8 @@ function openLiveStream(show: OpenLive) {
     title: show.subTitle || show.title,
     startTime: Number.parseInt(show.stime),
     source: 'open',
+    // 公演没有主播头像，用封面作窗口头像（与录播窗口一致）
+    avatar: show.coverPath,
     liveType: 1,
     liveMode: 0,
   })
@@ -156,6 +158,8 @@ function openHistoryStream(show: OpenLive) {
     title: show.subTitle || show.title,
     startTime: Number.parseInt(show.stime),
     source: 'open',
+    // 公演没有主播头像，用封面作窗口头像（与录播窗口一致）
+    avatar: show.coverPath,
     liveType: 1,
     liveMode: 0,
   })

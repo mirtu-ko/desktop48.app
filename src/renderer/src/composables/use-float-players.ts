@@ -11,7 +11,7 @@ export interface FloatPlayerPayload {
   liveMode?: number
   /** 数据源：user=用户直播(getLiveOne)，open=开放公演(getOpenLiveOne) */
   source?: string
-  /** open 模式下的顶部头像（队伍 logo，完整 URL） */
+  /** open 模式下的顶部头像（公演封面，完整 URL） */
   avatar?: string
 }
 

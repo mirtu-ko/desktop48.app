@@ -29,7 +29,7 @@ const props = defineProps({
   startTime: { type: Number, required: true },
   /** 数据源：user=用户直播回放(getLiveOne)，open=开放公演回放(getOpenLiveOne) */
   source: { type: String, default: 'user' },
-  /** open 模式下的顶部头像（队伍 logo，完整 URL） */
+  /** open 模式下的顶部头像（公演封面，完整 URL） */
   avatarUrl: { type: String, default: '' },
   /** 迷你窗紧凑模式：隐藏弹幕侧栏与对应头部按钮，适配画中画小窗口 */
   compact: { type: Boolean, default: false },

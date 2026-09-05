@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { app, ipcMain } from 'electron'
+import { isAllowedStreamUrl } from './allowed-hosts'
 import { Database } from './database'
 import { assertLocalServerAvailable, serverHost, serverPort } from './http-server'
 import { error, log } from './logger'
@@ -173,6 +174,9 @@ export function createFlvStreamProcess(liveId: string) {
 ipcMain.handle('createLiveStream', async (_event, rtmpUrl: string, liveId: string) => {
   // 端口耗尽时本地 HTTP 服务不存在，返回 URL 只会让播放器静默连接失败——显式拒绝并说明原因
   assertLocalServerAvailable()
+  // rtmpUrl 直接交给 ffmpeg 拉流，必须过白名单，否则渲染层被攻破即可诱导主进程连任意地址
+  if (!isAllowedStreamUrl(rtmpUrl))
+    throw new Error(`直播流地址不在允许范围内: ${rtmpUrl}`)
   const sessionId = getSafeLiveId(liveId)
   const existingSession = streamSessions.get(sessionId)
   const publicPath = getStreamRoute(liveId)

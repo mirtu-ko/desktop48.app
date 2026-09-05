@@ -1,4 +1,4 @@
-import type { MemberRecord, MemberTreeGroupNode } from './domain/member-tree'
+import type { GroupRecord, MemberRecord, MemberTreeGroupNode, TeamRecord } from './domain/member-tree'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
@@ -17,6 +17,30 @@ function assertConfigKey(key: string) {
     throw new Error('Invalid config key')
 }
 
+/** 应用配置：键即 CONFIG_KEYS 中的合法键（'all' 除外） */
+export interface AppConfig {
+  downloadDirectory?: string
+  ffmpegDirectory?: string
+  userAgent?: string
+}
+
+/** database.json 的落库结构：成员原始数据（API 同步）+ 屏蔽名单 + 应用配置 */
+export interface DatabaseShape {
+  /** 成员原始数据（starInfo/teamInfo/groupInfo 来自 update/group_team_star 接口，字段宽容处理） */
+  starInfo?: MemberRecord[]
+  teamInfo?: TeamRecord[]
+  groupInfo?: GroupRecord[]
+  /**
+   * 已屏蔽成员的 userId 列表（旧库可能残留 hiddenMemberIds，init() 时迁移）。
+   * 宽容 number|string：旧库存过字符串形式的 id（blocked-members 的纯函数按此设计）
+   */
+  blockedMemberIds?: Array<number | string>
+  config?: AppConfig
+  /** 兼容旧库残留字段（init() 清理）：迁移来源 / 已废弃的持久化树 */
+  hiddenMemberIds?: number[]
+  memberTree?: unknown
+}
+
 /**
  * lowdb 数据库门面：负责原子读写、config CRUD 与成员/屏蔽名单查询。
  *
@@ -31,13 +55,13 @@ function assertConfigKey(key: string) {
 class Database {
   /** 成员树：starInfo 的内存派生（不落盘），见 domain/member-tree.ts */
   public memberTree: MemberTreeGroupNode[] = []
-  public db: any
+  public db!: DatabaseShape
   public membersDB: MemberRecord[] | undefined
 
   private static database: Database | null = null
 
-  private adapter: SafeJSONFileSync<any>
-  private lowdb: LowSync<any>
+  private adapter: SafeJSONFileSync<DatabaseShape>
+  private lowdb: LowSync<DatabaseShape>
   private readonly dbPath: string
 
   constructor(dbPath?: string) {
@@ -79,7 +103,7 @@ class Database {
   }
 
   /** 保存 API 同步来的成员原始数据；清洗/派生只发生在内存里（建树），落盘的只有原始内容 */
-  public saveMemberData(content: any) {
+  public saveMemberData(content: Partial<Pick<DatabaseShape, 'starInfo' | 'teamInfo' | 'groupInfo'>>) {
     log('[database.ts] save-member-data 开始写入:', content.starInfo?.length, content.teamInfo?.length, content.groupInfo?.length)
     if (content.starInfo)
       this.db.starInfo = content.starInfo
@@ -100,7 +124,7 @@ class Database {
   }
 
   public getMember(userId: number) {
-    return this.db.starInfo.find((m: MemberRecord) => Number(m.userId) === Number(userId))
+    return this.db.starInfo?.find(m => Number(m.userId) === Number(userId))
   }
 
   public getBlockedMembers() {
@@ -109,7 +133,7 @@ class Database {
       this.db.blockedMemberIds = []
       this.lowdb.write()
     }
-    return resolveBlockedMembers(this.db.blockedMemberIds, this.db.starInfo)
+    return resolveBlockedMembers(this.db.blockedMemberIds, this.db.starInfo ?? [])
   }
 
   public setBlockedMembers(ids: number[]) {

@@ -2,6 +2,7 @@ import type { IpcMainInvokeEvent } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { ipcMain } from 'electron'
+import { isAllowedStreamUrl } from '../allowed-hosts'
 import { Database } from '../database'
 import { log, warn } from '../logger'
 import { FfmpegProcess, hasFfmpegSlot, MAX_CONCURRENT_FFMPEG_TASKS, resolveFfmpegBinary } from './ffmpeg-process'
@@ -36,6 +37,9 @@ function registerFfmpegTask(config: FfmpegTaskConfig): void {
   })
 
   ipcMain.handle(`${channelPrefix}Start`, async (event: IpcMainInvokeEvent, url: string, filename: string, liveId: string) => {
+    // 输入地址白名单：url 直接交给 ffmpeg（-i），不经校验会形成 netRequest 之外的安全旁路
+    if (!isAllowedStreamUrl(url))
+      throw new Error(`任务源地址不在允许范围内: ${url}`)
     // 保存目录与 ffmpeg 二进制校验
     const saveDir: string = Database.instance().getConfig('downloadDirectory', '') as string
     if (!fs.existsSync(saveDir))

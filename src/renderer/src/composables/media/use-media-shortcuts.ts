@@ -1,8 +1,12 @@
 /**
- * 录播页键盘策略（M2 从 ReviewPlayer.vue 拆出）：
- * 绑定在根节点而不是 window——回放页会以多标签形式同时存在多个实例，
- * 只有获得焦点的那个才应该响应按键。
- * 注：LivePlayer 走的是另一套「hover 检测」策略（无焦点概念），两边改动请互相参照。
+ * 媒体播放器键盘快捷键（ReviewPlayer.vue 拆出）：
+ * 按键→动作的映射与防误触规则（输入框过滤 / 原生控件交还 / 长按去抖）在此单源维护。
+ *
+ * 两种触发策略，由宿主按场景选择：
+ * - 焦点制（ReviewPlayer）：绑定在根节点，持有焦点才响应——回放页多实例并存时互不干扰
+ * - 悬浮制（LivePlayer）：hover 检测 + window 监听——直播浮窗无焦点概念，
+ *   同屏多个浮窗只有鼠标所在那个响应
+ * 两边共用同一份按键分派（dispatchMediaShortcut），改键位只需改这里。
  */
 export interface MediaShortcutActions {
   togglePlay: () => void
@@ -12,6 +16,95 @@ export interface MediaShortcutActions {
   rotateLeft: () => void
   rotateRight: () => void
   resetRotation: () => void
+}
+
+/**
+ * 按键分派（纯逻辑）：识别并执行快捷键动作。
+ * 返回 true 表示已消费（调用方应 preventDefault），false 表示不认识/不应处理。
+ * 直播场景仅需要旋转族快捷键（seek/音量对直播流无意义），通过 actions 传 partial 即可。
+ */
+export function dispatchMediaShortcut(
+  event: KeyboardEvent,
+  actions: Partial<MediaShortcutActions>,
+  mediaElement: HTMLMediaElement | null,
+): boolean {
+  const target = event.target as HTMLElement | null
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
+    return false
+
+  // 空格与方向键原生 controls 自身就会响应，焦点落在媒体元素或按钮上时必须交还给原生：
+  // 否则会出现 keydown 由本组件暂停、keyup 又被按钮的默认激活行为恢复播放的重复触发。
+  const nativeOwnsKey = event.key === ' ' || event.key.startsWith('Arrow')
+  const focusInNativeControl = target
+    && (target.tagName === 'VIDEO' || target.tagName === 'AUDIO' || target.tagName === 'BUTTON')
+  if (nativeOwnsKey && focusInNativeControl)
+    return false
+
+  switch (event.key) {
+    // 空格/播放键与迷你条统一走宿主的 togglePlay
+    case ' ':
+      if (actions.togglePlay)
+        actions.togglePlay()
+      else
+        return false
+      break
+    case 'ArrowLeft':
+      if (mediaElement)
+        mediaElement.currentTime = Math.max(0, mediaElement.currentTime - 5)
+      else
+        return false
+      break
+    case 'ArrowRight':
+      if (mediaElement)
+        mediaElement.currentTime = mediaElement.currentTime + 5
+      else
+        return false
+      break
+    case 'ArrowUp':
+      if (mediaElement)
+        mediaElement.volume = Math.min(1, mediaElement.volume + 0.1)
+      else
+        return false
+      break
+    case 'ArrowDown':
+      if (mediaElement)
+        mediaElement.volume = Math.max(0, mediaElement.volume - 0.1)
+      else
+        return false
+      break
+    case 'd':
+    case 'D':
+      if (actions.toggleDanmaku)
+        actions.toggleDanmaku()
+      else
+        return false
+      break
+    case 'f':
+    case 'F':
+      if (actions.toggleFullscreen)
+        actions.toggleFullscreen()
+      else
+        return false
+      break
+    case 'r':
+    case 'R':
+      // 长按 repeat 只响应第一次，避免连续转圈
+      if (event.repeat)
+        return false
+      if (event.shiftKey)
+        actions.rotateLeft?.()
+      else
+        actions.rotateRight?.()
+      break
+    case '0':
+      if (event.repeat)
+        return false
+      actions.resetRotation?.()
+      break
+    default:
+      return false
+  }
+  return true
 }
 
 export function useMediaShortcuts(options: {
@@ -30,68 +123,9 @@ export function useMediaShortcuts(options: {
   }
 
   function onKeydown(event: KeyboardEvent) {
-    const target = event.target as HTMLElement | null
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
-      return
-
-    // 空格与方向键原生 controls 自身就会响应，焦点落在媒体元素或按钮上时必须交还给原生：
-    // 否则会出现 keydown 由本组件暂停、keyup 又被按钮的默认激活行为恢复播放的重复触发。
-    const nativeOwnsKey = event.key === ' ' || event.key.startsWith('Arrow')
-    const focusInNativeControl = target
-      && (target.tagName === 'VIDEO' || target.tagName === 'AUDIO' || target.tagName === 'BUTTON')
-    if (nativeOwnsKey && focusInNativeControl)
-      return
-
-    const mediaElement = options.getMedia()
-    const { actions } = options
-    switch (event.key) {
-      // 空格/播放键与迷你条统一走宿主的 togglePlay
-      case ' ':
-        actions.togglePlay()
-        break
-      case 'ArrowLeft':
-        if (mediaElement)
-          mediaElement.currentTime = Math.max(0, mediaElement.currentTime - 5)
-        break
-      case 'ArrowRight':
-        if (mediaElement)
-          mediaElement.currentTime = mediaElement.currentTime + 5
-        break
-      case 'ArrowUp':
-        if (mediaElement)
-          mediaElement.volume = Math.min(1, mediaElement.volume + 0.1)
-        break
-      case 'ArrowDown':
-        if (mediaElement)
-          mediaElement.volume = Math.max(0, mediaElement.volume - 0.1)
-        break
-      case 'd':
-      case 'D':
-        actions.toggleDanmaku?.()
-        break
-      case 'f':
-      case 'F':
-        actions.toggleFullscreen()
-        break
-      case 'r':
-      case 'R':
-        // 长按 repeat 只响应第一次，避免连续转圈
-        if (event.repeat)
-          return
-        if (event.shiftKey)
-          actions.rotateLeft()
-        else
-          actions.rotateRight()
-        break
-      case '0':
-        if (event.repeat)
-          return
-        actions.resetRotation()
-        break
-      default:
-        return
-    }
-    event.preventDefault()
+    const consumed = dispatchMediaShortcut(event, options.actions, options.getMedia())
+    if (consumed)
+      event.preventDefault()
   }
 
   return { onKeydown, onPointerDown }

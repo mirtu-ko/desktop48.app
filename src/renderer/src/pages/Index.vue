@@ -54,13 +54,13 @@ watch(
   },
 )
 
-let changeMenuHandler: any
+/** EventBus 'change-selected-menu' 的处理器（menu 字符串，见 event-bus.ts Events 登记） */
+const changeMenuHandler: (menu: string) => void = changeMenu
 
 // 启动兜底：数据库没有成员信息时自动同步一次（逻辑见 use-member-sync.ts）
 const { ensureMembers } = useMemberSync()
 
 onMounted(async () => {
-  changeMenuHandler = changeMenu
   EventBus.on('change-selected-menu', changeMenuHandler)
   await ensureMembers()
 })

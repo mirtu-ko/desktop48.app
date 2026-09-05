@@ -29,7 +29,7 @@ export interface MemberDetail {
   fullPhoto2?: string
   fullPhoto3?: string
   fullPhoto4?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 const props = defineProps<{ member: MemberDetail | null, blocked?: boolean }>()

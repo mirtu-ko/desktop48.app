@@ -24,7 +24,7 @@ export function useLiveSession(options: {
   liveId: () => string
   /** 数据源：user=用户直播(getLiveOne)，open=开放公演(getOpenLiveOne) */
   source: () => string
-  /** open 模式下的顶部头像（队伍 logo，完整 URL） */
+  /** open 模式下的顶部头像（公演封面，完整 URL） */
   avatarUrl: () => string
   isRadio: () => boolean
   /** 卸载标记：置位后一切异步回包直接丢弃 */
@@ -65,10 +65,8 @@ export function useLiveSession(options: {
     )
     carouselTime.value = normalizeCarouselTime(data.carousels?.carouselTime)
     realName.value = data.user.userName
-    // open 模式优先用传入的队伍 logo 作为顶部头像
-    userAvatar.value = options.source() === 'open' && options.avatarUrl()
-      ? options.avatarUrl()
-      : Tools.sourceUrl(data.user.userAvatar)
+    // 头像：优先调用方传入（open 公演为封面），否则取详情的主播头像；open 模式无在线人数
+    userAvatar.value = options.avatarUrl() || Tools.sourceUrl(data.user.userAvatar)
     options.onAvatar(userAvatar.value)
     if (typeof data.onlineNum === 'number')
       options.onOnlineNum(data.onlineNum)

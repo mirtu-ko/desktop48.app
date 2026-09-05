@@ -6,6 +6,7 @@ import { useLivePlayer } from '../../composables/live/use-live-player'
 import { useLivePolling } from '../../composables/live/use-live-polling'
 import { useLiveSession } from '../../composables/live/use-live-session'
 import { useStreamRetry } from '../../composables/live/use-stream-retry'
+import { dispatchMediaShortcut } from '../../composables/media/use-media-shortcuts'
 import { useSleepBlocker } from '../../composables/media/use-sleep-blocker'
 import { useVideoRotation } from '../../composables/media/use-video-rotation'
 import { useDownloadGuard } from '../../composables/tasks/use-download-guard'
@@ -28,7 +29,7 @@ const props = defineProps({
   liveMode: { type: Number, required: true },
   /** 数据源：user=用户直播(getLiveOne)，open=开放公演(getOpenLiveOne) */
   source: { type: String, default: 'user' },
-  /** open 模式下的顶部头像（队伍 logo，完整 URL） */
+  /** open 模式下的顶部头像（公演封面，完整 URL） */
   avatarUrl: { type: String, default: '' },
   /** 迷你窗紧凑模式：隐藏次要信息，适配小尺寸画中画窗口 */
   compact: { type: Boolean, default: false },
@@ -42,7 +43,7 @@ const nativeAudio = ref<HTMLAudioElement | null>(null)
 const videoBoxRef = ref<HTMLElement | null>(null)
 const mediaLoading = ref(true)
 // 鼠标悬浮才响应快捷键：同屏可能有多个浮窗播放器，否则一次按键会把它们全部转一遍。
-// 注：ReviewPlayer 走的是另一套「根节点焦点 keydown」策略，两边改动请互相参照。
+// 触发策略与 ReviewPlayer 不同（它走根节点焦点制），但按键分派共用 use-media-shortcuts。
 const hovered = ref(false)
 // 卸载标记：置位后所有在途异步回包直接丢弃
 const isManuallyUnmounted = ref(false)
@@ -220,25 +221,19 @@ function onRecordClick() {
   ElMessage({ message: '已结束录制', type: 'info' })
 }
 
-// ── 键盘快捷键（仅视频模式、悬浮时响应） ─────────────────────────
+// ── 键盘快捷键（悬浮制：仅视频模式、鼠标悬浮时响应） ─────────────────────────
+// 按键分派与 ReviewPlayer 共用 dispatchMediaShortcut（键位单源）；
+// 直播场景只接旋转族快捷键（seek/音量对直播流无意义，不传对应 action 即不响应）
 function onKeyDown(event: KeyboardEvent) {
-  if (isRadio.value || !hovered.value || event.repeat || event.ctrlKey || event.metaKey || event.altKey)
+  if (isRadio.value || !hovered.value || event.ctrlKey || event.metaKey || event.altKey)
     return
-  const target = event.target as HTMLElement | null
-  if (target?.closest('input, textarea, [contenteditable="true"]'))
-    return
-  if (event.key === 'r' || event.key === 'R') {
+  const consumed = dispatchMediaShortcut(event, {
+    rotateLeft,
+    rotateRight,
+    resetRotation,
+  }, null)
+  if (consumed)
     event.preventDefault()
-    if (event.shiftKey)
-      rotateLeft()
-    else
-      rotateRight()
-    return
-  }
-  if (event.key === '0') {
-    event.preventDefault()
-    resetRotation()
-  }
 }
 
 /** 挂载播放器；环境不支持 HTTP-FLV 时统一在此提示 */

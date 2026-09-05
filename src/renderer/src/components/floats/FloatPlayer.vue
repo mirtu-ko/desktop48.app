@@ -405,7 +405,7 @@ onUnmounted(() => {
   height: 22px;
   border-radius: 50%;
   flex-shrink: 0;
-  object-fit: contain;
+  object-fit: cover;
   border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
 }
 
